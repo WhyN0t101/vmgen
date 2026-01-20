@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: vmgen-postgres
+    environment:
+      POSTGRES_DB: vmgen
+      POSTGRES_USER: vmgen
+      POSTGRES_PASSWORD: vmgen
+    ports:
+      - "5432:5432"
+    volumes:
+      - vmgen_pgdata:/var/lib/postgresql/data
+    restart: "no"
+
+volumes:
+  vmgen_pgdata:
