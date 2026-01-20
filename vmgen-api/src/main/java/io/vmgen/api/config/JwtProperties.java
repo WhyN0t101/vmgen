@@ -1,9 +1,13 @@
 package io.vmgen.api.config;
 
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+@Setter
+@Getter
 @Component
 @ConfigurationProperties(prefix = "vmgen.jwt")
 public class JwtProperties {
@@ -29,37 +33,6 @@ public class JwtProperties {
         }
     }
 
-    public String getSecret() {
-        return secret;
-    }
-
-    public void setSecret(String secret) {
-        this.secret = secret;
-    }
-
-    public String getIssuer() {
-        return issuer;
-    }
-
-    public void setIssuer(String issuer) {
-        this.issuer = issuer;
-    }
-
-    public long getUserTtlSeconds() {
-        return userTtlSeconds;
-    }
-
-    public void setUserTtlSeconds(long userTtlSeconds) {
-        this.userTtlSeconds = userTtlSeconds;
-    }
-
-    public long getAdminTtlSeconds() {
-        return adminTtlSeconds;
-    }
-
-    public void setAdminTtlSeconds(long adminTtlSeconds) {
-        this.adminTtlSeconds = adminTtlSeconds;
-    }
 }
 
 

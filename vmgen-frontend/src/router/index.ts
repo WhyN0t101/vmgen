@@ -10,6 +10,16 @@ const router = createRouter({
       component: () => import('@/views/HomePage.vue'),
     },
     {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginPage.vue'),
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/RegisterPage.vue'),
+    },
+    {
       path: '/generate',
       name: 'generate',
       component: () => import('@/views/GeneratePage.vue'),
@@ -35,9 +45,8 @@ router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    // For now, allow access (mock auth)
-    // In production: next({ name: 'login', query: { redirect: to.fullPath } })
-    next()
+    next({ name: 'login', query: { redirect: to.fullPath } })
+    return
   } else {
     next()
   }

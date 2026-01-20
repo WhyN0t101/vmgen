@@ -10,6 +10,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SessionService {
     private static final Duration ACTIVITY_UPDATE_THRESHOLD = Duration.ofSeconds(60);
+    private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     private final SessionRepository sessionRepository;
     private final AuditService auditService;
@@ -69,15 +72,21 @@ public class SessionService {
     /**
      * Called from JwtAuthenticationFilter (non-transactional context).
      * Uses an isolated, short transaction to avoid coupling to request handlers.
+     * Errors are logged but not propagated to avoid blocking authentication.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 2)
     public void updateActivityIfStale(UUID sessionId, Instant now) {
-        Session session = sessionRepository.findById(sessionId).orElse(null);
-        if (session == null) return;
-        Instant last = session.getLastActivityAt();
-        if (last == null || Duration.between(last, now).compareTo(ACTIVITY_UPDATE_THRESHOLD) > 0) {
-            session.setLastActivityAt(now);
-            sessionRepository.save(session);
+        try {
+            Session session = sessionRepository.findById(sessionId).orElse(null);
+            if (session == null) return;
+            Instant last = session.getLastActivityAt();
+            if (last == null || Duration.between(last, now).compareTo(ACTIVITY_UPDATE_THRESHOLD) > 0) {
+                session.setLastActivityAt(now);
+                sessionRepository.save(session);
+            }
+        } catch (Exception e) {
+            // Log but don't propagate - activity update failures shouldn't block requests
+            log.warn("Failed to update session activity for {}: {}", sessionId, e.getMessage());
         }
     }
 

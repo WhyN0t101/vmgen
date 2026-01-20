@@ -34,6 +34,7 @@ public class UserService {
         }
 
         // Prevent demoting the last admin
+        // Check adminCount <= 1 (not == 1) to be defensive against race conditions
         if (target.getRole() == UserRole.admin && newRole == UserRole.user) {
             long adminCount = userRepository.countByRole(UserRole.admin);
             if (adminCount <= 1) {

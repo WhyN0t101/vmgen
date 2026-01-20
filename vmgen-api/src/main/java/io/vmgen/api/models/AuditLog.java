@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnTransformer;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -36,9 +37,13 @@ public class AuditLog {
     private UUID resourceId;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
+    @ColumnTransformer(
+        read = "metadata::text",
+        write = "?::jsonb"
+    )
     private String metadataJson;
 
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
     @Column(name = "user_agent")

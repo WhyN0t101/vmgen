@@ -44,6 +44,22 @@ function logout() {
           <span v-if="authStore.user" class="text-sm text-slate-400">
             {{ authStore.user.email }}
           </span>
+          <BaseButton
+            v-if="!authStore.isAuthenticated"
+            variant="ghost"
+            size="sm"
+            @click="router.push({ name: 'register' })"
+          >
+            Register
+          </BaseButton>
+          <BaseButton
+            v-if="!authStore.isAuthenticated"
+            variant="secondary"
+            size="sm"
+            @click="router.push({ name: 'login' })"
+          >
+            Login
+          </BaseButton>
           <BaseButton v-if="authStore.isAuthenticated" variant="ghost" size="sm" @click="logout">
             Logout
           </BaseButton>

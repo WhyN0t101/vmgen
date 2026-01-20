@@ -74,12 +74,14 @@ public class AuthService {
                 .or(() -> userRepository.findByUsernameIgnoreCase(identifier))
                 .orElse(null);
 
-        if (user == null) {
-            auditService.logLoginFailed(identifier, ctx);
-            throw new AuthenticationFailedException();
+        // Always perform password verification, even if user is null
+        // This prevents timing attacks that reveal whether a username exists
+        boolean valid = false;
+        if (user != null) {
+            valid = passwordEncoder.matches(req.password(), user.getPasswordHash());
         }
 
-        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+        if (!valid) {
             auditService.logLoginFailed(identifier, ctx);
             throw new AuthenticationFailedException();
         }
