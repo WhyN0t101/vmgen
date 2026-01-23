@@ -38,6 +38,14 @@ function logout() {
             >
               Dashboard
             </router-link>
+            <router-link
+              v-if="authStore.isAdmin"
+              to="/admin"
+              class="text-slate-400 hover:text-slate-100 transition-colors"
+              active-class="text-primary-500"
+            >
+              Admin
+            </router-link>
           </div>
         </div>
         <div class="flex items-center gap-4">

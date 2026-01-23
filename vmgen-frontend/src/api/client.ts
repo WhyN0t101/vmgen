@@ -2,6 +2,13 @@ import { useAuthStore } from '@/stores/auth'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+// Global handler for 401 errors - will be set by App.vue
+let onUnauthorized: ((message: string) => void) | null = null
+
+export function setUnauthorizedHandler(handler: (message: string) => void) {
+  onUnauthorized = handler
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -23,7 +30,30 @@ export async function apiRequest<T>(
   })
   
   if (!response.ok) {
-    throw new Error(`API Error: ${response.statusText}`)
+    // Handle 401 Unauthorized (session expired/revoked)
+    if (response.status === 401) {
+      const errorData = await response.json().catch(() => ({}))
+      const message = errorData.message || 'Authentication required'
+      
+      // Clear auth state
+      authStore.logout()
+      
+      // Notify handler (App.vue will handle redirect)
+      if (onUnauthorized) {
+        onUnauthorized(message)
+      }
+      
+      // Create a proper error object
+      const error = new Error(message) as any
+      error.response = { status: 401, data: errorData }
+      throw error
+    }
+    
+    // Handle other errors
+    const errorData = await response.json().catch(() => ({}))
+    const error = new Error(errorData.message || `API Error: ${response.statusText}`) as any
+    error.response = { status: response.status, data: errorData }
+    throw error
   }
   
   return response.json()

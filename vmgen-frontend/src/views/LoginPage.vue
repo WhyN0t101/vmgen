@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSessionMonitor } from '@/composables/useSessionMonitor'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const sessionMonitor = useSessionMonitor()
 
 const identifier = ref('')
 const password = ref('')
@@ -19,14 +21,42 @@ async function handleSubmit() {
   isSubmitting.value = true
   try {
     await authStore.login(identifier.value, password.value)
+    
+    // Start session expiration monitoring
+    if (authStore.expiresAt) {
+      sessionMonitor.startMonitoring(authStore.expiresAt)
+    }
+    
     const redirect = (route.query.redirect as string | undefined) || '/dashboard'
     await router.replace(redirect)
-  } catch (e) {
-    errorMessage.value = 'Authentication failed'
+  } catch (e: any) {
+    const message = e.response?.data?.message || e.message || 'Login failed'
+    
+    // Map backend error messages to user-friendly messages
+    if (message === 'Authentication failed') {
+      errorMessage.value = 'Invalid username or password'
+    } else if (message.includes('Session')) {
+      errorMessage.value = 'Unable to create session. Please try again.'
+    } else if (!e.response) {
+      errorMessage.value = 'Cannot connect to server. Please check your connection.'
+    } else {
+      errorMessage.value = 'An unexpected error occurred. Please try again.'
+    }
   } finally {
     isSubmitting.value = false
   }
 }
+
+// Start monitoring if already logged in (e.g., page refresh)
+onMounted(() => {
+  if (authStore.expiresAt && authStore.isAuthenticated) {
+    sessionMonitor.startMonitoring(authStore.expiresAt)
+  }
+})
+
+onUnmounted(() => {
+  sessionMonitor.stopMonitoring()
+})
 </script>
 
 <template>

@@ -127,6 +127,12 @@
             <artifactId>bcprov-jdk18on</artifactId>
             <version>1.83</version>
         </dependency>
+
+        <!-- Apache HttpClient for Proxmox API -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

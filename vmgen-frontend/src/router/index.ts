@@ -37,6 +37,12 @@ const router = createRouter({
       component: () => import('@/views/DashboardPage.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('@/views/AdminPanelPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
   ],
 })
 
@@ -47,9 +53,14 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'login', query: { redirect: to.fullPath } })
     return
-  } else {
-    next()
   }
+  
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next({ name: 'dashboard' })
+    return
+  }
+  
+  next()
 })
 
 export default router

@@ -60,5 +60,19 @@ export interface User {
   created_at: string
 }
 
+export interface ActiveSession {
+  sessionId: string
+  userId: string
+  username: string
+  role: 'user' | 'admin'
+  createdAt: string
+  lastActivityAt: string
+  expiresAt: string
+}
+
+export interface RoleUpdateRequest {
+  role: 'user' | 'admin'
+}
+
 
 

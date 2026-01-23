@@ -143,6 +143,36 @@ export const api = {
       }
     )
   },
+
+  // Admin endpoints
+  admin: {
+    // Sessions
+    getActiveSessions: async (): Promise<import('@/types').ActiveSession[]> => {
+      return apiRequest<import('@/types').ActiveSession[]>('/api/admin/sessions')
+    },
+
+    revokeSession: async (sessionId: string): Promise<{ status: string }> => {
+      return apiRequest<{ status: string }>('/api/admin/sessions/revoke', {
+        method: 'POST',
+        body: JSON.stringify({ sessionUuid: sessionId }),
+      })
+    },
+
+    revokeAllUserSessions: async (userId: string): Promise<{ status: string }> => {
+      return apiRequest<{ status: string }>('/api/admin/sessions/revoke-all', {
+        method: 'POST',
+        body: JSON.stringify({ userUuid: userId }),
+      })
+    },
+
+    // Users
+    updateUserRole: async (userId: string, role: 'user' | 'admin'): Promise<{ status: string }> => {
+      return apiRequest<{ status: string }>(`/api/admin/users/${userId}/role`, {
+        method: 'POST',
+        body: JSON.stringify({ role }),
+      })
+    },
+  },
 }
 
 

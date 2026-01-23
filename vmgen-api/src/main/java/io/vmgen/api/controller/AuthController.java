@@ -6,6 +6,7 @@ import io.vmgen.api.dto.auth.AuthResponse;
 import io.vmgen.api.dto.auth.LoginRequest;
 import io.vmgen.api.dto.auth.RegisterRequest;
 import io.vmgen.api.service.AuthService;
+import io.vmgen.api.service.RateLimitService;
 import io.vmgen.api.service.SessionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -23,10 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
     private final AuthService authService;
     private final SessionService sessionService;
+    private final RateLimitService rateLimitService;
 
-    public AuthController(AuthService authService, SessionService sessionService) {
+    public AuthController(AuthService authService, SessionService sessionService, RateLimitService rateLimitService) {
         this.authService = authService;
         this.sessionService = sessionService;
+        this.rateLimitService = rateLimitService;
     }
 
     @PostMapping("/register")
@@ -37,6 +40,10 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
+        // Rate limiting: check before processing login
+        String clientIp = getClientIp(http);
+        rateLimitService.checkLoginRateLimit(clientIp);
+        
         AuditContext ctx = auditContext(http, Map.of());
         return ResponseEntity.ok(authService.login(req, ctx));
     }
@@ -54,9 +61,25 @@ public class AuthController {
     }
 
     private static AuditContext auditContext(HttpServletRequest req, Map<String, Object> metadata) {
-        String ip = req.getRemoteAddr();
+        String ip = getClientIp(req);
         String ua = req.getHeader("User-Agent");
         return new AuditContext(ip, ua, metadata);
+    }
+
+    /**
+     * Extract client IP address, handling X-Forwarded-For header for proxies.
+     */
+    private static String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            // X-Forwarded-For can contain multiple IPs, take the first one
+            return xForwardedFor.split(",")[0].trim();
+        }
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty()) {
+            return xRealIp;
+        }
+        return request.getRemoteAddr();
     }
 }
 
