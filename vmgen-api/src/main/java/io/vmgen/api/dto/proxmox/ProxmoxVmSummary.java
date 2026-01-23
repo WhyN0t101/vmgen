@@ -13,4 +13,5 @@ public class ProxmoxVmSummary {
     private String status;
     private Integer cpus;
     private Long maxmem;
+    private Boolean isTemplate;  // true if this is a Proxmox template
 }

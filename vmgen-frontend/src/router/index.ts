@@ -43,24 +43,62 @@ const router = createRouter({
       component: () => import('@/views/AdminPanelPage.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },
     },
+    // Admin Template Routes
+    {
+      path: '/admin/templates',
+      name: 'admin-template-list',
+      component: () => import('@/views/admin/templates/TemplateList.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/templates/new',
+      name: 'admin-template-register',
+      component: () => import('@/views/admin/templates/TemplateRegister.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/templates/:id',
+      name: 'admin-template-detail',
+      component: () => import('@/views/admin/templates/TemplateDetail.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/templates/:id/edit',
+      name: 'admin-template-edit',
+      component: () => import('@/views/admin/templates/TemplateEdit.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    // Public Template Routes
+    {
+      path: '/templates',
+      name: 'templates',
+      component: () => import('@/views/templates/TemplateCatalog.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
 // Auth guard
 router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
-  
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next({ name: 'login', query: { redirect: to.fullPath } })
-    return
+  try {
+    const authStore = useAuthStore()
+    
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+      next({ name: 'login', query: { redirect: to.fullPath } })
+      return
+    }
+    
+    if (to.meta.requiresAdmin && !authStore.isAdmin) {
+      next({ name: 'dashboard' })
+      return
+    }
+    
+    next()
+  } catch (error) {
+    console.error('Router guard error:', error)
+    // Fallback: allow navigation but log error
+    next()
   }
-  
-  if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    next({ name: 'dashboard' })
-    return
-  }
-  
-  next()
 })
 
 export default router

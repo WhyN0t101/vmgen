@@ -49,7 +49,7 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(Authentication authentication, HttpServletRequest http) {
+    public ResponseEntity<?> logout(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.ok(Map.of("status", "ok"));
         }

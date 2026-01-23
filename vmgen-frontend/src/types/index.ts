@@ -1,3 +1,4 @@
+// Legacy Template interface (for backward compatibility with existing code)
 export interface Template {
   id: string
   name: string
@@ -6,6 +7,88 @@ export interface Template {
   arch: 'x86_64' | 'arm64'
   capabilities: string[]
   description?: string
+}
+
+// New Template Management interfaces (matching backend DTOs)
+export type TemplateStatus = 'draft' | 'validating' | 'active' | 'failed' | 'deprecated'
+export type OsFamily = 'linux' | 'windows'
+export type Architecture = 'x64' | 'arm64'
+
+export interface TemplateResponse {
+  id: string
+  identifier: string
+  version: string
+  osFamily: OsFamily
+  osVersion: string
+  architecture: Architecture
+  description?: string
+  proxmoxVmid: number
+  proxmoxNode: string
+  diskStorage: string
+  diskSizeGb: number
+  minRamMb: number
+  minCpuCores: number
+  expectedSshUser: string
+  expectedSshPort: number
+  networkBridge?: string
+  sha256Hash?: string
+  status: TemplateStatus
+  capabilities: string[]
+  validationLogs?: string | Record<string, any>  // JSON string from backend, parsed in frontend
+  validationNotes?: string
+  lastValidatedAt?: string
+  validatedBy?: string
+  validatedAt?: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+  deprecatedAt?: string
+}
+
+export interface TemplateListResponse {
+  id: string
+  identifier: string
+  version: string
+  osFamily: OsFamily
+  status: TemplateStatus
+  createdAt: string
+}
+
+export interface RegisterTemplateRequest {
+  identifier: string
+  version: string
+  osFamily: OsFamily
+  osVersion: string
+  architecture: Architecture
+  description?: string
+  proxmoxVmid: number
+  proxmoxNode: string
+  diskStorage: string
+  diskSizeGb: number
+  minRamMb: number
+  minCpuCores: number
+  expectedSshUser?: string
+  expectedSshPort?: number
+  networkBridge?: string
+  capabilities: string[]
+}
+
+export interface UpdateTemplateMetadataRequest {
+  description?: string
+  expectedSshUser?: string
+  expectedSshPort?: number
+  networkBridge?: string
+  minRamMb?: number
+  minCpuCores?: number
+}
+
+export interface ProxmoxVmSummary {
+  vmid: number
+  name: string
+  status: string
+  cpus: number
+  maxmem: number
+  isTemplate?: boolean  // true if this is a Proxmox template
 }
 
 export interface Vulnerability {

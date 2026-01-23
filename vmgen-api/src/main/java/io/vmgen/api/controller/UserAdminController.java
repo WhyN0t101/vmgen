@@ -10,6 +10,7 @@ import io.vmgen.api.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,7 +49,7 @@ public class UserAdminController {
 
     private User requireAdminUser(Authentication authentication) {
         AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
-        UUID adminId = UUID.fromString(principal.userId());
+        UUID adminId = UUID.fromString(Objects.requireNonNull(principal).userId());
         return userRepository.findById(adminId).orElseThrow();
     }
 

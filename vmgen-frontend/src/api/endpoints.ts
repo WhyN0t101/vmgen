@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { Template, Vulnerability, Build, BuildSpec } from '@/types'
+import type { Template, Vulnerability, Build, BuildSpec, TemplateResponse, TemplateListResponse, RegisterTemplateRequest, UpdateTemplateMetadataRequest, ProxmoxVmSummary } from '@/types'
 import { mockTemplates, mockVulnerabilities } from './mockData'
 
 // Use mock data for development
@@ -171,6 +171,63 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ role }),
       })
+    },
+
+    // Templates
+    listTemplates: async (status?: string): Promise<TemplateListResponse[]> => {
+      const url = status ? `/api/admin/templates?status=${status}` : '/api/admin/templates'
+      return apiRequest<TemplateListResponse[]>(url)
+    },
+
+    getTemplate: async (id: string): Promise<TemplateResponse> => {
+      return apiRequest<TemplateResponse>(`/api/admin/templates/${id}`)
+    },
+
+    registerTemplate: async (data: RegisterTemplateRequest): Promise<TemplateResponse> => {
+      return apiRequest<TemplateResponse>('/api/admin/templates', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+    },
+
+    validateTemplate: async (id: string): Promise<TemplateResponse> => {
+      return apiRequest<TemplateResponse>(`/api/admin/templates/${id}/validate`, {
+        method: 'POST',
+      })
+    },
+
+    updateTemplateMetadata: async (id: string, data: UpdateTemplateMetadataRequest): Promise<TemplateResponse> => {
+      return apiRequest<TemplateResponse>(`/api/admin/templates/${id}/metadata`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      })
+    },
+
+    deprecateTemplate: async (id: string): Promise<void> => {
+      return apiRequest<void>(`/api/admin/templates/${id}/deprecate`, {
+        method: 'PATCH',
+      })
+    },
+
+    listProxmoxVms: async (node?: string): Promise<ProxmoxVmSummary[]> => {
+      const url = node ? `/api/admin/proxmox/vms?node=${node}` : '/api/admin/proxmox/vms'
+      return apiRequest<ProxmoxVmSummary[]>(url)
+    },
+
+    getVmStorage: async (vmid: number, node?: string): Promise<{ storage: string }> => {
+      const nodeParam = node ? `&node=${node}` : ''
+      return apiRequest<{ storage: string }>(`/api/admin/proxmox/vm-storage?vmid=${vmid}${nodeParam}`)
+    },
+  },
+
+  // Public template endpoints
+  templates: {
+    listActive: async (): Promise<TemplateListResponse[]> => {
+      return apiRequest<TemplateListResponse[]>('/api/templates')
+    },
+
+    getById: async (id: string): Promise<TemplateResponse> => {
+      return apiRequest<TemplateResponse>(`/api/templates/${id}`)
     },
   },
 }

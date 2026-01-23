@@ -93,7 +93,7 @@ public class TemplateService {
             }
         }
         
-        log.info("Template registered: {} v{} (ID: {})", request.getIdentifier(), request.getVersion(), template.getId());
+        log.info("Template registered: {} {} (ID: {})", request.getIdentifier(), request.getVersion(), template.getId());
         
         return toResponse(template);
     }
@@ -163,17 +163,22 @@ public class TemplateService {
             throw new TemplateValidationException("Template has no Proxmox node configured");
         }
         
-        if (!proxmoxService.vmExists(template.getProxmoxVmid(), node)) {
+        Integer vmid = template.getProxmoxVmid();
+        if (vmid == null) {
+            throw new TemplateValidationException("Template has no Proxmox VMID configured");
+        }
+        
+        if (!proxmoxService.vmExists(vmid, node)) {
             template.setStatus("failed");
             template = templateRepository.save(template);
             throw new TemplateValidationException(
-                "Proxmox VM " + template.getProxmoxVmid() + " does not exist on node " + node
+                "Proxmox VM " + vmid + " does not exist on node " + node
             );
         }
         
         // Get VM details (for future use)
         try {
-            proxmoxService.getVmDetails(template.getProxmoxVmid(), node);
+            proxmoxService.getVmDetails(vmid, node);
         } catch (Exception e) {
             log.warn("Could not fetch VM details during validation: {}", e.getMessage());
         }
@@ -205,7 +210,7 @@ public class TemplateService {
         
         template = templateRepository.save(template);
         
-        log.info("Template validated: {} v{} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
+        log.info("Template validated: {} {} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
         
         return toResponse(template);
     }
@@ -282,7 +287,7 @@ public class TemplateService {
             .validatedAt(template.getValidatedAt())
             .validatedBy(template.getValidatedBy() != null ? template.getValidatedBy().getId() : null)
             .validationNotes(template.getValidationNotes())
-            .createdBy(template.getCreatedBy().getId())
+            .createdBy(template.getCreatedBy() != null ? template.getCreatedBy().getId() : null)
             .createdAt(template.getCreatedAt())
             .deprecatedAt(template.getDeprecatedAt())
             .status(template.getStatus())

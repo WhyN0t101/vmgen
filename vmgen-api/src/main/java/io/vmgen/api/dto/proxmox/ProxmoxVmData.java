@@ -12,4 +12,5 @@ public class ProxmoxVmData {
     private Integer cpus;
     private Long maxmem;    // Bytes
     private Long maxdisk;   // Bytes
+    private Integer template;  // 1 if this is a Proxmox template, 0 or null if regular VM
 }

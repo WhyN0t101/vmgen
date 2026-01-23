@@ -8,6 +8,7 @@ import io.vmgen.api.dto.template.UpdateTemplateMetadataRequest;
 import io.vmgen.api.service.TemplateService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -95,6 +96,6 @@ public class AdminTemplateController {
     
     private UUID getUserId(Authentication authentication) {
         AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
-        return UUID.fromString(principal.userId());
+        return UUID.fromString(Objects.requireNonNull(principal).userId());
     }
 }

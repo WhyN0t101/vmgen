@@ -12,4 +12,5 @@ public class ProxmoxVmDetails {
     private Integer memory;  // MB
     private Integer cores;
     private Integer diskSizeGb;
+    private String diskStorage;  // Storage name where VM disk is stored (e.g., "data1", "local-lvm")
 }

@@ -86,6 +86,10 @@ public class AuthService {
             throw new AuthenticationFailedException();
         }
 
+        // Revoke all existing sessions for this user (single-session behavior)
+        // This ensures only one active session per user at any time
+        sessionService.revokeAllSessionsForUser(user.getId());
+
         UUID sessionId = UUID.randomUUID();
         Instant now = Instant.now();
         long ttlSeconds = user.getRole() == UserRole.admin

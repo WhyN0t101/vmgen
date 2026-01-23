@@ -28,7 +28,8 @@ async function handleSubmit() {
     }
     
     const redirect = (route.query.redirect as string | undefined) || '/dashboard'
-    await router.replace(redirect)
+    // Use push instead of replace to ensure navigation happens
+    await router.push(redirect)
   } catch (e: any) {
     const message = e.response?.data?.message || e.message || 'Login failed'
     

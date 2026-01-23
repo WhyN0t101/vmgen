@@ -39,12 +39,27 @@ function logout() {
               Dashboard
             </router-link>
             <router-link
+              to="/templates"
+              class="text-slate-400 hover:text-slate-100 transition-colors"
+              active-class="text-primary-500"
+            >
+              Templates
+            </router-link>
+            <router-link
               v-if="authStore.isAdmin"
               to="/admin"
               class="text-slate-400 hover:text-slate-100 transition-colors"
               active-class="text-primary-500"
             >
               Admin
+            </router-link>
+            <router-link
+              v-if="authStore.isAdmin"
+              to="/admin/templates"
+              class="text-slate-400 hover:text-slate-100 transition-colors"
+              active-class="text-primary-500"
+            >
+              Manage Templates
             </router-link>
           </div>
         </div>

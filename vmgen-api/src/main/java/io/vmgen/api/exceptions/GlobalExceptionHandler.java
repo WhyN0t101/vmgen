@@ -82,14 +82,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleBeanValidation(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Map<String, Object>> handleBeanValidation() {
         return ResponseEntity.badRequest().body(Map.of(
                 "message", "Validation failed"
         ));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleOther(Exception ex) {
+    public ResponseEntity<Map<String, Object>> handleOther() {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Internal server error"));
     }
 }

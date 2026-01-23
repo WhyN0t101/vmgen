@@ -10,6 +10,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnTransformer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -89,6 +90,10 @@ public class Template {
     private String diskStorage;
 
     @Column(name = "validation_logs", columnDefinition = "jsonb")
+    @ColumnTransformer(
+        read = "validation_logs::text",
+        write = "?::jsonb"
+    )
     private String validationLogs; // Stored as JSONB, handled as String in Java
 
     @Column(name = "last_validated_at")

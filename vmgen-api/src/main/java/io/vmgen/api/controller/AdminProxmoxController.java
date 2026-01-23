@@ -29,5 +29,15 @@ public class AdminProxmoxController {
         String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
         return ResponseEntity.ok(proxmoxService.listVms(targetNode));
     }
+    
+    @GetMapping("/vm-storage")
+    public ResponseEntity<java.util.Map<String, String>> getVmStorage(
+            @RequestParam Integer vmid,
+            @RequestParam(required = false) String node
+    ) {
+        String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
+        String storage = proxmoxService.getVmStorage(vmid, targetNode);
+        return ResponseEntity.ok(java.util.Map.of("storage", storage != null ? storage : ""));
+    }
 }
 
