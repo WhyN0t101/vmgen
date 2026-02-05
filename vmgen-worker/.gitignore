@@ -1,0 +1,27 @@
+# Virtual environments
+.venv/
+venv/
+
+# Environment files (contain secrets)
+.env
+config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

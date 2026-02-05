@@ -1,0 +1,36 @@
+VMGen Worker - Setup Instructions
+===================================
+
+1. CREATE VIRTUAL ENVIRONMENT
+   python -m venv .venv
+
+2. ACTIVATE (Windows PowerShell)
+   .\.venv\Scripts\Activate.ps1
+
+   If blocked, first run:
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+3. INSTALL DEPENDENCIES
+   pip install -r requirements.txt
+
+4. CONFIGURE ENVIRONMENT
+   - Copy .env.example to .env
+   - Fill in your credentials:
+     * DATABASE_PASSWORD
+     * PROXMOX_HOST, PROXMOX_TOKEN_ID, PROXMOX_TOKEN_SECRET
+     * PLATFORM_SECRET
+
+5. CONNECT TO DATABASE
+   docker exec -it vmgen-postgres psql -U vmgen -d vmgen
+
+6. RUN WORKER
+   python -m worker.main
+
+---
+TROUBLESHOOTING:
+
+If psycopg2-binary fails to install on Python 3.13:
+   pip install psycopg[binary]
+   (Note: psycopg3 uses different package name)
+
+Or downgrade to Python 3.11/3.12 for full compatibility.

@@ -1,0 +1,29 @@
+# VMGen Worker Configuration
+# Copy to config.yaml and adjust as needed
+# Secrets should be in .env, not here
+
+worker:
+  id: "worker-01"
+  poll_interval_seconds: 30
+  max_concurrent_builds: 3
+  heartbeat_interval_seconds: 60
+
+proxmox:
+  node: "pve"
+  storage: "local-lvm"
+  build_network: "vmbr1"
+
+timeouts:
+  ssh_wait_seconds: 300          # 5 minutes to wait for SSH
+  script_timeout_seconds: 1800   # 30 minutes per script
+  build_timeout_seconds: 10800   # 3 hours total build time
+  clone_timeout_seconds: 600     # 10 minutes for template clone
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Backend API for status updates
+# backend:
+#   url: "http://localhost:8080/api"
+#   timeout_seconds: 30
