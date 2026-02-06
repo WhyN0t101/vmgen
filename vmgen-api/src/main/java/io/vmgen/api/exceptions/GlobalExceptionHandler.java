@@ -60,7 +60,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleTemplateValidation(TemplateValidationException ex) {
         return ResponseEntity.badRequest().body(Map.of("message", ex.getPublicMessage()));
     }
-
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
+        return ResponseEntity.badRequest().body(Map.of("message", ex.getPublicMessage()));
+    }
     @ExceptionHandler(DuplicateTemplateException.class)
     public ResponseEntity<Map<String, Object>> handleDuplicateTemplate(DuplicateTemplateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getPublicMessage()));
@@ -85,6 +88,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleBeanValidation() {
         return ResponseEntity.badRequest().body(Map.of(
                 "message", "Validation failed"
+        ));
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingBody() {
+        return ResponseEntity.badRequest().body(Map.of(
+                "message", "Request body is required"
+        ));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(ConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "message", ex.getMessage()
         ));
     }
 

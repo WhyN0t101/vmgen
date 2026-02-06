@@ -41,7 +41,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain filterChain(HttpSecurity http, JwtService jwtService, SessionService sessionService) {
+    SecurityFilterChain filterChain(HttpSecurity http, JwtService jwtService, SessionService sessionService, WorkerApiKeyFilter workerApiKeyFilter) {
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, sessionService);
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -50,10 +50,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/worker/**").permitAll()
                         .requestMatchers("/api/templates/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(workerApiKeyFilter, JwtAuthenticationFilter.class)
                 .build();
     }
 }
