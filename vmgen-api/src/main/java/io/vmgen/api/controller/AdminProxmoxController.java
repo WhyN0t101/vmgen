@@ -4,6 +4,8 @@ import io.vmgen.api.config.ProxmoxApiConfig;
 import io.vmgen.api.dto.proxmox.ProxmoxVmSummary;
 import io.vmgen.api.service.ProxmoxService;
 import java.util.List;
+import java.util.Optional;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,15 +31,15 @@ public class AdminProxmoxController {
         String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
         return ResponseEntity.ok(proxmoxService.listVms(targetNode));
     }
-    
+
     @GetMapping("/vm-storage")
     public ResponseEntity<java.util.Map<String, String>> getVmStorage(
             @RequestParam Integer vmid,
             @RequestParam(required = false) String node
     ) {
         String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
-        String storage = proxmoxService.getVmStorage(vmid, targetNode);
-        return ResponseEntity.ok(java.util.Map.of("storage", storage != null ? storage : ""));
+        Optional<String> storage = proxmoxService.getVmStorage(vmid, targetNode);
+        return ResponseEntity.ok(java.util.Map.of("storage", storage.orElse("")));
     }
 }
 

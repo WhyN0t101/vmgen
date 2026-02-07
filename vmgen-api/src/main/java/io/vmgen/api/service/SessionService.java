@@ -1,7 +1,6 @@
 package io.vmgen.api.service;
 
 import io.vmgen.api.dto.admin.ActiveSessionDto;
-import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.exceptions.SessionExpiredException;
 import io.vmgen.api.models.Session;
 import io.vmgen.api.models.User;
@@ -9,115 +8,150 @@ import io.vmgen.api.repository.SessionRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class SessionService {
     private static final Duration ACTIVITY_UPDATE_THRESHOLD = Duration.ofSeconds(60);
-    private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     private final SessionRepository sessionRepository;
-    private final AuditService auditService;
-
-    public SessionService(SessionRepository sessionRepository, AuditService auditService) {
-        this.sessionRepository = sessionRepository;
-        this.auditService = auditService;
-    }
 
     @Transactional
     public Session createSession(User user, UUID sessionId, String tokenHash, Instant expiresAt) {
+        if (user == null || sessionId == null || tokenHash == null || expiresAt == null) {
+            throw new IllegalArgumentException("All session parameters are required");
+        }
+
+        if (sessionRepository.existsById(sessionId)) {
+            log.warn("Session ID collision detected: {}", sessionId);
+            throw new IllegalStateException("Session ID already exists");
+        }
+
         Session session = new Session();
         session.setId(sessionId);
         session.setUser(user);
         session.setTokenHash(tokenHash);
         session.setExpiresAt(expiresAt);
-        return sessionRepository.save(session);
+
+        session = sessionRepository.save(session);
+
+        log.info("Session created for user {} (session: {}, expires: {})",
+                user.getUsername(), sessionId, expiresAt);
+
+        return session;
     }
 
     @Transactional
     public void logout(UUID sessionId, UUID userId) {
-        sessionRepository.deleteByIdAndUserId(sessionId, userId);
+        int deleted = sessionRepository.deleteByIdAndUserId(sessionId, userId);
+        if (deleted > 0) {
+            log.info("User {} logged out (session: {})", userId, sessionId);
+        }
+
     }
 
     @Transactional
-    public void revokeSession(UUID sessionId) {
-        sessionRepository.deleteById(sessionId);
+    public void revokeSession(UUID sessionId, UUID adminUserId) {
+        Optional<Session> session = sessionRepository.findById(sessionId);
+        if (session.isPresent()) {
+            sessionRepository.deleteById(sessionId);
+            log.warn("Session {} revoked by admin {}", sessionId, adminUserId);
+        }
     }
 
     @Transactional
     public void revokeAllSessionsForUser(UUID userId) {
-        sessionRepository.deleteAllByUserId(userId);
+        int deleted = sessionRepository.deleteAllByUserId(userId);
+        if (deleted > 0) {
+            log.info("Revoked {} sessions for user {}", deleted, userId);
+        }
     }
 
     @Transactional(readOnly = true)
-    public Session getActiveSession(UUID sessionId, Instant now) {
+    public Optional<Session> getActiveSession(UUID sessionId, Instant now) {
         Session session = sessionRepository.findById(sessionId).orElse(null);
-        if (session == null) return null;
+
+        if (session == null) {
+            return Optional.empty();
+        }
+
         if (session.getExpiresAt() == null || !session.getExpiresAt().isAfter(now)) {
+            log.debug("Session {} is expired", sessionId);
             throw new SessionExpiredException();
         }
-        return session;
+
+        return Optional.of(session);
     }
 
     @Transactional(readOnly = true)
-    public UUID getSessionOwnerUserId(UUID sessionId) {
-        return sessionRepository.findById(sessionId).map(s -> s.getUser().getId()).orElse(null);
+    public Optional<UUID> getSessionOwnerUserId(UUID sessionId) {
+        return sessionRepository.findById(sessionId)
+                .map(s -> s.getUser().getId());
     }
 
     /**
      * Called from JwtAuthenticationFilter (non-transactional context).
-     * Uses an isolated, short transaction to avoid coupling to request handlers.
-     * Errors are logged but not propagated to avoid blocking authentication.
+     * Uses isolated transaction to avoid coupling to request handlers.
+     * Failures are logged but don't block authentication.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 2)
     public void updateActivityIfStale(UUID sessionId, Instant now) {
         try {
             Session session = sessionRepository.findById(sessionId).orElse(null);
-            if (session == null) return;
+            if (session == null) {
+                log.debug("Cannot update activity for non-existent session: {}", sessionId);
+                return;
+            }
+
             Instant last = session.getLastActivityAt();
-            if (last == null || Duration.between(last, now).compareTo(ACTIVITY_UPDATE_THRESHOLD) > 0) {
+            boolean shouldUpdate = last == null ||
+                    Duration.between(last, now).compareTo(ACTIVITY_UPDATE_THRESHOLD) > 0;
+
+            if (shouldUpdate) {
                 session.setLastActivityAt(now);
                 sessionRepository.save(session);
+                log.trace("Updated activity for session {}", sessionId);
             }
         } catch (Exception e) {
-            // Log but don't propagate - activity update failures shouldn't block requests
-            log.warn("Failed to update session activity for {}: {}", sessionId, e.getMessage());
+            log.error("Failed to update session activity for {}: {}", sessionId, e.getMessage(), e);
         }
     }
 
     @Transactional(readOnly = true)
     public List<ActiveSessionDto> listActiveSessions() {
         Instant now = Instant.now();
-        return sessionRepository.findAllActiveWithUser(now).stream().map(s -> new ActiveSessionDto(
-                s.getId().toString(),
-                s.getUser().getId().toString(),
-                s.getUser().getUsername(),
-                s.getUser().getRole().name(),
-                s.getCreatedAt().toString(),
-                s.getLastActivityAt().toString(),
-                s.getExpiresAt().toString()
-        )).toList();
+        return sessionRepository.findAllActiveWithUser(now).stream()
+                .map(s -> new ActiveSessionDto(
+                        s.getId().toString(),
+                        s.getUser().getId().toString(),
+                        s.getUser().getUsername(),
+                        s.getUser().getRole().name(),
+                        s.getCreatedAt().toString(),
+                        s.getLastActivityAt() != null ? s.getLastActivityAt().toString() : null,
+                        s.getExpiresAt().toString()
+                ))
+                .toList();
     }
 
     @Transactional
     public void cleanupExpiredAndIdle(Duration idleTimeout) {
         Instant now = Instant.now();
-        sessionRepository.deleteExpired(now);
+
+        int expiredCount = sessionRepository.deleteExpired(now);
+        log.info("Cleaned up {} expired sessions", expiredCount);
+
         if (idleTimeout != null) {
             Instant cutoff = now.minus(idleTimeout);
-            sessionRepository.deleteIdle(cutoff);
+            int idleCount = sessionRepository.deleteIdle(cutoff);
+            log.info("Cleaned up {} idle sessions (timeout: {})", idleCount, idleTimeout);
         }
     }
-
-    @Transactional
-    public void auditSessionRevoked(User admin, UUID targetUserId, UUID sessionId, AuditContext ctx) {
-        auditService.logSessionRevoked(admin, targetUserId, sessionId, ctx);
-    }
 }
-
-

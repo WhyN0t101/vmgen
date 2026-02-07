@@ -15,11 +15,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -28,31 +32,9 @@ public class AuthService {
     private final AuditService auditService;
     private final io.vmgen.api.config.JwtProperties jwtProperties;
 
-    public AuthService(
-            UserRepository userRepository,
-            PasswordEncoder passwordEncoder,
-            JwtService jwtService,
-            SessionService sessionService,
-            AuditService auditService,
-            io.vmgen.api.config.JwtProperties jwtProperties
-    ) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-        this.sessionService = sessionService;
-        this.auditService = auditService;
-        this.jwtProperties = jwtProperties;
-    }
-
     @Transactional
     public void register(RegisterRequest req) {
-        // Validate uniqueness (case-insensitive)
-        if (userRepository.findByUsernameIgnoreCase(req.username()).isPresent()) {
-            throw new ValidationException("Validation failed", List.of("Username already in use"));
-        }
-        if (userRepository.findByEmailIgnoreCase(req.email()).isPresent()) {
-            throw new ValidationException("Validation failed", List.of("Email already in use"));
-        }
+        validateRegistration(req);
 
         PasswordPolicyValidator.validate(req.password());
 
@@ -64,30 +46,41 @@ public class AuthService {
         user.setEmailVerifiedAt(null);
 
         userRepository.save(user);
+
+        log.info("User registered: {}", user.getUsername());
+    }
+
+    private void validateRegistration(RegisterRequest req) {
+        if (userRepository.findByUsernameIgnoreCase(req.username()).isPresent()) {
+            throw new ValidationException("Validation failed", List.of("Username already in use"));
+        }
+        if (userRepository.findByEmailIgnoreCase(req.email()).isPresent()) {
+            throw new ValidationException("Validation failed", List.of("Email already in use"));
+        }
     }
 
     @Transactional
     public AuthResponse login(LoginRequest req, AuditContext ctx) {
-        // Accept username or email
         String identifier = req.identifier();
+
         User user = userRepository.findByEmailIgnoreCase(identifier)
                 .or(() -> userRepository.findByUsernameIgnoreCase(identifier))
                 .orElse(null);
 
-        // Always perform password verification, even if user is null
-        // This prevents timing attacks that reveal whether a username exists
-        boolean valid = false;
-        if (user != null) {
-            valid = passwordEncoder.matches(req.password(), user.getPasswordHash());
-        }
+        // Constant-time password verification to prevent timing attacks
+        String passwordHash = user != null ? user.getPasswordHash() : "$2a$10$dummyHashToPreventTimingAttack";
+        boolean passwordMatches = passwordEncoder.matches(req.password(), passwordHash);
 
-        if (!valid) {
+        if (user == null || !passwordMatches) {
             auditService.logLoginFailed(identifier, ctx);
             throw new AuthenticationFailedException();
         }
 
-        // Revoke all existing sessions for this user (single-session behavior)
-        // This ensures only one active session per user at any time
+        // TODO: Check if user is locked/disabled/email unverified
+        // if (user.isLocked()) throw new AccountLockedException();
+        // if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
+
+        // Only revoke sessions after successful authentication
         sessionService.revokeAllSessionsForUser(user.getId());
 
         UUID sessionId = UUID.randomUUID();
@@ -102,20 +95,24 @@ public class AuthService {
 
         try {
             sessionService.createSession(user, sessionId, tokenHash, exp);
-        } catch (RuntimeException e) {
-            // Password verified but session creation failed; audit it as login_failed with metadata.
-            auditService.logLoginFailed(identifier, new AuditContext(
-                    ctx != null ? ctx.ipAddress() : null,
-                    ctx != null ? ctx.userAgent() : null,
-                    java.util.Map.of("reason", "session_create_failed")
-            ));
-            throw e;
+        } catch (Exception e) {
+            log.error("Session creation failed for user {}: {}", user.getUsername(), e.getMessage());
+            auditService.logLoginFailed(identifier, enrichContext(ctx, "session_create_failed"));
+            throw new AuthenticationFailedException();
         }
 
         auditService.logLogin(user, sessionId, ctx);
 
+        log.info("User logged in: {} (session: {})", user.getUsername(), sessionId);
+
         return new AuthResponse(token, exp.toString(), user.getRole().name());
     }
+
+    private AuditContext enrichContext(AuditContext ctx, String reason) {
+        return new AuditContext(
+                ctx != null ? ctx.ipAddress() : null,
+                ctx != null ? ctx.userAgent() : null,
+                java.util.Map.of("reason", reason)
+        );
+    }
 }
-
-

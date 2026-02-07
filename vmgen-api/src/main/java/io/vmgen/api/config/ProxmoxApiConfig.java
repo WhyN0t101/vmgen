@@ -3,6 +3,7 @@ package io.vmgen.api.config;
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.apache.hc.client5.http.classic.HttpClient;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
@@ -16,6 +17,7 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import javax.net.ssl.SSLContext;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 @ConfigurationProperties(prefix = "proxmox.api")
@@ -43,39 +45,53 @@ public class ProxmoxApiConfig {
             throw new IllegalStateException("proxmox.api.node must be configured");
         }
     }
-    
     @Bean
     public RestTemplate proxmoxRestTemplate() throws Exception {
+        // Create request config with all timeouts
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectionRequestTimeout(5000, TimeUnit.MILLISECONDS)  // Timeout to get connection from pool
+                .setResponseTimeout(30000, TimeUnit.MILLISECONDS)           // Timeout for response
+                .build();
+
         RestTemplate restTemplate;
-        
+
         if (!verifySsl) {
             // Disable SSL verification for self-signed certs
             TrustStrategy acceptingTrustStrategy = (cert, authType) -> true;
             SSLContext sslContext = SSLContextBuilder.create()
-                .loadTrustMaterial(null, acceptingTrustStrategy)
-                .build();
-            SSLConnectionSocketFactory socketFactory = 
-                new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
-            
+                    .loadTrustMaterial(null, acceptingTrustStrategy)
+                    .build();
+            SSLConnectionSocketFactory socketFactory =
+                    new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+
             HttpClient httpClient = HttpClients.custom()
-                .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
-                    .setSSLSocketFactory(socketFactory)
-                    .build())
-                .build();
-            
-            HttpComponentsClientHttpRequestFactory factory = 
-                new HttpComponentsClientHttpRequestFactory(httpClient);
+                    .setDefaultRequestConfig(requestConfig)
+                    .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
+                            .setSSLSocketFactory(socketFactory)
+                            .build())
+                    .build();
+
+            HttpComponentsClientHttpRequestFactory factory =
+                    new HttpComponentsClientHttpRequestFactory(httpClient);
+
             restTemplate = new RestTemplate(factory);
         } else {
-            restTemplate = new RestTemplate();
+            HttpClient httpClient = HttpClients.custom()
+                    .setDefaultRequestConfig(requestConfig)
+                    .build();
+
+            HttpComponentsClientHttpRequestFactory factory =
+                    new HttpComponentsClientHttpRequestFactory(httpClient);
+
+            restTemplate = new RestTemplate(factory);
         }
-        
+
         // Add interceptor to inject Authorization header on every request
         restTemplate.getInterceptors().add((request, body, execution) -> {
             request.getHeaders().add("Authorization", "PVEAPIToken=" + tokenId + "=" + tokenSecret);
             return execution.execute(request, body);
         });
-        
+
         return restTemplate;
     }
 }

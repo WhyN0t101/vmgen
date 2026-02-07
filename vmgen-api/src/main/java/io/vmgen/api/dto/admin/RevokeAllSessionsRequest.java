@@ -9,4 +9,3 @@ public record RevokeAllSessionsRequest(@NotBlank String userId) {
     }
 }
 
-

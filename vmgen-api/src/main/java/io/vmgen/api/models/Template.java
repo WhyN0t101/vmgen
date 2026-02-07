@@ -1,25 +1,21 @@
 package io.vmgen.api.models;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import org.hibernate.annotations.ColumnTransformer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
-@Table(name = "templates")
-@Data
+@Table(name = "templates", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"identifier", "version"})
+})
+@Getter
+@Setter
 public class Template {
 
     @Id
@@ -51,10 +47,10 @@ public class Template {
     private Integer diskSizeGb;
 
     @Column(name = "min_ram_mb", nullable = false)
-    private Integer minRamMb = 2048;
+    private Integer minRamMb;
 
     @Column(name = "min_cpu_cores", nullable = false)
-    private Integer minCpuCores = 2;
+    private Integer minCpuCores;
 
     @Column(name = "validated_at")
     private Instant validatedAt;
@@ -76,14 +72,14 @@ public class Template {
     @Column(name = "deprecated_at")
     private Instant deprecatedAt;
 
-    // V3 fields
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private String status = "draft";
+    private TemplateStatus status;
 
-    @Column(name = "proxmox_vmid")
+    @Column(name = "proxmox_vmid", nullable = false)
     private Integer proxmoxVmid;
 
-    @Column(name = "proxmox_node", length = 100)
+    @Column(name = "proxmox_node", nullable = false, length = 100)
     private String proxmoxNode;
 
     @Column(name = "disk_storage", length = 100)
@@ -91,19 +87,19 @@ public class Template {
 
     @Column(name = "validation_logs", columnDefinition = "jsonb")
     @ColumnTransformer(
-        read = "validation_logs::text",
-        write = "?::jsonb"
+            read = "validation_logs::text",
+            write = "?::jsonb"
     )
-    private String validationLogs; // Stored as JSONB, handled as String in Java
+    private String validationLogs;
 
     @Column(name = "last_validated_at")
     private Instant lastValidatedAt;
 
-    @Column(name = "expected_ssh_user", length = 50)
-    private String expectedSshUser = "root";
+    @Column(name = "expected_ssh_user", nullable = false, length = 50)
+    private String expectedSshUser;
 
-    @Column(name = "expected_ssh_port")
-    private Integer expectedSshPort = 22;
+    @Column(name = "expected_ssh_port", nullable = false)
+    private Integer expectedSshPort;
 
     @Column(name = "network_bridge", length = 100)
     private String networkBridge;
@@ -111,7 +107,8 @@ public class Template {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @OneToMany(mappedBy = "template", fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "template", fetch = FetchType.LAZY,
+            cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TemplateCapability> capabilities = new ArrayList<>();
 
     @PrePersist
@@ -120,31 +117,36 @@ public class Template {
             id = UUID.randomUUID();
         }
         Instant now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
-        if (status == null) {
-            status = "draft";
-        }
-        if (minRamMb == null) {
-            minRamMb = 2048;
-        }
-        if (minCpuCores == null) {
-            minCpuCores = 2;
-        }
-        if (expectedSshUser == null) {
-            expectedSshUser = "root";
-        }
-        if (expectedSshPort == null) {
-            expectedSshPort = 22;
-        }
+        createdAt = now;
+        updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();
+    }
+
+    // Bidirectional relationship helper
+    public void addCapability(TemplateCapability capability) {
+        capabilities.add(capability);
+        capability.setTemplate(this);
+    }
+
+    public void removeCapability(TemplateCapability capability) {
+        capabilities.remove(capability);
+        capability.setTemplate(null);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Template)) return false;
+        Template template = (Template) o;
+        return id != null && Objects.equals(id, template.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 }

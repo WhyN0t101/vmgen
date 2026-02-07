@@ -5,9 +5,12 @@ import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.auth.AuthResponse;
 import io.vmgen.api.dto.auth.LoginRequest;
 import io.vmgen.api.dto.auth.RegisterRequest;
+import io.vmgen.api.repository.UserRepository;
+import io.vmgen.api.service.AuditService;
 import io.vmgen.api.service.AuthService;
 import io.vmgen.api.service.RateLimitService;
 import io.vmgen.api.service.SessionService;
+import io.vmgen.api.models.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Map;
@@ -25,13 +28,22 @@ public class AuthController {
     private final AuthService authService;
     private final SessionService sessionService;
     private final RateLimitService rateLimitService;
+    private final UserRepository userRepository;  // Add this
+    private final AuditService auditService;      // Add this
 
-    public AuthController(AuthService authService, SessionService sessionService, RateLimitService rateLimitService) {
+    public AuthController(
+            AuthService authService,
+            SessionService sessionService,
+            RateLimitService rateLimitService,
+            UserRepository userRepository,
+            AuditService auditService
+    ) {
         this.authService = authService;
         this.sessionService = sessionService;
         this.rateLimitService = rateLimitService;
+        this.userRepository = userRepository;
+        this.auditService = auditService;
     }
-
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
         authService.register(req);
@@ -49,14 +61,25 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(Authentication authentication) {
+    public ResponseEntity<?> logout(Authentication authentication, HttpServletRequest http) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return ResponseEntity.ok(Map.of("status", "ok"));
         }
+
         AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
         UUID sessionId = UUID.fromString(principal.sessionId());
         UUID userId = UUID.fromString(principal.userId());
+
+        // Get user for audit logging
+        User user = userRepository.findById(userId).orElse(null);
+
         sessionService.logout(sessionId, userId);
+
+        // Audit log the logout
+        if (user != null) {
+            auditService.logLogout(user, sessionId, auditContext(http, Map.of()));
+        }
+
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 

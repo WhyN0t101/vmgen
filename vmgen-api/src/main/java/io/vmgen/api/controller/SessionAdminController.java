@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -45,13 +46,15 @@ public class SessionAdminController {
     @PostMapping("/revoke")
     public ResponseEntity<?> revoke(@Valid @RequestBody RevokeSessionRequest req, Authentication auth, HttpServletRequest http) {
         User admin = requireAdminUser(auth);
-        UUID sessionId = req.sessionUuid();
+        UUID sessionId = req.sessionUuid();  // Calls the method that converts string to UUID
 
-        UUID targetUserId = sessionService.getSessionOwnerUserId(sessionId);
-        sessionService.revokeSession(sessionId);
-        if (targetUserId != null) {
-            auditService.logSessionRevoked(admin, targetUserId, sessionId, auditContext(http, Map.of()));
-        }
+        Optional<UUID> targetUserId = sessionService.getSessionOwnerUserId(sessionId);
+        sessionService.revokeSession(sessionId, admin.getId());
+
+        targetUserId.ifPresent(userId ->
+                auditService.logSessionRevoked(admin, userId, sessionId, auditContext(http, Map.of()))
+
+        );
 
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
@@ -67,15 +70,19 @@ public class SessionAdminController {
 
     private User requireAdminUser(Authentication authentication) {
         AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
+        assert principal != null;
         UUID adminId = UUID.fromString(principal.userId());
         return userRepository.findById(adminId).orElseThrow();
     }
+
+
 
     private static AuditContext auditContext(HttpServletRequest req, Map<String, Object> metadata) {
         String ip = req.getRemoteAddr();
         String ua = req.getHeader("User-Agent");
         return new AuditContext(ip, ua, metadata);
     }
+
 }
 
 

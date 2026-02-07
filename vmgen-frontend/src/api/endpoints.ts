@@ -151,19 +151,19 @@ export const api = {
       return apiRequest<import('@/types').ActiveSession[]>('/api/admin/sessions')
     },
 
-    revokeSession: async (sessionId: string): Promise<{ status: string }> => {
-      return apiRequest<{ status: string }>('/api/admin/sessions/revoke', {
-        method: 'POST',
-        body: JSON.stringify({ sessionUuid: sessionId }),
-      })
-    },
+ revokeSession: async (sessionId: string): Promise<{ status: string }> => {
+  return apiRequest<{ status: string }>('/api/admin/sessions/revoke', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId }),  
+  })
+},
 
-    revokeAllUserSessions: async (userId: string): Promise<{ status: string }> => {
-      return apiRequest<{ status: string }>('/api/admin/sessions/revoke-all', {
-        method: 'POST',
-        body: JSON.stringify({ userUuid: userId }),
-      })
-    },
+   revokeAllUserSessions: async (userId: string): Promise<{ status: string }> => {
+  return apiRequest<{ status: string }>('/api/admin/sessions/revoke-all', {
+    method: 'POST',
+    body: JSON.stringify({ userId }), 
+  })
+},
 
     // Users
     updateUserRole: async (userId: string, role: 'user' | 'admin'): Promise<{ status: string }> => {

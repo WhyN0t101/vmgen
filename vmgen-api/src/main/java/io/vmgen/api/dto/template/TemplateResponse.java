@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import io.vmgen.api.models.TemplateStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,7 +44,7 @@ public class TemplateResponse {
     private Instant deprecatedAt;
     
     // V3 fields
-    private String status;
+    private TemplateStatus status;
     private Integer proxmoxVmid;
     private String proxmoxNode;
     private String diskStorage;

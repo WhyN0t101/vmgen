@@ -1,16 +1,17 @@
 package io.vmgen.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.vmgen.api.config.TemplateDefaults;
 import io.vmgen.api.dto.template.RegisterTemplateRequest;
 import io.vmgen.api.dto.template.TemplateListResponse;
 import io.vmgen.api.dto.template.TemplateResponse;
 import io.vmgen.api.dto.template.UpdateTemplateMetadataRequest;
 import io.vmgen.api.exceptions.DuplicateTemplateException;
-import io.vmgen.api.exceptions.ImmutableFieldUpdateException;
 import io.vmgen.api.exceptions.TemplateNotFoundException;
 import io.vmgen.api.exceptions.TemplateValidationException;
 import io.vmgen.api.models.Template;
 import io.vmgen.api.models.TemplateCapability;
+import io.vmgen.api.models.TemplateStatus;
 import io.vmgen.api.models.User;
 import io.vmgen.api.repository.TemplateCapabilityRepository;
 import io.vmgen.api.repository.TemplateRepository;
@@ -30,40 +31,59 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Slf4j
 public class TemplateService {
-    
+
     private final TemplateRepository templateRepository;
     private final TemplateCapabilityRepository capabilityRepository;
     private final UserRepository userRepository;
     private final ProxmoxService proxmoxService;
     private final ObjectMapper objectMapper;
-    
+
     /**
      * Register a new template from an existing Proxmox VM.
      */
     @Transactional
     public TemplateResponse registerTemplate(RegisterTemplateRequest request, UUID userId) {
-        // Check for duplicate identifier+version
-        if (templateRepository.findByIdentifierAndVersion(request.getIdentifier(), request.getVersion()).isPresent()) {
+        // Validate everything before database interaction
+        validateRegistrationRequest(request);
+
+        User creator = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+
+        // Build and save template
+        Template template = buildTemplate(request, creator);
+        template = templateRepository.save(template);
+
+        // Save capabilities
+        saveCapabilities(template, request.getCapabilities());
+
+        log.info("Template registered: {} {} (ID: {}, VMID: {}, Node: {})",
+                request.getIdentifier(), request.getVersion(), template.getId(),
+                template.getProxmoxVmid(), template.getProxmoxNode());
+
+        return toResponse(template);
+    }
+
+    private void validateRegistrationRequest(RegisterTemplateRequest request) {
+        if (templateRepository.findByIdentifierAndVersion(
+                request.getIdentifier(), request.getVersion()).isPresent()) {
             throw new DuplicateTemplateException(request.getIdentifier(), request.getVersion());
         }
-        
-        // Validate Proxmox VM exists
+
         String node = request.getProxmoxNode();
         if (node == null || node.isBlank()) {
-            throw new TemplateValidationException("Proxmox node is required in request");
+            throw new TemplateValidationException("Proxmox node is required");
         }
-        
-        if (!proxmoxService.vmExists(request.getProxmoxVmid(), node)) {
+
+        Integer vmid = request.getProxmoxVmid();
+        if (!proxmoxService.vmExists(vmid, node)) {
+            log.error("VM validation failed: VMID {} does not exist on node {}", vmid, node);
             throw new TemplateValidationException(
-                "Proxmox VM " + request.getProxmoxVmid() + " does not exist on node " + node
+                    "Proxmox VM " + vmid + " does not exist on node " + node
             );
         }
-        
-        // Get user
-        User creator = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
-        
-        // Create template
+    }
+
+    private Template buildTemplate(RegisterTemplateRequest request, User creator) {
         Template template = new Template();
         template.setIdentifier(request.getIdentifier());
         template.setVersion(request.getVersion());
@@ -72,173 +92,186 @@ public class TemplateService {
         template.setArchitecture(request.getArchitecture().toLowerCase());
         template.setDescription(request.getDescription());
         template.setProxmoxVmid(request.getProxmoxVmid());
-        template.setProxmoxNode(node);
+        template.setProxmoxNode(request.getProxmoxNode());
         template.setDiskStorage(request.getDiskStorage());
         template.setDiskSizeGb(request.getDiskSizeGb());
-        template.setMinRamMb(request.getMinRamMb() != null ? request.getMinRamMb() : 2048);
-        template.setMinCpuCores(request.getMinCpuCores() != null ? request.getMinCpuCores() : 2);
-        template.setExpectedSshUser(request.getExpectedSshUser() != null ? request.getExpectedSshUser() : "root");
-        template.setExpectedSshPort(request.getExpectedSshPort() != null ? request.getExpectedSshPort() : 22);
+        template.setMinRamMb(request.getMinRamMb() != null ? request.getMinRamMb() : TemplateDefaults.MIN_RAM_MB);
+        template.setMinCpuCores(request.getMinCpuCores() != null ? request.getMinCpuCores() : TemplateDefaults.MIN_CPU_CORES);
+        template.setExpectedSshUser(request.getExpectedSshUser() != null ? request.getExpectedSshUser() : TemplateDefaults.SSH_USER);
+        template.setExpectedSshPort(request.getExpectedSshPort() != null ? request.getExpectedSshPort() : TemplateDefaults.SSH_PORT);
         template.setNetworkBridge(request.getNetworkBridge());
-        template.setStatus("draft");
+        template.setStatus(TemplateStatus.DRAFT);
         template.setCreatedBy(creator);
-        
-        template = templateRepository.save(template);
-        
-        // Save capabilities
-        if (request.getCapabilities() != null && !request.getCapabilities().isEmpty()) {
-            for (String capability : request.getCapabilities()) {
-                TemplateCapability cap = new TemplateCapability(template.getId(), capability, template);
-                capabilityRepository.save(cap);
-            }
-        }
-        
-        log.info("Template registered: {} {} (ID: {})", request.getIdentifier(), request.getVersion(), template.getId());
-        
-        return toResponse(template);
+        return template;
     }
-    
+
+    private void saveCapabilities(Template template, List<String> capabilities) {
+        if (capabilities == null || capabilities.isEmpty()) {
+            return;
+        }
+
+        List<TemplateCapability> caps = capabilities.stream()
+                .map(cap -> new TemplateCapability(template.getId(), cap, template))
+                .collect(Collectors.toList());
+
+        capabilityRepository.saveAll(caps);
+    }
+
     /**
      * Get a template by ID.
      */
     @Transactional(readOnly = true)
     public TemplateResponse getTemplate(UUID id) {
         Template template = templateRepository.findById(id)
-            .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + id));
+                .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + id));
         return toResponse(template);
     }
-    
+
     /**
      * List active templates (for users).
      */
     @Transactional(readOnly = true)
     public List<TemplateListResponse> listActiveTemplates() {
-        return templateRepository.findAllByStatusOrderByCreatedAtDesc("active").stream()
-            .map(this::toListResponse)
-            .collect(Collectors.toList());
+        return templateRepository.findAllByStatusOrderByCreatedAtDesc(TemplateStatus.ACTIVE).stream()
+                .map(this::toListResponse)
+                .collect(Collectors.toList());
     }
-    
+
     /**
      * List all templates (admin only).
      */
     @Transactional(readOnly = true)
     public List<TemplateListResponse> listAllTemplates() {
         return templateRepository.findAllByOrderByCreatedAtDesc().stream()
-            .map(this::toListResponse)
-            .collect(Collectors.toList());
+                .map(this::toListResponse)
+                .collect(Collectors.toList());
     }
-    
+
     /**
      * List templates by status (admin filtering).
      */
     @Transactional(readOnly = true)
     public List<TemplateListResponse> listTemplatesByStatus(String status) {
-        return templateRepository.findAllByStatusOrderByCreatedAtDesc(status).stream()
-            .map(this::toListResponse)
-            .collect(Collectors.toList());
+        TemplateStatus statusEnum;
+        try {
+            statusEnum = TemplateStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new TemplateValidationException("Invalid status: " + status);
+        }
+        return templateRepository.findAllByStatusOrderByCreatedAtDesc(statusEnum).stream()
+                .map(this::toListResponse)
+                .collect(Collectors.toList());
     }
-    
+
     /**
      * Validate a template (transition from draft to active).
      */
     @Transactional
     public TemplateResponse validateTemplate(UUID templateId, UUID adminId) {
         Template template = templateRepository.findById(templateId)
-            .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + templateId));
-        
-        // Check status transition is valid
-        if (!"draft".equals(template.getStatus())) {
+                .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + templateId));
+
+        if (template.getStatus() != TemplateStatus.DRAFT) {
             throw new TemplateValidationException(
-                "Template must be in 'draft' status to validate. Current status: " + template.getStatus()
+                    "Template must be in 'draft' status to validate. Current status: " + template.getStatus()
             );
         }
-        
-        // Update status to validating
-        template.setStatus("validating");
+
+        // Validate Proxmox state before changing anything
+        ValidationResult validation = performProxmoxValidation(template);
+
+        if (!validation.valid()) {
+            template.setStatus(TemplateStatus.FAILED);
+            templateRepository.save(template);
+            throw new TemplateValidationException(validation.errorMessage());
+        }
+
+        // All validation passed, update to active in single transaction
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminId));
+
+        updateTemplateToActive(template, admin);
         template = templateRepository.save(template);
-        
-        // Verify Proxmox VM exists
+
+        log.info("Template validated: {} {} (ID: {}, VMID: {}, Node: {})",
+                template.getIdentifier(), template.getVersion(), template.getId(),
+                template.getProxmoxVmid(), template.getProxmoxNode());
+
+        return toResponse(template);
+    }
+
+    private ValidationResult performProxmoxValidation(Template template) {
         String node = template.getProxmoxNode();
-        if (node == null || node.isBlank()) {
-            throw new TemplateValidationException("Template has no Proxmox node configured");
-        }
-        
         Integer vmid = template.getProxmoxVmid();
+
+        if (node == null || node.isBlank()) {
+            return ValidationResult.failed("Template has no Proxmox node configured");
+        }
+
         if (vmid == null) {
-            throw new TemplateValidationException("Template has no Proxmox VMID configured");
+            return ValidationResult.failed("Template has no Proxmox VMID configured");
         }
-        
+
         if (!proxmoxService.vmExists(vmid, node)) {
-            template.setStatus("failed");
-            template = templateRepository.save(template);
-            throw new TemplateValidationException(
-                "Proxmox VM " + vmid + " does not exist on node " + node
-            );
+            log.error("VM validation failed: VMID {} does not exist on node {} for template {}",
+                    vmid, node, template.getId());
+            return ValidationResult.failed("Proxmox VM " + vmid + " does not exist on node " + node);
         }
-        
-        // Get VM details (for future use)
+
         try {
             proxmoxService.getVmDetails(vmid, node);
         } catch (Exception e) {
-            log.warn("Could not fetch VM details during validation: {}", e.getMessage());
+            log.warn("Could not fetch VM details during validation for template {}: {}",
+                    template.getId(), e.getMessage());
         }
-        
-        // Transition to active (actual validation by Automation Worker comes later)
-        template.setStatus("active");
-        
-        // Store mock validation logs
+
+        return ValidationResult.success();
+    }
+
+    private void updateTemplateToActive(Template template, User admin) {
+        template.setStatus(TemplateStatus.ACTIVE);
+
         Map<String, Object> validationLogs = new HashMap<>();
         validationLogs.put("registered", true);
         validationLogs.put("proxmox_verified", true);
         validationLogs.put("note", "Full validation (SSH, capabilities, hashing) will be performed by Automation Worker");
-        
+
         try {
             template.setValidationLogs(objectMapper.writeValueAsString(validationLogs));
         } catch (Exception e) {
-            log.error("Failed to serialize validation logs: {}", e.getMessage());
+            log.error("Failed to serialize validation logs for template {}: {}",
+                    template.getId(), e.getMessage());
         }
-        
-        // Set mock SHA256 hash (will be replaced by Automation Worker)
+
         template.setSha256Hash("pending-worker-validation-" + UUID.randomUUID().toString().replace("-", ""));
-        
-        // Set validation metadata
-        User admin = userRepository.findById(adminId)
-            .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminId));
         template.setValidatedBy(admin);
         template.setValidatedAt(Instant.now());
         template.setLastValidatedAt(Instant.now());
-        
-        template = templateRepository.save(template);
-        
-        log.info("Template validated: {} {} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
-        
-        return toResponse(template);
     }
-    
+
     /**
      * Deprecate a template (soft delete).
      */
     @Transactional
     public void deprecateTemplate(UUID templateId, UUID adminId) {
         Template template = templateRepository.findById(templateId)
-            .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + templateId));
-        
-        template.setStatus("deprecated");
+                .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + templateId));
+
+        template.setStatus(TemplateStatus.DEPRECATED);
         template.setDeprecatedAt(Instant.now());
         templateRepository.save(template);
-        
+
         log.info("Template deprecated: {} v{} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
     }
-    
+
     /**
      * Update template metadata (only mutable fields).
      */
     @Transactional
     public TemplateResponse updateMetadata(UUID id, UpdateTemplateMetadataRequest request) {
         Template template = templateRepository.findById(id)
-            .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + id));
-        
-        // Update only mutable fields
+                .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + id));
+
         if (request.getDescription() != null) {
             template.setDescription(request.getDescription());
         }
@@ -257,61 +290,73 @@ public class TemplateService {
         if (request.getMinCpuCores() != null) {
             template.setMinCpuCores(request.getMinCpuCores());
         }
-        
+
         template = templateRepository.save(template);
-        
+
         log.info("Template metadata updated: {} v{} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
-        
+
         return toResponse(template);
     }
-    
+
     // Helper methods
-    
+
     private TemplateResponse toResponse(Template template) {
         List<String> capabilities = capabilityRepository.findAllByTemplateId(template.getId()).stream()
-            .map(TemplateCapability::getCapability)
-            .collect(Collectors.toList());
-        
+                .map(TemplateCapability::getCapability)
+                .collect(Collectors.toList());
+
         return TemplateResponse.builder()
-            .id(template.getId())
-            .identifier(template.getIdentifier())
-            .version(template.getVersion())
-            .osFamily(template.getOsFamily())
-            .osVersion(template.getOsVersion())
-            .architecture(template.getArchitecture())
-            .description(template.getDescription())
-            .sha256Hash(template.getSha256Hash())
-            .diskSizeGb(template.getDiskSizeGb())
-            .minRamMb(template.getMinRamMb())
-            .minCpuCores(template.getMinCpuCores())
-            .validatedAt(template.getValidatedAt())
-            .validatedBy(template.getValidatedBy() != null ? template.getValidatedBy().getId() : null)
-            .validationNotes(template.getValidationNotes())
-            .createdBy(template.getCreatedBy() != null ? template.getCreatedBy().getId() : null)
-            .createdAt(template.getCreatedAt())
-            .deprecatedAt(template.getDeprecatedAt())
-            .status(template.getStatus())
-            .proxmoxVmid(template.getProxmoxVmid())
-            .proxmoxNode(template.getProxmoxNode())
-            .diskStorage(template.getDiskStorage())
-            .validationLogs(template.getValidationLogs())
-            .lastValidatedAt(template.getLastValidatedAt())
-            .expectedSshUser(template.getExpectedSshUser())
-            .expectedSshPort(template.getExpectedSshPort())
-            .networkBridge(template.getNetworkBridge())
-            .updatedAt(template.getUpdatedAt())
-            .capabilities(capabilities)
-            .build();
+                .id(template.getId())
+                .identifier(template.getIdentifier())
+                .version(template.getVersion())
+                .osFamily(template.getOsFamily())
+                .osVersion(template.getOsVersion())
+                .architecture(template.getArchitecture())
+                .description(template.getDescription())
+                .sha256Hash(template.getSha256Hash())
+                .diskSizeGb(template.getDiskSizeGb())
+                .minRamMb(template.getMinRamMb())
+                .minCpuCores(template.getMinCpuCores())
+                .validatedAt(template.getValidatedAt())
+                .validatedBy(template.getValidatedBy() != null ? template.getValidatedBy().getId() : null)
+                .validationNotes(template.getValidationNotes())
+                .createdBy(template.getCreatedBy() != null ? template.getCreatedBy().getId() : null)
+                .createdAt(template.getCreatedAt())
+                .deprecatedAt(template.getDeprecatedAt())
+                .status(template.getStatus())
+                .proxmoxVmid(template.getProxmoxVmid())
+                .proxmoxNode(template.getProxmoxNode())
+                .diskStorage(template.getDiskStorage())
+                .validationLogs(template.getValidationLogs())
+                .lastValidatedAt(template.getLastValidatedAt())
+                .expectedSshUser(template.getExpectedSshUser())
+                .expectedSshPort(template.getExpectedSshPort())
+                .networkBridge(template.getNetworkBridge())
+                .updatedAt(template.getUpdatedAt())
+                .capabilities(capabilities)
+                .build();
     }
-    
+
     private TemplateListResponse toListResponse(Template template) {
         return TemplateListResponse.builder()
-            .id(template.getId())
-            .identifier(template.getIdentifier())
-            .version(template.getVersion())
-            .osFamily(template.getOsFamily())
-            .status(template.getStatus())
-            .createdAt(template.getCreatedAt())
-            .build();
+                .id(template.getId())
+                .identifier(template.getIdentifier())
+                .version(template.getVersion())
+                .osFamily(template.getOsFamily())
+                .status(template.getStatus())
+                .createdAt(template.getCreatedAt())
+                .build();
     }
+
+    // Validation result holder
+        private record ValidationResult(boolean valid, String errorMessage) {
+
+        static ValidationResult success() {
+                return new ValidationResult(true, null);
+            }
+
+            static ValidationResult failed(String message) {
+                return new ValidationResult(false, message);
+            }
+        }
 }

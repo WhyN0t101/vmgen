@@ -1,6 +1,8 @@
 package io.vmgen.api.config;
 
 import io.vmgen.api.dto.auth.JwtClaimsDto;
+import io.vmgen.api.exceptions.InvalidTokenException;
+import io.vmgen.api.exceptions.SessionExpiredException;
 import io.vmgen.api.exceptions.SessionRevokedException;
 import io.vmgen.api.models.Session;
 import io.vmgen.api.service.JwtService;
@@ -13,14 +15,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final SessionService sessionService;
@@ -39,38 +44,57 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String rawToken = authHeader.substring("Bearer ".length()).trim();
-        JwtClaimsDto claims = jwtService.parseAndValidate(rawToken);
+        try {
+            String rawToken = authHeader.substring("Bearer ".length()).trim();
+            JwtClaimsDto claims = jwtService.parseAndValidate(rawToken);
 
-        UUID sessionId = UUID.fromString(claims.sessionId());
-        Instant now = Instant.now();
-        Session session = sessionService.getActiveSession(sessionId, now);
-        if (session == null) {
-            throw new SessionRevokedException();
+            UUID sessionId = UUID.fromString(claims.sessionId());
+            Instant now = Instant.now();
+            Optional<Session> session = sessionService.getActiveSession(sessionId, now);
+            if (session.isEmpty()) {
+                throw new SessionRevokedException();
+            }
+
+            String computedHash = TokenHashUtil.sha256HexLower(rawToken);
+            if (!TokenHashUtil.constantTimeEquals(session.get().getTokenHash(), computedHash)) {
+                throw new SessionRevokedException();
+            }
+
+            // Throttled activity tracking (isolated transaction inside service)
+            sessionService.updateActivityIfStale(sessionId, now);
+
+            String role = claims.role();
+            List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    new AuthPrincipal(claims.userId(), role, claims.sessionId()),
+                    null,
+                    authorities
+            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            filterChain.doFilter(request, response);
+
+        } catch (SessionRevokedException e) {
+            log.debug("Session revoked: {}", e.getMessage());
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Session has been revoked");
+        } catch (SessionExpiredException e) {
+            log.debug("Session expired: {}", e.getMessage());
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Session expired");
+        } catch (InvalidTokenException e) {
+            log.warn("Invalid token: {}", e.getMessage());
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
+        } catch (Exception e) {
+            log.error("Authentication error: {}", e.getMessage(), e);
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Authentication failed");
         }
+    }
 
-        String computedHash = TokenHashUtil.sha256HexLower(rawToken);
-        if (!TokenHashUtil.constantTimeEquals(session.getTokenHash(), computedHash)) {
-            throw new SessionRevokedException();
-        }
-
-        // Throttled activity tracking (isolated transaction inside service)
-        sessionService.updateActivityIfStale(sessionId, now);
-
-        String role = claims.role();
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
-
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                new AuthPrincipal(claims.userId(), role, claims.sessionId()),
-                null,
-                authorities
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        filterChain.doFilter(request, response);
+    private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.getWriter().write(String.format("{\"message\":\"%s\"}", message));
     }
 
     public record AuthPrincipal(String userId, String role, String sessionId) {}
 }
-
-

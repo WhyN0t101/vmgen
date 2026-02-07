@@ -1,13 +1,16 @@
 package io.vmgen.api.exceptions;
 
-public class InvalidTokenException extends VmgenApiException {
-    public InvalidTokenException() {
-        super("Invalid authentication token");
+public class InvalidTokenException extends RuntimeException {
+
+    public InvalidTokenException(String message) {
+        super(message);
     }
 
     public InvalidTokenException(Throwable cause) {
-        super("Invalid authentication token", cause);
+        super("Invalid token", cause);
+    }
+
+    public String getPublicMessage() {
+        return "Invalid or expired token";
     }
 }
-
-

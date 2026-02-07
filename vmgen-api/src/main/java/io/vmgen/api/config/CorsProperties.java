@@ -1,9 +1,12 @@
 package io.vmgen.api.config;
 
+import jakarta.annotation.PostConstruct;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -11,14 +14,16 @@ import org.springframework.stereotype.Component;
 @Setter
 @Component
 @ConfigurationProperties(prefix = "vmgen.cors")
+@Slf4j
 public class CorsProperties {
+
     /**
      * Comma-separated list of allowed origins.
      * Example: "http://localhost:5173,https://vmgen.example.com"
      */
-    private String allowedOrigins = "http://localhost:3000,http://localhost:5173";
+    private String allowedOrigins;
 
-    private String allowedMethods = "GET,POST,PUT,DELETE,OPTIONS";
+    private String allowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 
     private String allowedHeaders = "Authorization,Content-Type";
 
@@ -26,24 +31,60 @@ public class CorsProperties {
 
     private long maxAge = 3600L;
 
+    @PostConstruct
+    void validate() {
+        if (allowedOrigins == null || allowedOrigins.isBlank()) {
+            throw new IllegalStateException(
+                    "vmgen.cors.allowed-origins must be configured. " +
+                            "For development, use: http://localhost:5173"
+            );
+        }
+
+        List<String> origins = getAllowedOriginsList();
+
+        // Warn about wildcard in production
+        if (origins.contains("*")) {
+            log.warn("CORS configured with wildcard '*' - this is insecure for production!");
+        }
+
+        // Warn about localhost in what might be production
+        boolean hasLocalhost = origins.stream()
+                .anyMatch(origin -> origin.contains("localhost") || origin.contains("127.0.0.1"));
+
+        if (hasLocalhost) {
+            log.info("CORS includes localhost origins - ensure this is intentional");
+        }
+
+        log.info("CORS configured with {} allowed origins", origins.size());
+    }
+
     /**
-     * Parse comma-separated origins into a list.
+     * Parse comma-separated origins into a list, trimming whitespace.
      */
     public List<String> getAllowedOriginsList() {
-        return Arrays.asList(allowedOrigins.split(","));
+        return Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 
     /**
-     * Parse comma-separated methods into a list.
+     * Parse comma-separated methods into a list, trimming whitespace.
      */
     public List<String> getAllowedMethodsList() {
-        return Arrays.asList(allowedMethods.split(","));
+        return Arrays.stream(allowedMethods.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 
     /**
-     * Parse comma-separated headers into a list.
+     * Parse comma-separated headers into a list, trimming whitespace.
      */
     public List<String> getAllowedHeadersList() {
-        return Arrays.asList(allowedHeaders.split(","));
+        return Arrays.stream(allowedHeaders.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 }
