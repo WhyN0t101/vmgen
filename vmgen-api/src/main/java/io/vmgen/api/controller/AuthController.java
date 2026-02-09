@@ -21,7 +21,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -63,6 +65,8 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<?> logout(Authentication authentication, HttpServletRequest http) {
         if (authentication == null || authentication.getPrincipal() == null) {
+            // Log unauthenticated logout attempt for security monitoring
+            log.warn("Logout attempted without valid authentication from IP: {}", getClientIp(http));
             return ResponseEntity.ok(Map.of("status", "ok"));
         }
 

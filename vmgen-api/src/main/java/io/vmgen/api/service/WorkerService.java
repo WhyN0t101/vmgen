@@ -99,15 +99,13 @@ public class WorkerService {
             throw new ConflictException("Worker " + completion.getWorkerId() + " does not own this job");
         }
         
-        // Check if job was already marked failed (timeout)
-        if (request.getState() == VmRequestState.FAILED) {
-            log.warn("Late completion attempt for failed job {}. OVA should be cleaned up.", requestId);
-            throw new ConflictException("Job already marked as failed. Clean up orphaned artifacts.");
-        }
-        
-        // Verify job is in valid state for completion
-        if (request.getState() != VmRequestState.BUILDING && request.getState() != VmRequestState.EXPORTING) {
-            throw new ConflictException("Cannot complete job in state: " + request.getState());
+        // Validate state transition using state machine
+        if (!request.getState().canTransitionTo(VmRequestState.READY)) {
+            log.warn("Invalid state transition attempt: {} -> READY for job {}", request.getState(), requestId);
+            throw new ConflictException(
+                "Cannot complete job in state " + request.getState() + 
+                ". Valid transitions: " + request.getState().validTransitions()
+            );
         }
         
         // Update with artifact info
@@ -138,6 +136,12 @@ public class WorkerService {
         if (failure.getWorkerId() != null && 
             !failure.getWorkerId().equals(request.getClaimedByWorkerId())) {
             throw new ConflictException("Worker " + failure.getWorkerId() + " does not own this job");
+        }
+        
+        // Validate state transition (most states can fail, but check anyway)
+        if (!request.getState().canTransitionTo(VmRequestState.FAILED)) {
+            log.warn("Job {} in terminal state {}, ignoring fail request", requestId, request.getState());
+            return; // Already in terminal state
         }
         
         request.setState(VmRequestState.FAILED);
