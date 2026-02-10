@@ -68,12 +68,8 @@ public interface VmRequestRepository extends JpaRepository<VmRequest, UUID> {
     /**
      * Find jobs that haven't had progress updates (for timeout detection).
      */
-    @Query("""
-        SELECT vr FROM VmRequest vr 
-        WHERE vr.state IN ('building', 'exporting') 
-        AND vr.lastProgressAt < :threshold
-        """)
-    List<VmRequest> findStaleJobs(@Param("threshold") Instant threshold);
+    @Query("SELECT vr FROM VmRequest vr WHERE vr.state IN :states AND vr.lastProgressAt < :threshold")
+    List<VmRequest> findStaleJobs(@Param("states") List<VmRequestState> states, @Param("threshold") Instant threshold);
 
     /**
      * Find jobs by user.

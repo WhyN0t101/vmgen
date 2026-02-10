@@ -1,15 +1,18 @@
 package io.vmgen.api.models;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
 @Table(name = "vm_requests")
-@Data
+@Getter
+@Setter
 public class VmRequest {
 
     @Id
@@ -118,5 +121,18 @@ public class VmRequest {
         if (telemetryEnabled == null) {
             telemetryEnabled = false;
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof VmRequest)) return false;
+        VmRequest that = (VmRequest) o;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 }

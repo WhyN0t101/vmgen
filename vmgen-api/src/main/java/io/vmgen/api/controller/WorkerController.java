@@ -1,6 +1,7 @@
 package io.vmgen.api.controller;
 
 import io.vmgen.api.dto.worker.*;
+import jakarta.validation.Valid;
 import io.vmgen.api.service.WorkerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,7 @@ public class WorkerController {
      * Returns 204 No Content if no jobs available.
      */
     @PostMapping("/jobs/claim")
-    public ResponseEntity<?> claimJob(@RequestBody ClaimJobRequest request) {
+    public ResponseEntity<?> claimJob(@Valid @RequestBody ClaimJobRequest request) {
         log.info("Worker {} requesting job claim", request.getWorkerId());
         
         return workerService.claimNextJob(request.getWorkerId())
@@ -37,7 +38,7 @@ public class WorkerController {
     @PatchMapping("/jobs/{id}/progress")
     public ResponseEntity<?> updateProgress(
             @PathVariable("id") UUID requestId,
-            @RequestBody ProgressUpdateRequest request) {
+            @Valid @RequestBody ProgressUpdateRequest request) {
         
         workerService.updateProgress(requestId, request);
         return ResponseEntity.ok(Map.of("acknowledged", true));
@@ -50,7 +51,7 @@ public class WorkerController {
     @PostMapping("/jobs/{id}/complete")
     public ResponseEntity<?> completeJob(
             @PathVariable("id") UUID requestId,
-            @RequestBody JobCompleteRequest request) {
+            @Valid @RequestBody JobCompleteRequest request) {
         
         workerService.completeJob(requestId, request);
         return ResponseEntity.ok(Map.of("registered", true));
@@ -62,7 +63,7 @@ public class WorkerController {
     @PostMapping("/jobs/{id}/fail")
     public ResponseEntity<?> failJob(
             @PathVariable("id") UUID requestId,
-            @RequestBody JobFailRequest request) {
+            @Valid @RequestBody JobFailRequest request) {
         
         workerService.failJob(requestId, request);
         return ResponseEntity.ok(Map.of("acknowledged", true));

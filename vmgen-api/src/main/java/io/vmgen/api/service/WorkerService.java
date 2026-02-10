@@ -183,7 +183,8 @@ public class WorkerService {
     @Transactional
     public void markStaleJobsAsFailed(java.time.Duration timeout) {
         Instant threshold = Instant.now().minus(timeout);
-        List<VmRequest> staleJobs = vmRequestRepository.findStaleJobs(threshold);
+        List<VmRequest> staleJobs = vmRequestRepository.findStaleJobs(
+                List.of(VmRequestState.BUILDING, VmRequestState.EXPORTING), threshold);
         
         for (VmRequest job : staleJobs) {
             log.warn("Job {} timed out (no progress since {})", job.getId(), job.getLastProgressAt());

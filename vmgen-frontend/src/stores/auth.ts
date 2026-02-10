@@ -38,6 +38,8 @@ export const useAuthStore = defineStore('auth', () => {
       created_at: new Date().toISOString(),
     }
     
+    // TODO: SECURITY — localStorage is XSS-vulnerable. For production, migrate JWT
+    // to httpOnly secure cookies (requires backend cookie-setting endpoint). See AGENT_GUIDELINES Rule 12.
     localStorage.setItem('vmgen_token', data.token)
     localStorage.setItem('vmgen_role', data.role)
     if (data.expiresAt) {
