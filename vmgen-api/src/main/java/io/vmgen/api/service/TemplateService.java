@@ -75,6 +75,9 @@ public class TemplateService {
         }
 
         Integer vmid = request.getProxmoxVmid();
+        assertVmExists(vmid, node);
+    }
+    private void assertVmExists(Integer vmid, String node) {
         if (!proxmoxService.vmExists(vmid, node)) {
             log.error("VM validation failed: VMID {} does not exist on node {}", vmid, node);
             throw new TemplateValidationException(
@@ -82,7 +85,6 @@ public class TemplateService {
             );
         }
     }
-
     private Template buildTemplate(RegisterTemplateRequest request, User creator) {
         Template template = new Template();
         template.setIdentifier(request.getIdentifier());
@@ -212,11 +214,7 @@ public class TemplateService {
             return ValidationResult.failed("Template has no Proxmox VMID configured");
         }
 
-        if (!proxmoxService.vmExists(vmid, node)) {
-            log.error("VM validation failed: VMID {} does not exist on node {} for template {}",
-                    vmid, node, template.getId());
-            return ValidationResult.failed("Proxmox VM " + vmid + " does not exist on node " + node);
-        }
+        assertVmExists(vmid, node);
 
         try {
             proxmoxService.getVmDetails(vmid, node);
