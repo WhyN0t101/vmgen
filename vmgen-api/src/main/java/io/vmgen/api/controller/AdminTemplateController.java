@@ -41,8 +41,8 @@ public class AdminTemplateController {
             @Valid @RequestBody RegisterTemplateRequest request,
             Authentication authentication
     ) {
-        UUID userId = getUserId(authentication);
-        TemplateResponse response = templateService.registerTemplate(request, userId);
+        UUID adminId = getAdminId(authentication);
+        TemplateResponse response = templateService.registerTemplate(request, adminId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     
@@ -50,13 +50,7 @@ public class AdminTemplateController {
     public ResponseEntity<List<TemplateListResponse>> listTemplates(
             @RequestParam(required = false) String status
     ) {
-        List<TemplateListResponse> templates;
-        if (status != null && !status.isBlank()) {
-            templates = templateService.listTemplatesByStatus(status);
-        } else {
-            templates = templateService.listAllTemplates();
-        }
-        return ResponseEntity.ok(templates);
+        return ResponseEntity.ok(templateService.listTemplates(status));
     }
     
     @GetMapping("/{id}")
@@ -70,7 +64,7 @@ public class AdminTemplateController {
             @PathVariable UUID id,
             Authentication authentication
     ) {
-        UUID adminId = getUserId(authentication);
+        UUID adminId = getAdminId(authentication);
         TemplateResponse response = templateService.validateTemplate(id, adminId);
         return ResponseEntity.ok(response);
     }
@@ -80,7 +74,7 @@ public class AdminTemplateController {
             @PathVariable UUID id,
             Authentication authentication
     ) {
-        UUID adminId = getUserId(authentication);
+        UUID adminId = getAdminId(authentication);
         templateService.deprecateTemplate(id, adminId);
         return ResponseEntity.noContent().build();
     }
@@ -93,9 +87,11 @@ public class AdminTemplateController {
         TemplateResponse response = templateService.updateMetadata(id, request);
         return ResponseEntity.ok(response);
     }
-    
-    private UUID getUserId(Authentication authentication) {
-        AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
-        return UUID.fromString(Objects.requireNonNull(principal).userId());
+
+    private UUID getAdminId(Authentication authentication) {
+        AuthPrincipal principal = (AuthPrincipal) Objects.requireNonNull(
+                authentication.getPrincipal(), "Authentication principal must not be null"
+        );
+        return UUID.fromString(principal.userId());
     }
 }

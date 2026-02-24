@@ -1,6 +1,7 @@
 package io.vmgen.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.vmgen.api.config.ProxmoxApiConfig;
 import io.vmgen.api.config.TemplateDefaults;
 import io.vmgen.api.dto.template.RegisterTemplateRequest;
 import io.vmgen.api.dto.template.TemplateListResponse;
@@ -37,17 +38,19 @@ public class TemplateService {
     private final UserRepository userRepository;
     private final ProxmoxService proxmoxService;
     private final ObjectMapper objectMapper;
+    private final ProxmoxApiConfig proxmoxConfig;
 
     /**
-     * Register a new template from an existing Proxmox VM.
+     * Registers a new template from an existing Proxmox VM.
+     * Validates uniqueness and VM existence before persisting.
      */
     @Transactional
-    public TemplateResponse registerTemplate(RegisterTemplateRequest request, UUID userId) {
+    public TemplateResponse registerTemplate(RegisterTemplateRequest request, UUID adminId) {
         // Validate everything before database interaction
         validateRegistrationRequest(request);
 
-        User creator = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        User creator = userRepository.findById(adminId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + adminId));
 
         // Build and save template
         Template template = buildTemplate(request, creator);
@@ -63,6 +66,10 @@ public class TemplateService {
         return toResponse(template);
     }
 
+    /**
+     * Validates uniqueness of identifier/version combination and confirms
+     * the target Proxmox VM exists before any database interaction.
+     */
     private void validateRegistrationRequest(RegisterTemplateRequest request) {
         if (templateRepository.findByIdentifierAndVersion(
                 request.getIdentifier(), request.getVersion()).isPresent()) {
@@ -77,6 +84,11 @@ public class TemplateService {
         Integer vmid = request.getProxmoxVmid();
         assertVmExists(vmid, node);
     }
+
+    /**
+     * Asserts that a VM with the given VMID exists on the specified node.
+     * Throws {@link TemplateValidationException} if the VM cannot be found.
+     */
     private void assertVmExists(Integer vmid, String node) {
         if (!proxmoxService.vmExists(vmid, node)) {
             log.error("VM validation failed: VMID {} does not exist on node {}", vmid, node);
@@ -85,6 +97,12 @@ public class TemplateService {
             );
         }
     }
+
+
+    /**
+     * Constructs a new {@link Template} entity from the registration request,
+     * applying defaults for optional fields where not provided.
+     */
     private Template buildTemplate(RegisterTemplateRequest request, User creator) {
         Template template = new Template();
         template.setIdentifier(request.getIdentifier());
@@ -107,6 +125,11 @@ public class TemplateService {
         return template;
     }
 
+
+    /**
+     * Persists the capability tags associated with a template.
+     * No-ops if the capability list is null or empty.
+     */
     private void saveCapabilities(Template template, List<String> capabilities) {
         if (capabilities == null || capabilities.isEmpty()) {
             return;
@@ -120,7 +143,8 @@ public class TemplateService {
     }
 
     /**
-     * Get a template by ID.
+     * Retrieves a single template by its UUID.
+     * Throws {@link TemplateNotFoundException} if no match exists.
      */
     @Transactional(readOnly = true)
     public TemplateResponse getTemplate(UUID id) {
@@ -129,8 +153,10 @@ public class TemplateService {
         return toResponse(template);
     }
 
+
     /**
-     * List active templates (for users).
+     * Returns all active templates ordered by creation date descending.
+     * Intended for end-user consumption; excludes draft, failed, and deprecated templates.
      */
     @Transactional(readOnly = true)
     public List<TemplateListResponse> listActiveTemplates() {
@@ -139,34 +165,35 @@ public class TemplateService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * List all templates (admin only).
-     */
-    @Transactional(readOnly = true)
-    public List<TemplateListResponse> listAllTemplates() {
-        return templateRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(this::toListResponse)
-                .collect(Collectors.toList());
-    }
 
     /**
-     * List templates by status (admin filtering).
+     * Returns templates filtered by status, or all templates if status is null or blank.
+     * Throws {@link TemplateValidationException} if the provided status string is not a valid {@link TemplateStatus}.
      */
     @Transactional(readOnly = true)
-    public List<TemplateListResponse> listTemplatesByStatus(String status) {
+    public List<TemplateListResponse> listTemplates(String status) {
+        if (status == null || status.isBlank()) {
+            return templateRepository.findAllByOrderByCreatedAtDesc().stream()
+                    .map(this::toListResponse)
+                    .collect(Collectors.toList());
+        }
+
         TemplateStatus statusEnum;
         try {
             statusEnum = TemplateStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new TemplateValidationException("Invalid status: " + status);
         }
+
         return templateRepository.findAllByStatusOrderByCreatedAtDesc(statusEnum).stream()
                 .map(this::toListResponse)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Validate a template (transition from draft to active).
+     * Transitions a template from DRAFT to ACTIVE after verifying its Proxmox VM state.
+     * Sets the template to FAILED if Proxmox validation does not pass.
+     * Throws {@link TemplateValidationException} if the template is not in DRAFT status.
      */
     @Transactional
     public TemplateResponse validateTemplate(UUID templateId, UUID adminId) {
@@ -202,22 +229,28 @@ public class TemplateService {
         return toResponse(template);
     }
 
+
+    /**
+     * Performs Proxmox-side validation checks for a template.
+     * Returns a {@link ValidationResult} rather than throwing, allowing the caller
+     * to decide how to handle failure.
+     */
     private ValidationResult performProxmoxValidation(Template template) {
         String node = template.getProxmoxNode();
         Integer vmid = template.getProxmoxVmid();
-
-        if (node == null || node.isBlank()) {
-            return ValidationResult.failed("Template has no Proxmox node configured");
-        }
+        String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
 
         if (vmid == null) {
             return ValidationResult.failed("Template has no Proxmox VMID configured");
         }
 
-        assertVmExists(vmid, node);
+        if (!proxmoxService.vmExists(vmid, targetNode)) {
+            log.error("VM validation failed: VMID {} does not exist on node {}", vmid, targetNode);
+            return ValidationResult.failed("Proxmox VM " + vmid + " does not exist on node " + targetNode);
+        }
 
         try {
-            proxmoxService.getVmDetails(vmid, node);
+            proxmoxService.getVmDetails(vmid, targetNode);
         } catch (Exception e) {
             log.warn("Could not fetch VM details during validation for template {}: {}",
                     template.getId(), e.getMessage());
@@ -226,6 +259,11 @@ public class TemplateService {
         return ValidationResult.success();
     }
 
+
+    /**
+     * Applies the ACTIVE status and records audit metadata on the template.
+     * Sets a placeholder SHA-256 hash pending full validation by the Automation Worker.
+     */
     private void updateTemplateToActive(Template template, User admin) {
         template.setStatus(TemplateStatus.ACTIVE);
 
@@ -248,22 +286,34 @@ public class TemplateService {
     }
 
     /**
-     * Deprecate a template (soft delete).
+     * Marks a template as DEPRECATED and records the admin responsible.
+     * Throws {@link TemplateValidationException} if the template is already deprecated.
      */
     @Transactional
     public void deprecateTemplate(UUID templateId, UUID adminId) {
         Template template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + templateId));
 
+        if (template.getStatus() == TemplateStatus.DEPRECATED) {
+            throw new TemplateValidationException("Template is already deprecated");
+        }
+
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminId));
+
         template.setStatus(TemplateStatus.DEPRECATED);
         template.setDeprecatedAt(Instant.now());
+        template.setDeprecatedBy(admin);
         templateRepository.save(template);
 
-        log.info("Template deprecated: {} v{} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
+        log.info("Template deprecated: {} v{} by admin {} (ID: {})",
+                template.getIdentifier(), template.getVersion(), adminId, template.getId());
     }
 
     /**
-     * Update template metadata (only mutable fields).
+     * Updates mutable metadata fields on a template.
+     * Only non-null fields in the request are applied; immutable fields such as
+     * identifier, version, and Proxmox configuration are not affected.
      */
     @Transactional
     public TemplateResponse updateMetadata(UUID id, UpdateTemplateMetadataRequest request) {
@@ -298,6 +348,11 @@ public class TemplateService {
 
     // Helper methods
 
+
+    /**
+     * Maps a {@link Template} entity to a full {@link TemplateResponse} DTO,
+     * including a separate query for associated capabilities.
+     */
     private TemplateResponse toResponse(Template template) {
         List<String> capabilities = capabilityRepository.findAllByTemplateId(template.getId()).stream()
                 .map(TemplateCapability::getCapability)
@@ -317,6 +372,7 @@ public class TemplateService {
                 .minCpuCores(template.getMinCpuCores())
                 .validatedAt(template.getValidatedAt())
                 .validatedBy(template.getValidatedBy() != null ? template.getValidatedBy().getId() : null)
+                .deprecatedBy(template.getDeprecatedBy() != null ? template.getDeprecatedBy().getId() : null)
                 .validationNotes(template.getValidationNotes())
                 .createdBy(template.getCreatedBy() != null ? template.getCreatedBy().getId() : null)
                 .createdAt(template.getCreatedAt())
@@ -335,6 +391,11 @@ public class TemplateService {
                 .build();
     }
 
+
+    /**
+     * Maps a {@link Template} entity to a lightweight {@link TemplateListResponse} DTO.
+     * Used for list endpoints where full detail is not required.
+     */
     private TemplateListResponse toListResponse(Template template) {
         return TemplateListResponse.builder()
                 .id(template.getId())

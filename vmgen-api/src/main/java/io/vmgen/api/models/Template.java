@@ -107,6 +107,10 @@ public class Template {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deprecated_by")
+    private User deprecatedBy;
+
     @OneToMany(mappedBy = "template", fetch = FetchType.LAZY,
             cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TemplateCapability> capabilities = new ArrayList<>();

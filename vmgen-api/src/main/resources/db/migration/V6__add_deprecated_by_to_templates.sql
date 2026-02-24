@@ -1,0 +1,1 @@
+ALTER TABLE templates ADD COLUMN deprecated_by UUID REFERENCES users(id);

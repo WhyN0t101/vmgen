@@ -28,7 +28,8 @@ public class TemplateResponse {
     private Integer diskSizeGb;
     private Integer minRamMb;
     private Integer minCpuCores;
-    
+    private UUID deprecatedBy;
+
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Instant validatedAt;
     
