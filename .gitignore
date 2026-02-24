@@ -1,0 +1,5 @@
+# Root .gitignore
+.idea/
+*.iws
+*.iml
+*.ipr

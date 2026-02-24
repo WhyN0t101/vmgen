@@ -42,7 +42,7 @@ public class AuthService {
         user.setUsername(req.username());
         user.setEmail(req.email().toLowerCase(Locale.ROOT));
         user.setPasswordHash(passwordEncoder.encode(req.password()));
-        user.setRole(UserRole.user);
+        user.setRole(UserRole.USER);
         user.setEmailVerifiedAt(null);
 
         userRepository.save(user);
@@ -85,7 +85,7 @@ public class AuthService {
 
         UUID sessionId = UUID.randomUUID();
         Instant now = Instant.now();
-        long ttlSeconds = user.getRole() == UserRole.admin
+        long ttlSeconds = user.getRole() == UserRole.ADMIN
                 ? jwtProperties.getAdminTtlSeconds()
                 : jwtProperties.getUserTtlSeconds();
         Instant exp = now.plusSeconds(ttlSeconds);
@@ -97,7 +97,7 @@ public class AuthService {
             sessionService.createSession(user, sessionId, tokenHash, exp);
         } catch (Exception e) {
             log.error("Session creation failed for user {}: {}", user.getUsername(), e.getMessage());
-            auditService.logLoginFailed(identifier, enrichContext(ctx, "session_create_failed"));
+            auditService.logLoginFailed(identifier, enrichContext(ctx));
             throw new AuthenticationFailedException();
         }
 
@@ -108,11 +108,11 @@ public class AuthService {
         return new AuthResponse(token, exp.toString(), user.getRole().name());
     }
 
-    private AuditContext enrichContext(AuditContext ctx, String reason) {
+    private AuditContext enrichContext(AuditContext ctx) {
         return new AuditContext(
                 ctx != null ? ctx.ipAddress() : null,
                 ctx != null ? ctx.userAgent() : null,
-                java.util.Map.of("reason", reason)
+                java.util.Map.of("reason", "session_create_failed")
         );
     }
 }

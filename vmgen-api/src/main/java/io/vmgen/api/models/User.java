@@ -30,7 +30,7 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 50)
-    private UserRole role = UserRole.user;
+    private UserRole role = UserRole.USER;
 
     @Column(name = "email_verified_at")
     private Instant emailVerifiedAt;
@@ -47,7 +47,7 @@ public class User {
         Instant now = Instant.now();
         if (createdAt == null) createdAt = now;
         if (updatedAt == null) updatedAt = now;
-        if (role == null) role = UserRole.user;
+        if (role == null) role = UserRole.USER;
     }
 
     @PreUpdate
