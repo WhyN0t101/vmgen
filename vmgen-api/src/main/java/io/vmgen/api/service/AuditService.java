@@ -22,26 +22,37 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
-    // Audit action constants
     private static final String ACTION_LOGIN = "login";
     private static final String ACTION_LOGIN_FAILED = "login_failed";
     private static final String ACTION_SESSION_REVOKED = "session_revoked";
     private static final String ACTION_ROLE_UPDATED = "role_updated";
     private static final String ACTION_LOGOUT = "logout";
 
+
+    /**
+     * Records a successful login event in a new independent transaction.
+     * Persists regardless of the calling transaction outcome.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logLogin(User user, UUID sessionId, AuditContext ctx) {
         write(user, ACTION_LOGIN, "session", sessionId, ctx,
                 Map.of("sessionId", sessionId.toString()));
     }
 
+    /**
+     * Records a failed login attempt against the provided identifier.
+     * User is null since identity cannot be confirmed on failure.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logLoginFailed(String identifier, AuditContext ctx) {
         write(null, ACTION_LOGIN_FAILED, null, null, ctx,
                 Map.of("identifier", identifier));
     }
 
-
+    /**
+     * Records a session revocation event performed by an admin.
+     * sessionId may be null when all sessions for a user are revoked in bulk.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logSessionRevoked(User admin, UUID targetUserId, UUID sessionId, AuditContext ctx) {
         Map<String, Object> metadata = new HashMap<>();
@@ -52,12 +63,18 @@ public class AuditService {
         write(admin, ACTION_SESSION_REVOKED, "session", sessionId, ctx, metadata);
     }
 
+    /**
+     * Records a logout event for the given user and session.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logLogout(User user, UUID sessionId, AuditContext ctx) {
         write(user, ACTION_LOGOUT, "session", sessionId, ctx,
                 Map.of("sessionId", sessionId.toString()));
     }
 
+    /**
+     * Records a role change performed by an admin on a target user.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logRoleUpdated(User admin, UUID targetUserId, String newRole, AuditContext ctx) {
         write(admin, ACTION_ROLE_UPDATED, "user", targetUserId, ctx, Map.of(
@@ -66,6 +83,11 @@ public class AuditService {
         ));
     }
 
+    /**
+     * Core write method for all audit events.
+     * Merges extra metadata with context metadata before persisting.
+     * Catches and logs all exceptions to ensure audit failures never propagate to the caller.
+     */
     private void write(
             User user,
             String action,
@@ -106,6 +128,11 @@ public class AuditService {
                     e);
         }
     }
+
+    /**
+     * Serialises a metadata map to JSON.
+     * Returns a fallback error JSON string if serialisation fails rather than throwing.
+     */
     private String toJsonSafe(Map<String, Object> obj) {
         if (obj == null || obj.isEmpty()) {
             return null;

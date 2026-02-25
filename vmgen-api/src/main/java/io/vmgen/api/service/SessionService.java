@@ -24,6 +24,11 @@ public class SessionService {
 
     private final SessionRepository sessionRepository;
 
+
+    /**
+     * Creates and persists a new session for the given user.
+     * Guards against session ID collisions, which are theoretically possible with UUID v4.
+     */
     @Transactional
     public Session createSession(User user, UUID sessionId, String tokenHash, Instant expiresAt) {
         if (user == null || sessionId == null || tokenHash == null || expiresAt == null) {
@@ -49,6 +54,12 @@ public class SessionService {
         return session;
     }
 
+
+
+    /**
+     * Logs out a user by deleting their specific session.
+     * No-ops silently if the session does not exist or does not belong to the user.
+     */
     @Transactional
     public void logout(UUID sessionId, UUID userId) {
         int deleted = sessionRepository.deleteByIdAndUserId(sessionId, userId);
@@ -58,6 +69,10 @@ public class SessionService {
 
     }
 
+    /**
+     * Revokes a specific session by ID, performed by an admin.
+     * No-ops silently if the session does not exist.
+     */
     @Transactional
     public void revokeSession(UUID sessionId, UUID adminUserId) {
         Optional<Session> session = sessionRepository.findById(sessionId);
@@ -67,6 +82,10 @@ public class SessionService {
         }
     }
 
+    /**
+     * Revokes all active sessions for a given user.
+     * Used on login to enforce single-session policy, and on role change to invalidate stale claims.
+     */
     @Transactional
     public void revokeAllSessionsForUser(UUID userId) {
         int deleted = sessionRepository.deleteAllByUserId(userId);
@@ -75,6 +94,10 @@ public class SessionService {
         }
     }
 
+    /**
+     * Returns the active session for the given ID if it exists and has not expired.
+     * Throws {@link SessionExpiredException} if the session is found but past its expiry.
+     */
     @Transactional(readOnly = true)
     public Optional<Session> getActiveSession(UUID sessionId, Instant now) {
         Session session = sessionRepository.findById(sessionId).orElse(null);
@@ -91,6 +114,9 @@ public class SessionService {
         return Optional.of(session);
     }
 
+    /**
+     * Returns the user ID that owns the given session, if it exists.
+     */
     @Transactional(readOnly = true)
     public Optional<UUID> getSessionOwnerUserId(UUID sessionId) {
         return sessionRepository.findById(sessionId)
@@ -98,9 +124,9 @@ public class SessionService {
     }
 
     /**
-     * Called from JwtAuthenticationFilter (non-transactional context).
-     * Uses isolated transaction to avoid coupling to request handlers.
-     * Failures are logged but don't block authentication.
+     * Updates the last activity timestamp for a session if it has not been updated
+     * within the configured threshold. Runs in an isolated transaction with a short
+     * timeout to avoid blocking the authentication filter. Failures are swallowed.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 2)
     public void updateActivityIfStale(UUID sessionId, Instant now) {
@@ -125,6 +151,9 @@ public class SessionService {
         }
     }
 
+    /**
+     * Returns all currently active sessions with their associated user details.
+     */
     @Transactional(readOnly = true)
     public List<ActiveSessionDto> listActiveSessions() {
         Instant now = Instant.now();
@@ -141,6 +170,10 @@ public class SessionService {
                 .toList();
     }
 
+    /**
+     * Deletes expired sessions and optionally idle sessions beyond the given timeout.
+     * Intended to be called by a scheduled task.
+     */
     @Transactional
     public void cleanupExpiredAndIdle(Duration idleTimeout) {
         Instant now = Instant.now();

@@ -14,6 +14,7 @@ import io.vmgen.api.utils.TokenHashUtil;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,12 @@ public class AuthService {
     private final AuditService auditService;
     private final io.vmgen.api.config.JwtProperties jwtProperties;
 
+
+
+    /**
+     * Registers a new user after validating username/email uniqueness and password policy.
+     * Email is normalised to lowercase before persisting.
+     */
     @Transactional
     public void register(RegisterRequest req) {
         validateRegistration(req);
@@ -50,6 +57,10 @@ public class AuthService {
         log.info("User registered: {}", user.getUsername());
     }
 
+    /**
+     * Validates that the username and email are not already in use.
+     * Throws {@link ValidationException} on conflict.
+     */
     private void validateRegistration(RegisterRequest req) {
         if (userRepository.findByUsernameIgnoreCase(req.username()).isPresent()) {
             throw new ValidationException("Validation failed", List.of("Username already in use"));
@@ -59,6 +70,12 @@ public class AuthService {
         }
     }
 
+    /**
+     * Authenticates a user by email or username.
+     * Uses constant-time password verification to prevent timing attacks.
+     * Revokes all existing sessions before issuing a new one.
+     * Throws {@link AuthenticationFailedException} on invalid credentials or session creation failure.
+     */
     @Transactional
     public AuthResponse login(LoginRequest req, AuditContext ctx) {
         String identifier = req.identifier();
@@ -108,14 +125,21 @@ public class AuthService {
         return new AuthResponse(token, exp.toString(), user.getRole().name());
     }
 
+    /**
+     * Enriches an {@link AuditContext} with a failure reason metadata entry.
+     * Used when session creation fails after successful authentication.
+     */
     private AuditContext enrichContext(AuditContext ctx) {
         return new AuditContext(
                 ctx != null ? ctx.ipAddress() : null,
                 ctx != null ? ctx.userAgent() : null,
-                java.util.Map.of("reason", "session_create_failed")
-        );
+                Map.of("reason", "session_create_failed")        );
     }
 
+    /**
+     * Logs out the user by revoking the session and recording an audit event.
+     * No-ops silently if the user cannot be found, as the session is revoked regardless.
+     */
     public void logout(UUID sessionId, UUID userId, AuditContext ctx) {
         sessionService.logout(sessionId, userId);
         userRepository.findById(userId).ifPresent(user ->

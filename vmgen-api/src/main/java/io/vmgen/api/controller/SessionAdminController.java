@@ -1,14 +1,12 @@
 package io.vmgen.api.controller;
 
-import io.vmgen.api.config.JwtAuthenticationFilter.AuthPrincipal;
 import io.vmgen.api.dto.admin.ActiveSessionDto;
 import io.vmgen.api.dto.admin.RevokeAllSessionsRequest;
 import io.vmgen.api.dto.admin.RevokeSessionRequest;
-import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.models.User;
-import io.vmgen.api.repository.UserRepository;
 import io.vmgen.api.service.AuditService;
 import io.vmgen.api.service.SessionService;
+import io.vmgen.api.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -24,18 +22,20 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static io.vmgen.api.utils.HttpUtils.auditContext;
+
 @RestController
 @RequestMapping("/api/admin/sessions")
 @PreAuthorize("hasRole('ADMIN')")
 public class SessionAdminController {
     private final SessionService sessionService;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final AuditService auditService;
 
-    public SessionAdminController(SessionService sessionService, UserRepository userRepository, AuditService auditService) {
+    public SessionAdminController(SessionService sessionService, AuditService auditService, UserService userService) {
         this.sessionService = sessionService;
-        this.userRepository = userRepository;
         this.auditService = auditService;
+        this.userService = userService;
     }
 
     @GetMapping
@@ -44,9 +44,9 @@ public class SessionAdminController {
     }
 
     @PostMapping("/revoke")
-    public ResponseEntity<?> revoke(@Valid @RequestBody RevokeSessionRequest req, Authentication auth, HttpServletRequest http) {
-        User admin = requireAdminUser(auth);
-        UUID sessionId = req.sessionUuid();  // Calls the method that converts string to UUID
+    public ResponseEntity<Map<String, String>> revoke(@Valid @RequestBody RevokeSessionRequest req, Authentication auth, HttpServletRequest http) {
+        User admin = userService.requireAdminUser(auth);
+        UUID sessionId = req.sessionUuid();
 
         Optional<UUID> targetUserId = sessionService.getSessionOwnerUserId(sessionId);
         sessionService.revokeSession(sessionId, admin.getId());
@@ -60,29 +60,13 @@ public class SessionAdminController {
     }
 
     @PostMapping("/revoke-all")
-    public ResponseEntity<?> revokeAll(@Valid @RequestBody RevokeAllSessionsRequest req, Authentication auth, HttpServletRequest http) {
-        User admin = requireAdminUser(auth);
+    public ResponseEntity<Map<String, String>> revokeAll(@Valid @RequestBody RevokeAllSessionsRequest req, Authentication auth, HttpServletRequest http) {
+        User admin = userService.requireAdminUser(auth);
         UUID userId = req.userUuid();
         sessionService.revokeAllSessionsForUser(userId);
         auditService.logSessionRevoked(admin, userId, null, auditContext(http, Map.of()));
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
-
-    private User requireAdminUser(Authentication authentication) {
-        AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
-        assert principal != null;
-        UUID adminId = UUID.fromString(principal.userId());
-        return userRepository.findById(adminId).orElseThrow();
-    }
-
-
-
-    private static AuditContext auditContext(HttpServletRequest req, Map<String, Object> metadata) {
-        String ip = req.getRemoteAddr();
-        String ua = req.getHeader("User-Agent");
-        return new AuditContext(ip, ua, metadata);
-    }
-
 }
 
 

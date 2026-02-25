@@ -1,6 +1,7 @@
 package io.vmgen.api.config;
 
 import io.vmgen.api.utils.TokenHashUtil;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,12 +12,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import static io.vmgen.api.utils.HttpUtils.getClientIp;
+
 @Component
 @Slf4j
 public class WorkerApiKeyFilter extends OncePerRequestFilter {
 
     @Value("${worker.api.key}")
     private String workerApiKey;
+
+    @PostConstruct
+    public void validate() {
+        if (workerApiKey == null || workerApiKey.isBlank()) {
+            throw new IllegalStateException("worker.api.key must be configured");
+        }
+    }
 
     @Override
     protected void doFilterInternal(
@@ -48,11 +58,4 @@ public class WorkerApiKeyFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }
