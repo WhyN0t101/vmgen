@@ -11,6 +11,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Full template representation returned to clients, including metadata,
+ * Proxmox configuration, validation state, and capability tags.
+ */
 @Data
 @Builder
 @NoArgsConstructor

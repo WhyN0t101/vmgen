@@ -7,6 +7,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+/*
+  Configures the primary {@link ObjectMapper} for the API, ensuring
+  proper support for {@code java.time} types and ISO-8601 date formats.
+ */
 public class JacksonConfig {
 
     @Bean

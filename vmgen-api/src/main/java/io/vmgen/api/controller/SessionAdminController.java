@@ -3,6 +3,7 @@ package io.vmgen.api.controller;
 import io.vmgen.api.dto.admin.ActiveSessionDto;
 import io.vmgen.api.dto.admin.RevokeAllSessionsRequest;
 import io.vmgen.api.dto.admin.RevokeSessionRequest;
+import io.vmgen.api.dto.common.StatusResponse;
 import io.vmgen.api.models.User;
 import io.vmgen.api.service.AuditService;
 import io.vmgen.api.service.SessionService;
@@ -44,7 +45,7 @@ public class SessionAdminController {
     }
 
     @PostMapping("/revoke")
-    public ResponseEntity<Map<String, String>> revoke(@Valid @RequestBody RevokeSessionRequest req, Authentication auth, HttpServletRequest http) {
+    public ResponseEntity<StatusResponse> revoke(@Valid @RequestBody RevokeSessionRequest req, Authentication auth, HttpServletRequest http) {
         User admin = userService.requireAdminUser(auth);
         UUID sessionId = req.sessionUuid();
 
@@ -53,19 +54,18 @@ public class SessionAdminController {
 
         targetUserId.ifPresent(userId ->
                 auditService.logSessionRevoked(admin, userId, sessionId, auditContext(http, Map.of()))
-
         );
 
-        return ResponseEntity.ok(Map.of("status", "ok"));
+        return ResponseEntity.ok(new StatusResponse("ok"));
     }
 
     @PostMapping("/revoke-all")
-    public ResponseEntity<Map<String, String>> revokeAll(@Valid @RequestBody RevokeAllSessionsRequest req, Authentication auth, HttpServletRequest http) {
+    public ResponseEntity<StatusResponse> revokeAll(@Valid @RequestBody RevokeAllSessionsRequest req, Authentication auth, HttpServletRequest http) {
         User admin = userService.requireAdminUser(auth);
         UUID userId = req.userUuid();
         sessionService.revokeAllSessionsForUser(userId);
         auditService.logSessionRevoked(admin, userId, null, auditContext(http, Map.of()));
-        return ResponseEntity.ok(Map.of("status", "ok"));
+        return ResponseEntity.ok(new StatusResponse("ok"));
     }
 }
 

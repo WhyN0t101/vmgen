@@ -10,6 +10,10 @@ import org.springframework.stereotype.Component;
 @Getter
 @Component
 @ConfigurationProperties(prefix = "vmgen.jwt")
+/**
+ * Strongly-typed configuration for JWT issuance and validation,
+ * including HS256 secret material, issuer, and token lifetimes.
+ */
 public class JwtProperties {
     /**
      * HS256 secret. Must be at least 32 bytes (256 bits).

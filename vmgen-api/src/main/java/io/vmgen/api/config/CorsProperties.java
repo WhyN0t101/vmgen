@@ -15,12 +15,17 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "vmgen.cors")
 @Slf4j
+/*
+  Binds {@code vmgen.cors.*} properties and exposes parsed CORS settings.
+  Performs basic validation and logs potentially unsafe configurations at startup.
+ */
 public class CorsProperties {
 
     /**
      * Comma-separated list of allowed origins.
      * Example: "http://localhost:5173,https://vmgen.example.com"
      */
+    @SuppressWarnings("JavadocLinkAsPlainText")
     private String allowedOrigins;
 
     private String allowedMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
@@ -31,6 +36,10 @@ public class CorsProperties {
 
     private long maxAge = 3600L;
 
+    /**
+     * Validates the configured CORS origins and logs the effective configuration.
+     * Intended to fail fast on missing configuration and highlight insecure setups.
+     */
     @PostConstruct
     void validate() {
         if (allowedOrigins == null || allowedOrigins.isBlank()) {
@@ -56,6 +65,7 @@ public class CorsProperties {
         }
 
         log.info("CORS configured with {} allowed origins", origins.size());
+        log.info("CORS allowed origins: {}", origins);
     }
 
     /**

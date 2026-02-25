@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -26,6 +27,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Slf4j
+/*
+ * Authenticates incoming HTTP requests using a Bearer JWT.
+ * Validates the token, checks the backing session record, and populates
+ * the Spring Security context with user identity and role authorities.
+ */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final SessionService sessionService;
@@ -36,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
             throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -77,21 +83,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         } catch (SessionRevokedException e) {
             log.debug("Session revoked: {}", e.getMessage());
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Session has been revoked");
+            sendErrorResponse(response, "Session has been revoked");
         } catch (SessionExpiredException e) {
             log.debug("Session expired: {}", e.getMessage());
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Session expired");
+            sendErrorResponse(response, "Session expired");
         } catch (InvalidTokenException e) {
             log.warn("Invalid token: {}", e.getMessage());
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid token");
+            sendErrorResponse(response, "Invalid token");
         } catch (Exception e) {
             log.error("Authentication error: {}", e.getMessage(), e);
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Authentication failed");
+            sendErrorResponse(response, "Authentication failed");
         }
     }
 
-    private void sendErrorResponse(HttpServletResponse response, int status, String message) throws IOException {
-        response.setStatus(status);
+    private void sendErrorResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
         response.getWriter().write(String.format("{\"message\":\"%s\"}", message));
     }

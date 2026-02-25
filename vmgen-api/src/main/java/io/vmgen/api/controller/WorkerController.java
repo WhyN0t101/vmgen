@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 
@@ -40,30 +39,30 @@ public class WorkerController {
 
 
     @PatchMapping("/jobs/{id}/progress")
-    public ResponseEntity<Map<String, Boolean>> updateProgress(
+    public ResponseEntity<WorkerAckResponse> updateProgress(
             @PathVariable("id") UUID requestId,
             @Valid @RequestBody ProgressUpdateRequest request) {
         
         workerService.updateProgress(requestId, request);
-        return ResponseEntity.ok(Map.of("acknowledged", true));
+        return ResponseEntity.ok(new WorkerAckResponse(true));
     }
 
 
     @PostMapping("/jobs/{id}/complete")
-    public ResponseEntity<Map<String, Boolean>> completeJob(
+    public ResponseEntity<WorkerRegisteredResponse> completeJob(
             @PathVariable("id") UUID requestId,
             @Valid @RequestBody JobCompleteRequest request) {
         
         workerService.completeJob(requestId, request);
-        return ResponseEntity.ok(Map.of("registered", true));
+        return ResponseEntity.ok(new WorkerRegisteredResponse(true));
     }
 
     @PostMapping("/jobs/{id}/fail")
-    public ResponseEntity<Map<String, Boolean>> failJob(
+    public ResponseEntity<WorkerAckResponse> failJob(
             @PathVariable("id") UUID requestId,
             @Valid @RequestBody JobFailRequest request) {
         
         workerService.failJob(requestId, request);
-        return ResponseEntity.ok(Map.of("acknowledged", true));
+        return ResponseEntity.ok(new WorkerAckResponse(true));
     }
 }

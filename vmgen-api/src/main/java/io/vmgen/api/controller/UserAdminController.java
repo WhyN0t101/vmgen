@@ -1,7 +1,7 @@
 package io.vmgen.api.controller;
 
 import io.vmgen.api.dto.admin.RoleUpdateRequest;
-import io.vmgen.api.dto.audit.AuditContext;
+import io.vmgen.api.dto.common.StatusResponse;
 import io.vmgen.api.models.User;
 import io.vmgen.api.models.UserRole;
 import io.vmgen.api.service.UserService;
@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static io.vmgen.api.utils.HttpUtils.auditContext;
+
 @RestController
 @RequestMapping("/api/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
@@ -29,7 +31,7 @@ public class UserAdminController {
     }
 
     @PostMapping("/{userId}/role")
-    public ResponseEntity<Map<String, String>> updateRole(
+    public ResponseEntity<StatusResponse> updateRole(
             @PathVariable UUID userId,
             @Valid @RequestBody RoleUpdateRequest req,
             Authentication auth,
@@ -37,30 +39,9 @@ public class UserAdminController {
     ) {
         User admin = userService.requireAdminUser(auth);
         userService.updateRole(admin, userId, UserRole.valueOf(req.role()), auditContext(http, Map.of()));
-        return ResponseEntity.ok(Map.of("status", "ok"));
+        return ResponseEntity.ok(new StatusResponse("ok"));
     }
 
-
-    private static AuditContext auditContext(HttpServletRequest req, Map<String, Object> metadata) {
-        String ip = getClientIp(req);
-        String ua = req.getHeader("User-Agent");
-        return new AuditContext(ip, ua, metadata);
-    }
-
-    /**
-     * Extract client IP address, handling X-Forwarded-For header for proxies.
-     */
-    private static String getClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp;
-        }
-        return request.getRemoteAddr();
-    }
 }
 
 

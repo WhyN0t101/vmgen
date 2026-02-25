@@ -20,17 +20,18 @@ const users = computed(() => {
   
   sessions.value.forEach(session => {
     const existing = userMap.get(session.userId)
+    const isAdminRole = (session.role || '').toLowerCase() === 'admin'
+    const normalizedRole = isAdminRole ? 'admin' : 'user'
     if (existing) {
       existing.sessionCount++
-      // Update role if session has admin role
-      if (session.role === 'admin') {
+      if (isAdminRole) {
         existing.role = 'admin'
       }
     } else {
       userMap.set(session.userId, {
         userId: session.userId,
         username: session.username,
-        role: session.role as 'user' | 'admin',
+        role: normalizedRole,
         sessionCount: 1,
       })
     }
@@ -45,7 +46,7 @@ const currentUserId = computed(() => {
   
   // Find admin sessions that might match current user
   // We match by checking if username matches email pattern or if it's the only admin session
-  const adminSessions = sessions.value.filter(s => s.role === 'admin')
+  const adminSessions = sessions.value.filter(s => (s.role || '').toLowerCase() === 'admin')
   
   // If there's only one admin session, it's likely the current user
   if (adminSessions.length === 1) {
@@ -64,7 +65,7 @@ const currentUserId = computed(() => {
 // Count admins
 const adminCount = computed(() => {
   if (!users.value) return 0
-  return users.value.filter(u => u.role === 'admin').length
+  return users.value.filter(u => (u.role || '').toLowerCase() === 'admin').length
 })
 
 function handleRoleChange(userId: string, currentRole: 'user' | 'admin', newRole: 'user' | 'admin') {
@@ -95,7 +96,7 @@ function handleRoleChange(userId: string, currentRole: 'user' | 'admin', newRole
 }
 
 const isCurrentUser = (userId: string) => currentUserId.value === userId
-const isLastAdmin = (user: { role: 'user' | 'admin' }) => user.role === 'admin' && adminCount.value <= 1
+const isLastAdmin = (user: { role: 'user' | 'admin' }) => (user.role || '').toLowerCase() === 'admin' && adminCount.value <= 1
 </script>
 
 <template>

@@ -19,6 +19,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+
+/*
+ * Central HTTP security configuration for the VMGen API.
+ * Defines stateless JWT-based authentication for users/admins and delegates
+ * worker authentication to {@link WorkerApiKeyFilter} for {@code /api/worker/**}.
+ */
 public class SecurityConfig {
 
     private final CorsProperties corsProperties;

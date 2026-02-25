@@ -169,7 +169,7 @@ export const api = {
     updateUserRole: async (userId: string, role: 'user' | 'admin'): Promise<{ status: string }> => {
       return apiRequest<{ status: string }>(`/api/admin/users/${userId}/role`, {
         method: 'POST',
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role: role.toUpperCase() }),
       })
     },
 

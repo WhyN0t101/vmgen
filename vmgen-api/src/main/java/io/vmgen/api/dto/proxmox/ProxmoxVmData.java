@@ -3,6 +3,10 @@ package io.vmgen.api.dto.proxmox;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
+/**
+ * Raw VM entry as returned by the Proxmox VM list API. Used as an
+ * intermediate representation before mapping to higher-level summaries.
+ */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ProxmoxVmData {

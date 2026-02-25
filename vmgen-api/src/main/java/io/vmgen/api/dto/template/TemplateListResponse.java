@@ -10,6 +10,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Lightweight view of a template for list endpoints where full detail
+ * (capabilities, Proxmox config, etc.) is not required.
+ */
 @Data
 @Builder
 @NoArgsConstructor

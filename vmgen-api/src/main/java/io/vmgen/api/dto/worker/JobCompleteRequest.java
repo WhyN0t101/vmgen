@@ -3,8 +3,11 @@ package io.vmgen.api.dto.worker;
 import lombok.Data;
 
 import java.util.List;
-import java.util.Map;
 
+/**
+ * Worker-to-backend notification that a VM build has completed,
+ * including OVA metadata, provenance information, and generated flags.
+ */
 @Data
 public class JobCompleteRequest {
     private String workerId;

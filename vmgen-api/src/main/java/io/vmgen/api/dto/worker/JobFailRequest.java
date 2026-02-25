@@ -2,6 +2,10 @@ package io.vmgen.api.dto.worker;
 
 import lombok.Data;
 
+/**
+ * Worker-to-backend notification that a VM build has failed, including
+ * a coarse error type, message, and optional truncated logs.
+ */
 @Data
 public class JobFailRequest {
     private String workerId;

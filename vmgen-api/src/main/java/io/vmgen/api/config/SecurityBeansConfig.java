@@ -11,6 +11,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+/*
+ * Security-related bean configuration, including the application's
+ * {@link PasswordEncoder} strategy (Argon2 with BCrypt fallback).
+ */
 public class SecurityBeansConfig {
 
     @Bean

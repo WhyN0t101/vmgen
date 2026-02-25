@@ -1,5 +1,9 @@
 package io.vmgen.api.config;
 
+/*
+ * Central location for default template resource and SSH configuration.
+ * These defaults are applied when optional fields are omitted in requests.
+ */
 public final class TemplateDefaults {
 
     private TemplateDefaults() {

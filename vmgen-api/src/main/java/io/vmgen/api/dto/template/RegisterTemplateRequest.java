@@ -8,6 +8,10 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import lombok.Data;
 
+/**
+ * Payload for registering a new template from an existing Proxmox VM,
+ * including OS metadata, resources, network settings, and capabilities.
+ */
 @Data
 public class RegisterTemplateRequest {
     

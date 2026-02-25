@@ -5,6 +5,7 @@ import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.auth.AuthResponse;
 import io.vmgen.api.dto.auth.LoginRequest;
 import io.vmgen.api.dto.auth.RegisterRequest;
+import io.vmgen.api.dto.common.StatusResponse;
 import io.vmgen.api.service.AuthService;
 import io.vmgen.api.service.RateLimitService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,9 +36,9 @@ public class AuthController {
         this.rateLimitService = rateLimitService;
     }
     @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest req) {
+    public ResponseEntity<StatusResponse> register(@Valid @RequestBody RegisterRequest req) {
         authService.register(req);
-        return ResponseEntity.ok(Map.of("status", "ok"));
+        return ResponseEntity.ok(new StatusResponse("ok"));
     }
 
     @PostMapping("/login")
@@ -51,10 +52,10 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout(Authentication authentication, HttpServletRequest http) {
+    public ResponseEntity<StatusResponse> logout(Authentication authentication, HttpServletRequest http) {
         if (authentication == null || authentication.getPrincipal() == null) {
             log.warn("Logout attempted without valid authentication from IP: {}", getClientIp(http));
-            return ResponseEntity.ok(Map.of("status", "ok"));
+            return ResponseEntity.ok(new StatusResponse("ok"));
         }
 
         AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
@@ -62,7 +63,7 @@ public class AuthController {
         UUID userId = UUID.fromString(principal.userId());
 
         authService.logout(sessionId, userId, auditContext(http, Map.of()));
-        return ResponseEntity.ok(Map.of("status", "ok"));
+        return ResponseEntity.ok(new StatusResponse("ok"));
     }
 
 

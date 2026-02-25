@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -16,11 +17,20 @@ import static io.vmgen.api.utils.HttpUtils.getClientIp;
 
 @Component
 @Slf4j
+/*
+ * Filter that enforces an API key for all {@code /api/worker/**} requests.
+ * Provides a simple machine-to-machine authentication mechanism independent
+ * of user JWT-based authentication.
+ */
 public class WorkerApiKeyFilter extends OncePerRequestFilter {
 
     @Value("${worker.api.key}")
     private String workerApiKey;
 
+    /**
+     * Ensures that a worker API key is configured before the application
+     * starts accepting requests.
+     */
     @PostConstruct
     public void validate() {
         if (workerApiKey == null || workerApiKey.isBlank()) {
@@ -28,11 +38,16 @@ public class WorkerApiKeyFilter extends OncePerRequestFilter {
         }
     }
 
+    /**
+     * Validates the {@code X-Worker-Api-Key} header for worker endpoints and
+     * rejects requests with missing or invalid keys using a constant-time
+     * comparison to avoid timing side channels.
+     */
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain chain
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain
     ) throws ServletException, IOException {
 
         // Only check /api/worker/** endpoints

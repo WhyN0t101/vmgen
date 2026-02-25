@@ -7,6 +7,7 @@ import java.util.Map;
 
 public class HttpUtils {
     private HttpUtils() {}
+    
     /**
      * Extract client IP address, handling X-Forwarded-For header for proxies.
      */

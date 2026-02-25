@@ -3,6 +3,10 @@ package io.vmgen.api.dto.proxmox;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
+/**
+ * Subset of the Proxmox VM configuration used by VMGen for validation
+ * and display purposes.
+ */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ProxmoxVmConfig {

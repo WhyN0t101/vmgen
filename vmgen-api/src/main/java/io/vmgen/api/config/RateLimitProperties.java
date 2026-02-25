@@ -9,7 +9,12 @@ import org.springframework.stereotype.Component;
 @Setter
 @Component
 @ConfigurationProperties(prefix = "vmgen.rate-limit.login")
+/*
+ * Configuration for login rate limiting (per-IP request limits and window).
+ * Used by {@code RateLimitService} to protect authentication endpoints.
+ */
 public class RateLimitProperties {
+
     /**
      * Maximum number of login requests allowed per window.
      */

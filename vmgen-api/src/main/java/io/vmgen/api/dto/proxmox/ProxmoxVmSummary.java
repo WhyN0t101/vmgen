@@ -4,6 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * High-level summary of a Proxmox VM or template, used to populate
+ * admin-facing selection lists in the frontend.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

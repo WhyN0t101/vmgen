@@ -6,6 +6,10 @@ import lombok.Data;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Full job specification returned to a worker when it successfully
+ * claims a VM build request from the backend.
+ */
 @Data
 @Builder
 public class ClaimJobResponse {

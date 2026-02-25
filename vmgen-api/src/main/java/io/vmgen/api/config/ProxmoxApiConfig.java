@@ -2,6 +2,7 @@ package io.vmgen.api.config;
 
 import jakarta.annotation.PostConstruct;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
@@ -22,6 +23,12 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 @ConfigurationProperties(prefix = "proxmox.api")
 @Data
+@Slf4j
+/*
+ * Configuration for connecting to the Proxmox API.
+ * Binds {@code proxmox.api.*} properties and exposes a {@link RestTemplate}
+ * preconfigured with timeouts, connection pooling, and token-based authentication.
+ */
 public class ProxmoxApiConfig {
     
     private String url;
@@ -30,6 +37,10 @@ public class ProxmoxApiConfig {
     private boolean verifySsl = false;
     private String node;         // Default node for operations
     
+    /**
+     * Validates that mandatory Proxmox API properties are set and logs
+     * a warning when SSL verification is disabled.
+     */
     @PostConstruct
     void validate() {
         if (url == null || url.isBlank()) {
@@ -44,7 +55,17 @@ public class ProxmoxApiConfig {
         if (node == null || node.isBlank()) {
             throw new IllegalStateException("proxmox.api.node must be configured");
         }
+
+        if (!verifySsl) {
+            log.warn("Proxmox SSL verification is disabled (proxmox.api.verify-ssl=false); "
+                    + "this should only be used in local or development environments.");
+        }
     }
+
+    /**
+     * Builds a {@link RestTemplate} for Proxmox calls with appropriate
+     * timeouts, connection pooling, and Authorization header injection.
+     */
     @Bean
     public RestTemplate proxmoxRestTemplate() throws Exception {
         // Create request config with all timeouts

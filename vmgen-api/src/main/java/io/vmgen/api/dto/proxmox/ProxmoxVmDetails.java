@@ -4,6 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Detailed Proxmox VM characteristics relevant to template registration,
+ * including memory, CPU, disk size, and storage.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

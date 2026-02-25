@@ -5,11 +5,14 @@ import type { User } from '@/types'
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const token = ref<string | null>(localStorage.getItem('vmgen_token'))
-  const role = ref<'user' | 'admin' | null>((localStorage.getItem('vmgen_role') as 'user' | 'admin' | null) || null)
+  const storedRole = localStorage.getItem('vmgen_role')?.toLowerCase()
+  const initialRole: 'user' | 'admin' | null =
+    storedRole === 'admin' ? 'admin' : storedRole === 'user' ? 'user' : null
+  const role = ref<'user' | 'admin' | null>(initialRole)
   const expiresAt = ref<string | null>(localStorage.getItem('vmgen_expires_at'))
   
   const isAuthenticated = computed(() => !!token.value)
-  const isAdmin = computed(() => (user.value?.role || role.value) === 'admin')
+  const isAdmin = computed(() => (user.value?.role || role.value)?.toLowerCase() === 'admin')
   
   async function login(identifier: string, password: string) {
     const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/login`, {
@@ -26,22 +29,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
     
     const data = await response.json()
+    const normalizedRole = (data.role || '').toLowerCase()
+    const roleValue = normalizedRole === 'admin' ? 'admin' : normalizedRole === 'user' ? 'user' : null
     token.value = data.token
-    role.value = data.role
+    role.value = roleValue
     expiresAt.value = data.expiresAt
     
     // Backend response doesn't return user profile yet; keep minimal client-side identity.
     user.value = {
       id: 'unknown',
       email: identifier,
-      role: data.role,
+      role: roleValue ?? 'user',
       created_at: new Date().toISOString(),
     }
     
     // TODO: SECURITY — localStorage is XSS-vulnerable. For production, migrate JWT
     // to httpOnly secure cookies (requires backend cookie-setting endpoint). See AGENT_GUIDELINES Rule 12.
     localStorage.setItem('vmgen_token', data.token)
-    localStorage.setItem('vmgen_role', data.role)
+    localStorage.setItem('vmgen_role', roleValue ?? normalizedRole ?? '')
     if (data.expiresAt) {
       localStorage.setItem('vmgen_expires_at', data.expiresAt)
     }

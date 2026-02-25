@@ -2,6 +2,10 @@ package io.vmgen.api.dto.worker;
 
 import lombok.Data;
 
+/**
+ * Worker-to-backend progress update for an in-flight VM request,
+ * including stage, percentage, and a human-readable message.
+ */
 @Data
 public class ProgressUpdateRequest {
     private String workerId;

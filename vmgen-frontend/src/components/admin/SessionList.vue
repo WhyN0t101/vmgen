@@ -86,7 +86,7 @@ function handleRevokeAll(userId: string) {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-3 mb-3 flex-wrap">
               <span class="font-mono text-sm text-slate-300">{{ session.username }}</span>
-              <BaseBadge :variant="session.role === 'admin' ? 'danger' : 'info'" size="sm">
+              <BaseBadge :variant="(session.role || '').toLowerCase() === 'admin' ? 'danger' : 'info'" size="sm">
                 {{ session.role }}
               </BaseBadge>
               <span class="text-xs text-slate-500 font-mono">{{ session.sessionId.substring(0, 8) }}...</span>

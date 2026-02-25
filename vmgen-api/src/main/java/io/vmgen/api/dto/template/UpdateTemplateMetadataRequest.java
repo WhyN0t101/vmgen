@@ -4,6 +4,10 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Partial update payload for mutable template metadata such as description
+ * and resource/SSH configuration.
+ */
 @Data
 public class UpdateTemplateMetadataRequest {
     
