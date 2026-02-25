@@ -142,7 +142,7 @@ docker exec -it vmgen-postgres psql -U vmgen -d vmgen -f /tmp/promote_initial_ad
 
 Or via pgAdmin: Execute the SQL query directly.
 
-## 📄 License
+## License
 
 See `LICENSE` file for details.
 
