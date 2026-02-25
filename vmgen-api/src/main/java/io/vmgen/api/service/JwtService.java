@@ -24,6 +24,8 @@ public class JwtService {
     private final Algorithm algorithm;
     private final JWTVerifier verifier;
 
+
+
     public JwtService(JwtProperties jwtProperties) {
         this.jwtProperties = jwtProperties;
 
@@ -42,6 +44,11 @@ public class JwtService {
         log.info("JWT service initialized with issuer: {}", jwtProperties.getIssuer());
     }
 
+
+    /**
+     * Generates a signed JWT token with user identity, role, and session claims.
+     * Throws {@link IllegalArgumentException} if any parameter is null.
+     */
     public String generateToken(UUID userId, String role, UUID sessionId, Instant issuedAt, Instant expiresAt) {
         if (userId == null || role == null || sessionId == null || issuedAt == null || expiresAt == null) {
             throw new IllegalArgumentException("All parameters required for token generation");
@@ -57,6 +64,11 @@ public class JwtService {
                 .sign(algorithm);
     }
 
+    /**
+     * Parses and validates a raw JWT token string.
+     * Throws {@link SessionExpiredException} if the token is expired.
+     * Throws {@link InvalidTokenException} if the token is malformed, missing claims, or fails verification.
+     */
     public JwtClaimsDto parseAndValidate(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             log.warn("Token validation failed: empty token");

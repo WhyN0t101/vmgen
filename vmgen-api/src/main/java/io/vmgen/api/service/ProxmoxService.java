@@ -16,7 +16,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -53,7 +52,7 @@ public class ProxmoxService {
             log.warn("vmExists called with null vmid");
             return false;
         }
-        String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
+        String targetNode = resolveNode(node);
 
         try {
             String url = buildUrl("/nodes/{node}/qemu/{vmid}/status/current");
@@ -89,7 +88,7 @@ public class ProxmoxService {
      */
     public ProxmoxVmDetails getVmDetails(Integer vmid, String node) {
         if (vmid == null) throw new IllegalArgumentException("VMID must be provided");
-        String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
+        String targetNode = resolveNode(node);
         try {
             String url = buildUrl("/nodes/{node}/qemu/{vmid}/config");
             @SuppressWarnings("rawtypes") ResponseEntity<ProxmoxApiResponse> response =
@@ -137,7 +136,7 @@ public class ProxmoxService {
             log.warn("getVmStorage called with null vmid");
             return Optional.empty();
         }
-        String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
+        String targetNode = resolveNode(node);
         try {
             ProxmoxVmDetails details = getVmDetails(vmid, targetNode);
             return Optional.ofNullable(details.getDiskStorage());
@@ -160,7 +159,7 @@ public class ProxmoxService {
      * @throws ProxmoxConnectionException if the request fails or times out
      */
     public List<ProxmoxVmSummary> listVms(String node) {
-        String targetNode = (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
+        String targetNode = resolveNode(node);
         try {
             String url = buildUrl("/nodes/{node}/qemu");
             @SuppressWarnings("rawtypes") ResponseEntity<ProxmoxApiResponse> response =
@@ -186,7 +185,7 @@ public class ProxmoxService {
             List<ProxmoxVmSummary> summaries = vmList.stream()
                     .filter(Objects::nonNull)
                     .map(this::mapToVmSummary)
-                    .collect(Collectors.toList());
+                    .toList();
 
             log.info("Listed {} VMs on node {}", summaries.size(), targetNode);
             return summaries;
@@ -198,6 +197,10 @@ public class ProxmoxService {
             log.error("Failed to list VMs on node {}: {}", targetNode, e.getMessage());
             throw new ProxmoxConnectionException("Failed to list VMs: " + e.getMessage(), e);
         }
+    }
+
+    private String resolveNode(String node) {
+        return (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
     }
 
     private String buildUrl(String path) {
@@ -218,13 +221,10 @@ public class ProxmoxService {
         details.setMemory(vmConfig.getMemory());
         details.setCores(vmConfig.getCores());
 
-        // Try scsi0 first, then ide0
         DiskInfo diskInfo = extractDiskInfo(vmConfig.getScsi0());
         if (diskInfo == null) {
             diskInfo = extractDiskInfo(vmConfig.getIde0());
         }
-        // Remove the virtio0 line if it doesn't exist in your DTO
-
         if (diskInfo != null) {
             details.setDiskStorage(diskInfo.storage);
             details.setDiskSizeGb(diskInfo.sizeGb);
@@ -270,4 +270,5 @@ public class ProxmoxService {
     }
 
     private record DiskInfo(String storage, Integer sizeGb) {}
+
 }

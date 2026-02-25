@@ -1,8 +1,12 @@
 package io.vmgen.api.service;
 
-import io.vmgen.api.dto.worker.*;
+import io.vmgen.api.dto.worker.ClaimJobResponse;
+import io.vmgen.api.dto.worker.ProgressUpdateRequest;
+import io.vmgen.api.dto.worker.JobCompleteRequest;
+import io.vmgen.api.dto.worker.JobFailRequest;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ConflictException;
+import io.vmgen.api.models.Template;
 import io.vmgen.api.models.VmRequest;
 import io.vmgen.api.models.VmRequestState;
 import io.vmgen.api.repository.VmRequestRepository;
@@ -11,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -24,8 +29,9 @@ public class WorkerService {
     private final VmRequestRepository vmRequestRepository;
 
     /**
-     * Atomically claim the next queued job.
-     * Uses FOR UPDATE SKIP LOCKED to prevent race conditions.
+     * Atomically claims the next queued job for the given worker.
+     * Uses FOR UPDATE SKIP LOCKED at the database level to prevent race conditions
+     * between concurrent worker instances. Returns empty if no jobs are available.
      */
     @Transactional
     public Optional<ClaimJobResponse> claimNextJob(String workerId) {
@@ -53,7 +59,9 @@ public class WorkerService {
     }
 
     /**
-     * Update job progress (prevents timeout detection).
+     * Updates progress for an in-flight job and resets the heartbeat timestamp.
+     * Transitions the job to EXPORTING state if the reported stage is "exporting".
+     * Throws {@link ConflictException} if the worker does not own the job or the state is invalid.
      */
     @Transactional
     public void updateProgress(UUID requestId, ProgressUpdateRequest update) {
@@ -85,9 +93,12 @@ public class WorkerService {
         log.debug("Progress updated for job {}: {} ({}%)", requestId, update.getStage(), update.getPercent());
     }
 
+
     /**
-     * Complete a job and register the artifact.
-     * Validates state to prevent late completion after timeout.
+     * Marks a job as READY and records artifact metadata upon successful completion.
+     * Validates the state transition to prevent late completion after a timeout has already
+     * marked the job as FAILED.
+     * Throws {@link ConflictException} if the worker does not own the job or the transition is invalid.
      */
     @Transactional
     public void completeJob(UUID requestId, JobCompleteRequest completion) {
@@ -125,7 +136,9 @@ public class WorkerService {
     }
 
     /**
-     * Mark a job as failed.
+     * Marks a job as FAILED with the provided error details.
+     * No-ops silently if the job is already in a terminal state.
+     * Throws {@link ConflictException} if the worker does not own the job.
      */
     @Transactional
     public void failJob(UUID requestId, JobFailRequest failure) {
@@ -154,12 +167,11 @@ public class WorkerService {
     }
 
     /**
-     * Build claim response with full build specification.
+     * Builds the full job specification response returned to the worker upon claiming a job.
      */
     private ClaimJobResponse buildClaimResponse(VmRequest request) {
-        // Get template info
-        var template = request.getTemplate();
-        
+
+        Template template = request.getTemplate();
         // TODO: Fetch scripts from vm_request_scripts table
         
         return ClaimJobResponse.builder()
@@ -177,22 +189,22 @@ public class WorkerService {
     }
 
     /**
-     * Mark jobs as failed if no progress update within timeout period.
-     * Called periodically by ScheduledTasksService.
+     * Marks all BUILDING and EXPORTING jobs as FAILED if no progress update has been
+     * received within the given timeout duration.
+     * Intended to be called periodically by a scheduled task.
      */
     @Transactional
-    public void markStaleJobsAsFailed(java.time.Duration timeout) {
-        Instant threshold = Instant.now().minus(timeout);
+    public void markStaleJobsAsFailed(Duration timeout){
+    Instant threshold = Instant.now().minus(timeout);
         List<VmRequest> staleJobs = vmRequestRepository.findStaleJobs(
                 List.of(VmRequestState.BUILDING, VmRequestState.EXPORTING), threshold);
-        
-        for (VmRequest job : staleJobs) {
-            log.warn("Job {} timed out (no progress since {})", job.getId(), job.getLastProgressAt());
+
+        staleJobs.forEach(job -> {
             job.setState(VmRequestState.FAILED);
             job.setFailedAt(Instant.now());
             job.setFailureReason("TIMEOUT: No progress update for " + timeout.toMinutes() + " minutes");
-            vmRequestRepository.save(job);
-        }
+        });
+        vmRequestRepository.saveAll(staleJobs);
         
         if (!staleJobs.isEmpty()) {
             log.info("Marked {} stale jobs as failed", staleJobs.size());
