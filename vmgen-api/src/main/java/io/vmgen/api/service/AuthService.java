@@ -115,4 +115,10 @@ public class AuthService {
                 java.util.Map.of("reason", "session_create_failed")
         );
     }
+
+    public void logout(UUID sessionId, UUID userId, AuditContext ctx) {
+        sessionService.logout(sessionId, userId);
+        userRepository.findById(userId).ifPresent(user ->
+                auditService.logLogout(user, sessionId, ctx));
+    }
 }
