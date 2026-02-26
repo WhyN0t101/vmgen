@@ -53,14 +53,6 @@ function logout() {
             >
               Admin
             </router-link>
-            <router-link
-              v-if="authStore.isAdmin"
-              to="/admin/templates"
-              class="text-slate-400 hover:text-slate-100 transition-colors"
-              active-class="text-primary-500"
-            >
-              Manage Templates
-            </router-link>
           </div>
         </div>
         <div class="flex items-center gap-4">

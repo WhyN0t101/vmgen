@@ -1,6 +1,6 @@
 package io.vmgen.api.repository;
 
-import io.vmgen.api.models.Session;
+import io.vmgen.api.models.user.Session;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

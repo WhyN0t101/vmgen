@@ -1,5 +1,7 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.flag;
 
+import io.vmgen.api.models.script.Script;
+import io.vmgen.api.models.vm.VmRequest;
 import jakarta.persistence.*;
 import lombok.Data;
 

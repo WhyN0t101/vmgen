@@ -199,6 +199,24 @@ public class ProxmoxService {
         }
     }
 
+    /**
+     * Retrieves a single VM summary by VMID from Proxmox.
+     * Uses {@link #listVms(String)} under the hood and filters by VMID.
+     *
+     * @param vmid the VMID to look up; must not be null
+     * @param node the target Proxmox node; falls back to {@code proxmox.api.node} if null or blank
+     * @return an {@link Optional} containing the matching {@link ProxmoxVmSummary}, or empty if not found
+     */
+    public Optional<ProxmoxVmSummary> getVmSummary(Integer vmid, String node) {
+        if (vmid == null) {
+            log.warn("getVmSummary called with null vmid");
+            return Optional.empty();
+        }
+        return listVms(node).stream()
+                .filter(vm -> vm != null && Objects.equals(vm.getVmid(), vmid))
+                .findFirst();
+    }
+
     private String resolveNode(String node) {
         return (node != null && !node.isBlank()) ? node : proxmoxConfig.getNode();
     }

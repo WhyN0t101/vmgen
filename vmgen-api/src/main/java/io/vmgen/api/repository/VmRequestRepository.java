@@ -1,7 +1,7 @@
 package io.vmgen.api.repository;
 
-import io.vmgen.api.models.VmRequest;
-import io.vmgen.api.models.VmRequestState;
+import io.vmgen.api.models.vm.VmRequest;
+import io.vmgen.api.models.vm.VmRequestState;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

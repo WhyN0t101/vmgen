@@ -218,6 +218,73 @@ export const api = {
       const nodeParam = node ? `&node=${node}` : ''
       return apiRequest<{ storage: string }>(`/api/admin/proxmox/vm-storage?vmid=${vmid}${nodeParam}`)
     },
+
+    // Scripts
+    listScripts: async (queryString: string): Promise<import('@/types').PagedResponse<import('@/types').ScriptListItem>> => {
+      const url = queryString ? `/api/admin/scripts?${queryString}` : '/api/admin/scripts'
+      return apiRequest<import('@/types').PagedResponse<import('@/types').ScriptListItem>>(url)
+    },
+
+    getScript: async (id: string): Promise<import('@/types').ScriptDetail> => {
+      return apiRequest<import('@/types').ScriptDetail>(`/api/admin/scripts/${id}`)
+    },
+
+    createScript: async (data: import('@/types').CreateScriptRequest): Promise<import('@/types').ScriptDetail> => {
+      return apiRequest<import('@/types').ScriptDetail>('/api/admin/scripts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+    },
+
+    updateScript: async (id: string, data: import('@/types').UpdateScriptRequest): Promise<import('@/types').ScriptDetail> => {
+      return apiRequest<import('@/types').ScriptDetail>(`/api/admin/scripts/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      })
+    },
+
+    deprecateScript: async (id: string): Promise<import('@/types').StatusResponse> => {
+      return apiRequest<import('@/types').StatusResponse>(`/api/admin/scripts/${id}/deprecate`, {
+        method: 'POST',
+      })
+    },
+
+    // Vulnerability categories
+    listCategories: async (activeOnly: boolean = true): Promise<import('@/types').CategoryList[]> => {
+      const param = activeOnly ? '?activeOnly=true' : '?activeOnly=false'
+      return apiRequest<import('@/types').CategoryList[]>(`/api/admin/categories${param}`)
+    },
+
+    getCategory: async (id: string): Promise<import('@/types').CategoryDetail> => {
+      return apiRequest<import('@/types').CategoryDetail>(`/api/admin/categories/${id}`)
+    },
+
+    createCategory: async (data: import('@/types').CreateCategoryRequest): Promise<import('@/types').CategoryDetail> => {
+      return apiRequest<import('@/types').CategoryDetail>('/api/admin/categories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+    },
+
+    updateCategory: async (id: string, data: import('@/types').UpdateCategoryRequest): Promise<import('@/types').CategoryDetail> => {
+      return apiRequest<import('@/types').CategoryDetail>(`/api/admin/categories/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      })
+    },
+
+    deprecateCategory: async (id: string): Promise<import('@/types').StatusResponse> => {
+      return apiRequest<import('@/types').StatusResponse>(`/api/admin/categories/${id}/deprecate`, {
+        method: 'POST',
+      })
+    },
+
+    reorderCategories: async (items: import('@/types').CategoryReorderRequest[]): Promise<import('@/types').StatusResponse> => {
+      return apiRequest<import('@/types').StatusResponse>('/api/admin/categories/reorder', {
+        method: 'POST',
+        body: JSON.stringify(items),
+      })
+    },
   },
 
   // Public template endpoints

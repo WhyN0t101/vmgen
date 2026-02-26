@@ -1,4 +1,4 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.user;
 
 public enum UserRole {
     USER,

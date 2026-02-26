@@ -4,7 +4,7 @@ import io.vmgen.api.dto.admin.ActiveSessionDto;
 import io.vmgen.api.dto.admin.RevokeAllSessionsRequest;
 import io.vmgen.api.dto.admin.RevokeSessionRequest;
 import io.vmgen.api.dto.common.StatusResponse;
-import io.vmgen.api.models.User;
+import io.vmgen.api.models.user.User;
 import io.vmgen.api.service.AuditService;
 import io.vmgen.api.service.SessionService;
 import io.vmgen.api.service.UserService;

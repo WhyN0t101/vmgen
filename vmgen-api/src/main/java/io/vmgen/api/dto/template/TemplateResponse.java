@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import io.vmgen.api.models.TemplateStatus;
+import io.vmgen.api.models.template.TemplateStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -58,6 +58,7 @@ public class TemplateResponse {
     private String expectedSshUser;
     private Integer expectedSshPort;
     private String networkBridge;
+    private String sshAuthMethod;
     
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Instant updatedAt;

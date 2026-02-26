@@ -1,5 +1,7 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.script;
 
+import io.vmgen.api.models.user.User;
+import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -28,8 +30,9 @@ public class Script {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "vulnerability_category", nullable = false, length = 100)
-    private String vulnerabilityCategory;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private VulnerabilityCategory category;
 
     @Column(name = "difficulty_level", nullable = false, length = 50)
     private String difficultyLevel;

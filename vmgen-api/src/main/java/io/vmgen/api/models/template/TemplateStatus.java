@@ -1,4 +1,4 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.template;
 
 public enum TemplateStatus {
     DRAFT,

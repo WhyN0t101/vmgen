@@ -2,8 +2,8 @@ package io.vmgen.api.service;
 
 import io.vmgen.api.dto.admin.ActiveSessionDto;
 import io.vmgen.api.exceptions.SessionExpiredException;
-import io.vmgen.api.models.Session;
-import io.vmgen.api.models.User;
+import io.vmgen.api.models.user.Session;
+import io.vmgen.api.models.user.User;
 import io.vmgen.api.repository.SessionRepository;
 import java.time.Duration;
 import java.time.Instant;

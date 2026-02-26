@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Plus, X } from 'lucide-vue-next'
 import { useRegisterTemplate, useProxmoxVms } from '@/composables/useTemplates'
@@ -25,14 +25,20 @@ const form = ref<RegisterTemplateRequest>({
   diskSizeGb: 20,
   minRamMb: 2048,
   minCpuCores: 2,
-  expectedSshUser: 'root',
+  expectedSshUser: 'vmgen-builder',
   expectedSshPort: 22,
   networkBridge: 'vmbr0',
+  sshAuthMethod: 'cloudinit',
   capabilities: [],
 })
 
 const customCapability = ref('')
 const { data: proxmoxVms, refetch: fetchVms } = useProxmoxVms(() => form.value.proxmoxNode)
+
+// Only expose actual Proxmox templates in the dropdown; regular VMs remain selectable via manual VMID.
+const proxmoxTemplates = computed(() =>
+  (proxmoxVms.value || []).filter((vm: any) => vm.isTemplate)
+)
 
 const commonCapabilities = ['ssh', 'web_server', 'database', 'docker', 'systemd']
 
@@ -59,10 +65,30 @@ function removeCapability(cap: string) {
   }
 }
 
+const testingConnection = ref(false)
+const testResult = ref<{ success: boolean; message: string } | null>(null)
+
 async function selectVm(vm: any) {
   if (!vm) return
   form.value.proxmoxVmid = vm.vmid
-  
+
+  // Suggest identifier based on VM name if not already set
+  if (!form.value.identifier && vm.name) {
+    form.value.identifier = String(vm.name)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  }
+
+  // Auto-populate basic resource hints from Proxmox summary
+  if (typeof vm.maxmem === 'number' && vm.maxmem > 0) {
+    // maxmem is bytes -> MB
+    form.value.minRamMb = Math.max(512, Math.round(vm.maxmem / (1024 * 1024)))
+  }
+  if (typeof vm.cpus === 'number' && vm.cpus > 0) {
+    form.value.minCpuCores = vm.cpus
+  }
+
   // Auto-populate storage from VM config
   try {
     const storageResponse = await api.admin.getVmStorage(vm.vmid, form.value.proxmoxNode)
@@ -72,6 +98,31 @@ async function selectVm(vm: any) {
   } catch (error) {
     console.warn('Could not auto-detect storage for VM:', error)
     // Keep current value or default
+  }
+}
+
+async function testConnection() {
+  if (!form.value.proxmoxVmid) {
+    testResult.value = {
+      success: false,
+      message: 'Please select a Proxmox template and VMID first.',
+    }
+    return
+  }
+
+  testingConnection.value = true
+  testResult.value = null
+
+  try {
+    // Placeholder: backend/worker SSH validation is not yet implemented.
+    // This keeps the UI flow ready while avoiding failing API calls.
+    await new Promise(resolve => setTimeout(resolve, 800))
+    testResult.value = {
+      success: false,
+      message: 'Backend SSH test endpoint is not implemented yet. This is a planned feature.',
+    }
+  } finally {
+    testingConnection.value = false
   }
 }
 
@@ -172,19 +223,19 @@ async function handleSubmit() {
             <BaseButton type="button" variant="secondary" @click="fetchVms()">
               Fetch Available VMs
             </BaseButton>
-            <div v-if="proxmoxVms && proxmoxVms.length > 0" class="mt-4">
+            <div v-if="proxmoxTemplates && proxmoxTemplates.length > 0" class="mt-4">
               <select
-                @change="selectVm(proxmoxVms.find((v: any) => v.vmid === Number($event.target.value)))"
+                @change="selectVm(proxmoxTemplates.find((v: any) => v.vmid === Number($event.target.value)))"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">Select a VM...</option>
-                <option v-for="vm in proxmoxVms" :key="vm.vmid" :value="vm.vmid">
+                <option v-for="vm in proxmoxTemplates" :key="vm.vmid" :value="vm.vmid">
                   {{ vm.name }} ({{ vm.vmid }}) - {{ vm.status }}{{ vm.isTemplate ? ' [Proxmox Template]' : '' }}
                 </option>
               </select>
               <p class="mt-2 text-xs text-slate-400">
-                <span class="text-yellow-400">Note:</span> Items marked "[Proxmox Template]" are Proxmox templates. 
-                You can register them, but you may need to clone them to a VM first for full functionality.
+                <span class="text-yellow-400">Note:</span> Only Proxmox templates are listed here.
+                To reference a regular VM, enter its VMID manually above.
               </p>
             </div>
           </div>
@@ -284,6 +335,53 @@ async function handleSubmit() {
       <!-- Validation Configuration -->
       <BaseCard>
         <h2 class="text-xl font-semibold text-slate-100 mb-4">Validation Configuration</h2>
+
+        <div class="mb-4 rounded-lg border border-slate-700 bg-slate-900/40 p-4">
+          <p class="text-sm text-slate-200 font-semibold mb-1">What is validation?</p>
+          <p class="text-xs text-slate-400">
+            After registration, VMGen will boot this template in isolation, attempt SSH using the
+            configuration below, and run basic checks. Templates must pass validation before users
+            can request VMs from them.
+          </p>
+        </div>
+
+        <div class="mb-4 space-y-2">
+          <p class="text-sm font-medium text-slate-300">SSH Authentication Method</p>
+          <div class="flex flex-col gap-1">
+            <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+              <input
+                v-model="form.sshAuthMethod"
+                type="radio"
+                value="cloudinit"
+                class="text-primary-500"
+              />
+              <span>Cloud-init (recommended) – use ephemeral SSH keys via cloud-init.</span>
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+              <input
+                v-model="form.sshAuthMethod"
+                type="radio"
+                value="password_reset"
+                class="text-primary-500"
+              />
+              <span>Password reset (legacy) – worker resets a local account password.</span>
+            </label>
+            <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+              <input
+                v-model="form.sshAuthMethod"
+                type="radio"
+                value="static_key"
+                class="text-primary-500"
+              />
+              <span>Static key (advanced) – image contains a pre-baked SSH key.</span>
+            </label>
+          </div>
+          <p class="mt-1 text-xs text-slate-400">
+            Use <span class="font-semibold text-slate-200">cloud-init</span> for modern templates with
+            ephemeral SSH keys. Other options exist for legacy or special-case images.
+          </p>
+        </div>
+
         <div class="grid grid-cols-3 gap-4">
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-2">Expected SSH User</label>
@@ -311,6 +409,20 @@ async function handleSubmit() {
             />
           </div>
         </div>
+
+        <div class="mt-4 flex items-center gap-3">
+          <BaseButton type="button" variant="secondary" @click="testConnection" :disabled="testingConnection">
+            {{ testingConnection ? 'Testing...' : 'Test SSH Connection (planned)' }}
+          </BaseButton>
+          <p class="text-xs text-slate-500">
+            This will eventually perform a quick SSH connectivity check against the template. For
+            now it is a placeholder and does not perform any backend calls.
+          </p>
+        </div>
+
+        <div v-if="testResult" class="mt-3 text-xs" :class="testResult.success ? 'text-emerald-400' : 'text-amber-400'">
+          {{ testResult.message }}
+        </div>
       </BaseCard>
 
       <!-- Capabilities -->
@@ -329,7 +441,24 @@ async function handleSubmit() {
                 @change="toggleCapability(cap)"
                 class="mr-2"
               />
-              <span class="text-slate-300">{{ cap }}</span>
+              <span class="text-slate-300">
+                {{ cap }}
+                <span v-if="cap === 'ssh'" class="block text-[11px] text-slate-500">
+                  Template has an SSH server installed and reachable.
+                </span>
+                <span v-else-if="cap === 'web_server'" class="block text-[11px] text-slate-500">
+                  Web server (e.g. Apache/Nginx) installed – required for web exploit scripts.
+                </span>
+                <span v-else-if="cap === 'database'" class="block text-[11px] text-slate-500">
+                  Database service available (e.g. MySQL/PostgreSQL).
+                </span>
+                <span v-else-if="cap === 'docker'" class="block text-[11px] text-slate-500">
+                  Docker or container runtime available on the template.
+                </span>
+                <span v-else-if="cap === 'systemd'" class="block text-[11px] text-slate-500">
+                  Systemd-based init system; services manageable via systemctl.
+                </span>
+              </span>
             </label>
           </div>
 

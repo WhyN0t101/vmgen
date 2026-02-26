@@ -1,5 +1,6 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.audit;
 
+import io.vmgen.api.models.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

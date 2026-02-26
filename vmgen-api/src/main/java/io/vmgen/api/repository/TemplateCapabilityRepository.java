@@ -1,7 +1,7 @@
 package io.vmgen.api.repository;
 
-import io.vmgen.api.models.TemplateCapability;
-import io.vmgen.api.models.TemplateCapabilityId;
+import io.vmgen.api.models.template.TemplateCapability;
+import io.vmgen.api.models.template.TemplateCapabilityId;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

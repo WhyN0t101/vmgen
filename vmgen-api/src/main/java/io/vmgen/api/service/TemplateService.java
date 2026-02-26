@@ -3,6 +3,7 @@ package io.vmgen.api.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vmgen.api.config.ProxmoxApiConfig;
 import io.vmgen.api.config.TemplateDefaults;
+import io.vmgen.api.dto.proxmox.ProxmoxVmSummary;
 import io.vmgen.api.dto.template.RegisterTemplateRequest;
 import io.vmgen.api.dto.template.TemplateListResponse;
 import io.vmgen.api.dto.template.TemplateResponse;
@@ -10,10 +11,10 @@ import io.vmgen.api.dto.template.UpdateTemplateMetadataRequest;
 import io.vmgen.api.exceptions.DuplicateTemplateException;
 import io.vmgen.api.exceptions.TemplateNotFoundException;
 import io.vmgen.api.exceptions.TemplateValidationException;
-import io.vmgen.api.models.Template;
-import io.vmgen.api.models.TemplateCapability;
-import io.vmgen.api.models.TemplateStatus;
-import io.vmgen.api.models.User;
+import io.vmgen.api.models.template.Template;
+import io.vmgen.api.models.template.TemplateCapability;
+import io.vmgen.api.models.template.TemplateStatus;
+import io.vmgen.api.models.user.User;
 import io.vmgen.api.repository.TemplateCapabilityRepository;
 import io.vmgen.api.repository.TemplateRepository;
 import io.vmgen.api.repository.UserRepository;
@@ -68,7 +69,8 @@ public class TemplateService {
 
     /**
      * Validates uniqueness of identifier/version combination and confirms
-     * the target Proxmox VM exists before any database interaction.
+     * the target Proxmox VM exists and is a Proxmox template before any
+     * database interaction.
      */
     private void validateRegistrationRequest(RegisterTemplateRequest request) {
         if (templateRepository.findByIdentifierAndVersion(
@@ -83,6 +85,26 @@ public class TemplateService {
 
         Integer vmid = request.getProxmoxVmid();
         assertVmExists(vmid, node);
+
+        // Ensure we do not register the same Proxmox template twice
+        if (templateRepository.existsByProxmoxVmidAndProxmoxNode(vmid, node)) {
+            throw new TemplateValidationException(
+                    "This Proxmox template (VMID " + vmid + " on node " + node + ") is already registered"
+            );
+        }
+
+        // Ensure the backing Proxmox VM is actually a template (template == 1)
+        ProxmoxVmSummary vmSummary = proxmoxService.getVmSummary(vmid, node)
+                .orElseThrow(() -> new TemplateValidationException(
+                        "Proxmox VM " + vmid + " does not exist on node " + node
+                ));
+
+        if (vmSummary.getIsTemplate() == null || !vmSummary.getIsTemplate()) {
+            throw new TemplateValidationException(
+                    "Proxmox VM " + vmid + " on node " + node + " is not a Proxmox template. " +
+                            "Convert it to a template in Proxmox before registering."
+            );
+        }
     }
 
     /**
@@ -120,6 +142,11 @@ public class TemplateService {
         template.setExpectedSshUser(request.getExpectedSshUser() != null ? request.getExpectedSshUser() : TemplateDefaults.SSH_USER);
         template.setExpectedSshPort(request.getExpectedSshPort() != null ? request.getExpectedSshPort() : TemplateDefaults.SSH_PORT);
         template.setNetworkBridge(request.getNetworkBridge());
+        String sshAuthMethod = request.getSshAuthMethod();
+        if (sshAuthMethod == null || sshAuthMethod.isBlank()) {
+            sshAuthMethod = "cloudinit";
+        }
+        template.setSshAuthMethod(sshAuthMethod);
         template.setStatus(TemplateStatus.DRAFT);
         template.setCreatedBy(creator);
         return template;
@@ -386,6 +413,7 @@ public class TemplateService {
                 .expectedSshUser(template.getExpectedSshUser())
                 .expectedSshPort(template.getExpectedSshPort())
                 .networkBridge(template.getNetworkBridge())
+                .sshAuthMethod(template.getSshAuthMethod())
                 .updatedAt(template.getUpdatedAt())
                 .capabilities(capabilities)
                 .build();

@@ -1,5 +1,10 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.vm;
 
+import io.vmgen.api.models.flag.Flag;
+import io.vmgen.api.models.provenance.ProvenanceRecord;
+import io.vmgen.api.models.user.User;
+import io.vmgen.api.models.build.BuildLog;
+import io.vmgen.api.models.template.Template;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

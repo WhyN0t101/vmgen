@@ -2,8 +2,8 @@ package io.vmgen.api.controller;
 
 import io.vmgen.api.dto.admin.RoleUpdateRequest;
 import io.vmgen.api.dto.common.StatusResponse;
-import io.vmgen.api.models.User;
-import io.vmgen.api.models.UserRole;
+import io.vmgen.api.models.user.User;
+import io.vmgen.api.models.user.UserRole;
 import io.vmgen.api.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;

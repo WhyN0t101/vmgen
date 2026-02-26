@@ -1,7 +1,7 @@
 package io.vmgen.api.repository;
 
-import io.vmgen.api.models.User;
-import io.vmgen.api.models.UserRole;
+import io.vmgen.api.models.user.User;
+import io.vmgen.api.models.user.UserRole;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

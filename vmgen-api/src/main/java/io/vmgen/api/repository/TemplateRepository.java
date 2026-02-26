@@ -1,7 +1,7 @@
 package io.vmgen.api.repository;
 
-import io.vmgen.api.models.Template;
-import io.vmgen.api.models.TemplateStatus;
+import io.vmgen.api.models.template.Template;
+import io.vmgen.api.models.template.TemplateStatus;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,4 +16,9 @@ public interface TemplateRepository extends JpaRepository<Template, UUID> {
     List<Template> findAllByStatusOrderByCreatedAtDesc(TemplateStatus status);
 
     List<Template> findAllByOrderByCreatedAtDesc();
+
+    /**
+     * Checks whether a template already exists for the given Proxmox VMID and node.
+     */
+    boolean existsByProxmoxVmidAndProxmoxNode(Integer proxmoxVmid, String proxmoxNode);
 }

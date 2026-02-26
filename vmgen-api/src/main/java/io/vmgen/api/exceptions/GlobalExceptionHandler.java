@@ -25,9 +25,6 @@ public class GlobalExceptionHandler {
                 .body(Map.of("message", ex.getPublicMessage()));
     }
 
-    // Removed SessionExpiredException handler - caught in filter
-    // Removed SessionRevokedException handler - caught in filter
-
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

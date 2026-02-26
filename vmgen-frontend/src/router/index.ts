@@ -43,6 +43,25 @@ const router = createRouter({
       component: () => import('@/views/AdminPanelPage.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },
     },
+    // Admin Scripts
+    {
+      path: '/admin/scripts',
+      name: 'admin-scripts',
+      component: () => import('@/views/admin/scripts/ScriptListPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/scripts/new',
+      name: 'admin-script-create',
+      component: () => import('@/views/admin/scripts/ScriptFormPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
+    {
+      path: '/admin/scripts/:id/edit',
+      name: 'admin-script-edit',
+      component: () => import('@/views/admin/scripts/ScriptFormPage.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
     // Admin Template Routes
     {
       path: '/admin/templates',

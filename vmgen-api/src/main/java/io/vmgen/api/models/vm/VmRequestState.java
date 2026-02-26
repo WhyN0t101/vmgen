@@ -1,4 +1,4 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.vm;
 
 import java.util.EnumSet;
 import java.util.Map;

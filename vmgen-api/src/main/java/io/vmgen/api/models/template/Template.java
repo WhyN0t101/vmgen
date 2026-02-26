@@ -1,5 +1,6 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.template;
 
+import io.vmgen.api.models.user.User;
 import jakarta.persistence.*;
 import org.hibernate.annotations.ColumnTransformer;
 import java.time.Instant;
@@ -103,6 +104,18 @@ public class Template {
 
     @Column(name = "network_bridge", length = 100)
     private String networkBridge;
+
+    @Column(name = "ssh_auth_method", nullable = false, length = 20)
+    private String sshAuthMethod = "password_reset";
+
+    @Column(name = "last_validation_attempt")
+    private Instant lastValidationAttempt;
+
+    @Column(name = "validation_duration_seconds")
+    private Integer validationDurationSeconds;
+
+    @Column(name = "proxmox_template_name", length = 255)
+    private String proxmoxTemplateName;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;

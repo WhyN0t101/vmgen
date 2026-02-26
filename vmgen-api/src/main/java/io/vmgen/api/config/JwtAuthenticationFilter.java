@@ -4,7 +4,7 @@ import io.vmgen.api.dto.auth.JwtClaimsDto;
 import io.vmgen.api.exceptions.InvalidTokenException;
 import io.vmgen.api.exceptions.SessionExpiredException;
 import io.vmgen.api.exceptions.SessionRevokedException;
-import io.vmgen.api.models.Session;
+import io.vmgen.api.models.user.Session;
 import io.vmgen.api.service.JwtService;
 import io.vmgen.api.service.SessionService;
 import io.vmgen.api.utils.TokenHashUtil;

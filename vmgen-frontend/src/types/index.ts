@@ -31,6 +31,8 @@ export interface TemplateResponse {
   expectedSshUser: string
   expectedSshPort: number
   networkBridge?: string
+  sshAuthMethod: 'cloudinit' | 'password_reset' | 'static_key'
+  supportsCloudInit: boolean
   sha256Hash?: string
   status: TemplateStatus
   capabilities: string[]
@@ -70,7 +72,141 @@ export interface RegisterTemplateRequest {
   expectedSshUser?: string
   expectedSshPort?: number
   networkBridge?: string
+  sshAuthMethod: 'cloudinit' | 'password_reset' | 'static_key'
   capabilities: string[]
+}
+
+// Vulnerability categories
+export interface CategoryList {
+  id: string
+  identifier: string
+  name: string
+  color?: string
+  icon?: string
+  owaspMapping?: string
+  displayOrder: number
+  scriptCount: number
+}
+
+export interface ScriptSummary {
+  id: string
+  identifier: string
+  version: string
+  name: string
+  difficultyLevel: string
+  isActive: boolean
+}
+
+export interface ScriptListItem extends ScriptSummary {
+  categoryId?: string
+  categoryName?: string
+  categoryColor?: string
+  owaspMapping?: string
+  createdAt: string
+}
+
+export interface PagedResponse<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  last: boolean
+}
+
+export interface ScriptDetail extends ScriptListItem {
+  description?: string
+  scriptContent: string
+  flagLocation: string
+  flagOwnership?: string
+  flagPermissions?: string
+  createdByUsername?: string
+  deprecatedAt?: string
+  requiredOsFamilies: string[]
+  requiredCapabilities: string[]
+  minRamMb?: number | null
+  minDiskGb?: number | null
+}
+
+export interface CreateScriptRequest {
+  identifier: string
+  version: string
+  name: string
+  description?: string
+  categoryId: string
+  difficultyLevel: string
+  scriptContent: string
+  flagLocation: string
+  flagOwnership?: string
+  flagPermissions?: string
+  requiredOsFamilies?: string[]
+  requiredCapabilities?: string[]
+  minRamMb?: number | null
+  minDiskGb?: number | null
+}
+
+export interface UpdateScriptRequest {
+  name: string
+  description?: string
+  categoryId: string
+  difficultyLevel: string
+  scriptContent: string
+  flagLocation: string
+  flagOwnership?: string
+  flagPermissions?: string
+  requiredOsFamilies?: string[]
+  requiredCapabilities?: string[]
+  minRamMb?: number | null
+  minDiskGb?: number | null
+}
+
+export interface CategoryDetail {
+  id: string
+  identifier: string
+  name: string
+  description?: string
+  color?: string
+  icon?: string
+  owaspMapping?: string
+  severityRange?: string
+  isActive: boolean
+  displayOrder: number
+  createdAt: string
+  createdByUsername?: string
+  deprecatedAt?: string
+  scriptCount: number
+  scripts: ScriptSummary[]
+}
+
+export interface CreateCategoryRequest {
+  identifier: string
+  name: string
+  description?: string
+  color?: string
+  icon?: string
+  owaspMapping?: string
+  severityRange?: string
+  displayOrder?: number
+}
+
+export interface UpdateCategoryRequest {
+  identifier: string
+  name: string
+  description?: string
+  color?: string
+  icon?: string
+  owaspMapping?: string
+  severityRange?: string
+  displayOrder?: number
+}
+
+export interface CategoryReorderRequest {
+  categoryId: string
+  newOrder: number
+}
+
+export interface StatusResponse {
+  status: string
 }
 
 export interface UpdateTemplateMetadataRequest {

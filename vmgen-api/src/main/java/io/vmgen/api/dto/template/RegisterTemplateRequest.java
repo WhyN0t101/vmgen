@@ -1,5 +1,6 @@
 package io.vmgen.api.dto.template;
 
+import io.vmgen.api.config.TemplateDefaults;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -53,13 +54,25 @@ public class RegisterTemplateRequest {
     
     // Validation config
     @Size(max = 50, message = "Expected SSH user must not exceed 50 characters")
-    private String expectedSshUser = "root";
+    private String expectedSshUser = TemplateDefaults.SSH_USER;
     
     @jakarta.validation.constraints.Max(value = 65535, message = "Expected SSH port must not exceed 65535")
-    private Integer expectedSshPort = 22;
+    private Integer expectedSshPort = TemplateDefaults.SSH_PORT;
     
     @Size(max = 100, message = "Network bridge must not exceed 100 characters")
     private String networkBridge;
+    
+    /**
+     * SSH authentication method used by the worker when connecting to this
+     * template during validation and build: {@code cloudinit},
+     * {@code password_reset}, or {@code static_key}.
+     */
+    @Size(max = 20, message = "SSH auth method must not exceed 20 characters")
+    @Pattern(
+            regexp = "^(cloudinit|password_reset|static_key)$",
+            message = "sshAuthMethod must be one of: cloudinit, password_reset, static_key"
+    )
+    private String sshAuthMethod = "cloudinit";
     
     // Resources
     @NotNull(message = "Disk size is required")

@@ -1,4 +1,4 @@
-package io.vmgen.api.models;
+package io.vmgen.api.models.template;
 
 import java.io.Serializable;
 import java.util.UUID;
