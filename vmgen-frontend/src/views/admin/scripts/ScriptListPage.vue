@@ -15,7 +15,7 @@ const activeOnly = ref(true)
 const { data: categoriesData } = useCategoryList(true)
 const categories = computed(() => categoriesData.value ?? [])
 
-const { data: scriptsData, refetch, isLoading } = useScriptList({
+const { data: scriptsData, isLoading } = useScriptList({
   categoryId: selectedCategoryId,
   difficulty: selectedDifficulty,
   activeOnly,
@@ -66,7 +66,6 @@ function difficultyBadgeClass(level: string) {
             <select
               v-model="selectedCategoryId"
               class="min-w-[180px] rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100"
-              @change="refetch()"
             >
               <option value="">All</option>
               <option v-for="cat in categories" :key="cat.id" :value="cat.id">
@@ -79,7 +78,6 @@ function difficultyBadgeClass(level: string) {
             <select
               v-model="selectedDifficulty"
               class="min-w-[140px] rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100"
-              @change="refetch()"
             >
               <option value="">All</option>
               <option value="EASY">Easy</option>
@@ -92,7 +90,6 @@ function difficultyBadgeClass(level: string) {
               v-model="activeOnly"
               type="checkbox"
               class="rounded border-slate-600 bg-slate-950/60"
-              @change="refetch()"
             />
             Active only
           </label>

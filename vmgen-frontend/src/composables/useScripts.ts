@@ -4,6 +4,10 @@ import type {
   ScriptListItem,
   CreateScriptRequest,
   UpdateScriptRequest,
+  ScriptCompatibilityInfo,
+  ScriptParameter,
+  CreateScriptParameterRequest,
+  UpdateScriptParameterRequest,
 } from '@/types'
 import { api } from '@/api/endpoints'
 import { computed, type Ref } from 'vue'
@@ -71,6 +75,78 @@ export function useCreateScript() {
       showToast(message, 'error')
     },
   })
+}
+
+export function useScriptCompatibility(id: Ref<string>) {
+  return useQuery<ScriptCompatibilityInfo>({
+    queryKey: computed(() => [...SCRIPT_KEYS.detail(id.value), 'compatibility']),
+    queryFn: () => api.admin.getScriptCompatibility(id.value),
+    enabled: computed(() => !!id.value),
+  })
+}
+
+export function useScriptParameters(id: Ref<string>) {
+  const queryClient = useQueryClient()
+  const listQuery = useQuery<ScriptParameter[]>({
+    queryKey: computed(() => [...SCRIPT_KEYS.detail(id.value), 'parameters']),
+    queryFn: () => api.admin.listScriptParameters(id.value),
+    enabled: computed(() => !!id.value),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (payload: { scriptId: string; data: CreateScriptParameterRequest }) =>
+      api.admin.createScriptParameter(payload.scriptId, payload.data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
+      })
+      showToast('Parameter created', 'success')
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || 'Failed to create parameter'
+      showToast(message, 'error')
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: {
+      scriptId: string
+      parameterId: string
+      data: UpdateScriptParameterRequest
+    }) => api.admin.updateScriptParameter(payload.scriptId, payload.parameterId, payload.data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
+      })
+      showToast('Parameter updated', 'success')
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || 'Failed to update parameter'
+      showToast(message, 'error')
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (payload: { scriptId: string; parameterId: string }) =>
+      api.admin.deleteScriptParameter(payload.scriptId, payload.parameterId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
+      })
+      showToast('Parameter deleted', 'success')
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || 'Failed to delete parameter'
+      showToast(message, 'error')
+    },
+  })
+
+  return {
+    listQuery,
+    createMutation,
+    updateMutation,
+    deleteMutation,
+  }
 }
 
 export function useUpdateScript() {

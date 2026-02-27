@@ -18,5 +18,6 @@ public class CategoryListDto {
     private String owaspMapping;
     private Integer displayOrder;
     private Integer scriptCount;
+    private Boolean isActive;
 }
 

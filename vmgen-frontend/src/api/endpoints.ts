@@ -1,5 +1,23 @@
 import { apiRequest } from './client'
-import type { Template, Vulnerability, Build, BuildSpec, TemplateResponse, TemplateListResponse, RegisterTemplateRequest, UpdateTemplateMetadataRequest, ProxmoxVmSummary } from '@/types'
+import type {
+  Template,
+  Vulnerability,
+  Build,
+  BuildSpec,
+  TemplateResponse,
+  TemplateListResponse,
+  RegisterTemplateRequest,
+  UpdateTemplateMetadataRequest,
+  ProxmoxVmSummary,
+  ScriptCompatibilityInfo,
+  ScriptParameter,
+  CreateScriptParameterRequest,
+  UpdateScriptParameterRequest,
+  StatusResponse,
+  ScriptDetail,
+  ScriptListItem,
+  PagedResponse,
+} from '@/types'
 import { mockTemplates, mockVulnerabilities } from './mockData'
 
 // Use mock data for development
@@ -220,33 +238,102 @@ export const api = {
     },
 
     // Scripts
-    listScripts: async (queryString: string): Promise<import('@/types').PagedResponse<import('@/types').ScriptListItem>> => {
+    listScripts: async (queryString: string): Promise<PagedResponse<ScriptListItem>> => {
       const url = queryString ? `/api/admin/scripts?${queryString}` : '/api/admin/scripts'
-      return apiRequest<import('@/types').PagedResponse<import('@/types').ScriptListItem>>(url)
+      return apiRequest<PagedResponse<ScriptListItem>>(url)
     },
 
-    getScript: async (id: string): Promise<import('@/types').ScriptDetail> => {
-      return apiRequest<import('@/types').ScriptDetail>(`/api/admin/scripts/${id}`)
+    getScript: async (id: string): Promise<ScriptDetail> => {
+      return apiRequest<ScriptDetail>(`/api/admin/scripts/${id}`)
     },
 
-    createScript: async (data: import('@/types').CreateScriptRequest): Promise<import('@/types').ScriptDetail> => {
-      return apiRequest<import('@/types').ScriptDetail>('/api/admin/scripts', {
+    createScript: async (data: import('@/types').CreateScriptRequest): Promise<ScriptDetail> => {
+      return apiRequest<ScriptDetail>('/api/admin/scripts', {
         method: 'POST',
         body: JSON.stringify(data),
       })
     },
 
-    updateScript: async (id: string, data: import('@/types').UpdateScriptRequest): Promise<import('@/types').ScriptDetail> => {
-      return apiRequest<import('@/types').ScriptDetail>(`/api/admin/scripts/${id}`, {
+    updateScript: async (id: string, data: import('@/types').UpdateScriptRequest): Promise<ScriptDetail> => {
+      return apiRequest<ScriptDetail>(`/api/admin/scripts/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       })
     },
 
-    deprecateScript: async (id: string): Promise<import('@/types').StatusResponse> => {
-      return apiRequest<import('@/types').StatusResponse>(`/api/admin/scripts/${id}/deprecate`, {
+    deprecateScript: async (id: string): Promise<StatusResponse> => {
+      return apiRequest<StatusResponse>(`/api/admin/scripts/${id}/deprecate`, {
         method: 'POST',
       })
+    },
+
+    // Script compatibility
+    getScriptCompatibility: async (id: string): Promise<ScriptCompatibilityInfo> => {
+      return apiRequest<ScriptCompatibilityInfo>(`/api/admin/scripts/${id}/compatibility`)
+    },
+
+    addScriptConflict: async (id: string, conflictsWithId: string): Promise<StatusResponse> => {
+      return apiRequest<StatusResponse>(`/api/admin/scripts/${id}/conflicts`, {
+        method: 'POST',
+        body: JSON.stringify({ conflictsWithScriptId: conflictsWithId }),
+      })
+    },
+
+    removeScriptConflict: async (id: string, conflictId: string): Promise<StatusResponse> => {
+      return apiRequest<StatusResponse>(`/api/admin/scripts/${id}/conflicts/${conflictId}`, {
+        method: 'DELETE',
+      })
+    },
+
+    addScriptDependency: async (id: string, requiresId: string): Promise<StatusResponse> => {
+      return apiRequest<StatusResponse>(`/api/admin/scripts/${id}/dependencies`, {
+        method: 'POST',
+        body: JSON.stringify({ requiresScriptId: requiresId }),
+      })
+    },
+
+    removeScriptDependency: async (id: string, dependencyId: string): Promise<StatusResponse> => {
+      return apiRequest<StatusResponse>(`/api/admin/scripts/${id}/dependencies/${dependencyId}`, {
+        method: 'DELETE',
+      })
+    },
+
+    // Script parameters
+    listScriptParameters: async (scriptId: string): Promise<ScriptParameter[]> => {
+      return apiRequest<ScriptParameter[]>(`/api/admin/scripts/${scriptId}/parameters`)
+    },
+
+    createScriptParameter: async (
+      scriptId: string,
+      data: CreateScriptParameterRequest,
+    ): Promise<ScriptParameter> => {
+      return apiRequest<ScriptParameter>(`/api/admin/scripts/${scriptId}/parameters`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+    },
+
+    updateScriptParameter: async (
+      scriptId: string,
+      parameterId: string,
+      data: UpdateScriptParameterRequest,
+    ): Promise<ScriptParameter> => {
+      return apiRequest<ScriptParameter>(
+        `/api/admin/scripts/${scriptId}/parameters/${parameterId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        },
+      )
+    },
+
+    deleteScriptParameter: async (scriptId: string, parameterId: string): Promise<StatusResponse> => {
+      return apiRequest<StatusResponse>(
+        `/api/admin/scripts/${scriptId}/parameters/${parameterId}/delete`,
+        {
+          method: 'POST',
+        },
+      )
     },
 
     // Vulnerability categories

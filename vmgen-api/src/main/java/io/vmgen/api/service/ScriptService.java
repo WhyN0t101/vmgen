@@ -6,13 +6,16 @@ import io.vmgen.api.dto.script.ScriptListDto;
 import io.vmgen.api.dto.script.UpdateScriptRequest;
 import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
+import io.vmgen.api.exceptions.ScriptConflictException;
 import io.vmgen.api.models.script.Script;
 import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
 import io.vmgen.api.repository.ScriptRepository;
 import io.vmgen.api.repository.UserRepository;
 import io.vmgen.api.repository.VulnerabilityCategoryRepository;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -36,6 +39,8 @@ public class ScriptService {
     private final ScriptRepository scriptRepository;
     private final VulnerabilityCategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final ScriptCompatibilityService compatibilityService;
+    private final ScriptParameterService parameterService;
 
     /**
      * Lists scripts with optional filters.
@@ -86,14 +91,55 @@ public class ScriptService {
         script.setIdentifier(request.getIdentifier());
         script.setVersion(request.getVersion());
         buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions());
-        script.setCreatedBy(
-                userRepository.findByUsernameIgnoreCase(adminUsername)
-                        .orElseThrow(() -> new ResourceNotFoundException("User not found: " + adminUsername))
-        );
+        var admin = userRepository.findByUsernameIgnoreCase(adminUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + adminUsername));
+        script.setCreatedBy(admin);
 
         Script saved = scriptRepository.save(script);
+
+        // Optional: create compatibility and parameter definitions atomically with the script.
+        createCompatibilityAndParametersIfPresent(saved.getId(), request, admin.getId());
+
         log.info("Created script {}@{}", saved.getIdentifier(), saved.getVersion());
         return toDetailDto(saved);
+    }
+
+    private void createCompatibilityAndParametersIfPresent(UUID scriptId, CreateScriptRequest request, UUID adminId) {
+        List<UUID> conflictIds = request.getConflictsWithScriptIds();
+        List<UUID> requiresIds = request.getRequiresScriptIds();
+
+        if (conflictIds != null && !conflictIds.isEmpty()
+                && requiresIds != null && !requiresIds.isEmpty()) {
+            Set<UUID> overlaps = new HashSet<>(conflictIds);
+            overlaps.retainAll(new HashSet<>(requiresIds));
+            if (!overlaps.isEmpty()) {
+                throw new ScriptConflictException("A script cannot be both a dependency and a conflict");
+            }
+        }
+
+        if (conflictIds != null) {
+            // De-dupe while preserving input order.
+            Set<UUID> seen = new HashSet<>();
+            for (UUID id : conflictIds) {
+                if (id == null || !seen.add(id)) continue;
+                compatibilityService.addConflict(scriptId, id, adminId);
+            }
+        }
+
+        if (requiresIds != null) {
+            Set<UUID> seen = new HashSet<>();
+            for (UUID id : requiresIds) {
+                if (id == null || !seen.add(id)) continue;
+                compatibilityService.addDependency(scriptId, id, adminId);
+            }
+        }
+
+        if (request.getParameters() != null) {
+            for (var param : request.getParameters()) {
+                if (param == null) continue;
+                parameterService.createParameter(scriptId, param);
+            }
+        }
     }
 
     /**

@@ -55,5 +55,17 @@ public class CreateScriptRequest {
     private List<String> requiredCapabilities;
     private Integer minRamMb;
     private Integer minDiskGb;
+
+    /**
+     * Optional compatibility relations to create atomically with the script.
+     * These are persisted as ScriptConflict / ScriptDependency edges.
+     */
+    private List<UUID> conflictsWithScriptIds;
+    private List<UUID> requiresScriptIds;
+
+    /**
+     * Optional parameter definitions to create atomically with the script.
+     */
+    private List<CreateScriptParameterRequest> parameters;
 }
 

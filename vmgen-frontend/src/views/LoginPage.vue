@@ -99,7 +99,7 @@ onUnmounted(() => {
           {{ errorMessage }}
         </p>
 
-        <BaseButton class="w-full" :loading="isSubmitting" :disabled="isSubmitting">
+        <BaseButton type="submit" class="w-full" :loading="isSubmitting" :disabled="isSubmitting">
           Sign in
         </BaseButton>
       </form>

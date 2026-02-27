@@ -9,8 +9,9 @@ type CategoryFormState = (CreateCategoryRequest & { id?: string })
 
 const showForm = ref(false)
 const editingCategory = ref<CategoryFormState | null>(null)
+const activeOnly = ref(true)
 
-const { data: categoriesData, isLoading, refetch } = useCategoryList(true)
+const { data: categoriesData, isLoading, refetch } = useCategoryList(activeOnly)
 const categories = computed(() => categoriesData.value ?? [])
 
 const saveMutation = useCreateOrUpdateCategory()
@@ -112,7 +113,19 @@ async function moveCategory(cat: CategoryList, direction: 'up' | 'down') {
         <BaseCard v-for="i in 3" :key="i" class="h-20 animate-pulse bg-slate-900/60 border-slate-800/80" />
       </div>
 
-      <div v-else-if="categories.length > 0" class="space-y-3">
+      <div v-else>
+        <div class="flex items-center justify-end gap-3">
+          <label class="flex items-center gap-2 text-xs text-slate-400">
+            <input
+              v-model="activeOnly"
+              type="checkbox"
+              class="rounded border-slate-600 bg-slate-950/60"
+            />
+            Active only
+          </label>
+        </div>
+
+        <div v-if="categories.length > 0" class="space-y-3 mt-3">
         <BaseCard
           v-for="cat in categories"
           :key="cat.id"
@@ -179,7 +192,7 @@ async function moveCategory(cat: CategoryList, direction: 'up' | 'down') {
               <BaseButton
                 variant="ghost"
                 size="sm"
-                :disabled="cat.scriptCount > 0 || deprecateMutation.isPending.value"
+                :disabled="!cat.isActive || deprecateMutation.isPending.value"
                 @click="handleDeprecate(cat.id)"
               >
                 Deprecate
@@ -187,13 +200,16 @@ async function moveCategory(cat: CategoryList, direction: 'up' | 'down') {
             </div>
           </div>
         </BaseCard>
-      </div>
+        </div>
 
-      <div v-else class="py-16 text-center text-slate-400">
-        <p>No categories defined yet.</p>
-        <p class="mt-1 text-sm">
-          Create your first vulnerability category to start organizing scripts.
-        </p>
+        <div v-else class="py-16 text-center text-slate-400">
+          <p v-if="activeOnly">
+            No active categories. Disable <span class="font-semibold">Active only</span> to see deprecated categories.
+          </p>
+          <p v-else>
+            No categories defined yet.
+          </p>
+        </div>
       </div>
 
       <div

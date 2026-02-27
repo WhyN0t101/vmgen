@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { computed, type Ref } from 'vue'
 import type {
   CategoryList,
   CategoryDetail,
@@ -21,10 +22,12 @@ function showToast(message: string, type: 'success' | 'error' = 'success') {
   console.log(`[${type.toUpperCase()}] ${message}`)
 }
 
-export function useCategoryList(activeOnly = true) {
+export function useCategoryList(activeOnly: boolean | Ref<boolean> = true) {
+  const resolve = () => (typeof activeOnly === 'boolean' ? activeOnly : activeOnly.value)
+
   return useQuery<CategoryList[]>({
-    queryKey: CATEGORY_KEYS.list(activeOnly),
-    queryFn: () => api.admin.listCategories(activeOnly),
+    queryKey: computed(() => CATEGORY_KEYS.list(resolve())),
+    queryFn: () => api.admin.listCategories(resolve()),
     staleTime: 30 * 1000,
   })
 }

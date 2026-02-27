@@ -4,8 +4,18 @@ import { useRoute, useRouter } from 'vue-router'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useCategoryList } from '@/composables/useCategories'
-import { useCreateScript, useScriptDetail, useUpdateScript } from '@/composables/useScripts'
-import type { CreateScriptRequest, UpdateScriptRequest } from '@/types'
+import {
+  useCreateScript,
+  useScriptDetail,
+  useUpdateScript,
+  useScriptCompatibility,
+  useScriptList,
+} from '@/composables/useScripts'
+import ScriptCompatibilityEditor from '@/components/admin/ScriptCompatibilityEditor.vue'
+import ScriptParameterEditor from '@/components/admin/ScriptParameterEditor.vue'
+import ScriptCompatibilityDraftEditor from '@/components/admin/ScriptCompatibilityDraftEditor.vue'
+import ScriptParameterDraftEditor from '@/components/admin/ScriptParameterDraftEditor.vue'
+import type { CreateScriptRequest, CreateScriptParameterRequest, UpdateScriptRequest } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -17,6 +27,17 @@ const { data: categoriesData } = useCategoryList(true)
 const categories = computed(() => categoriesData.value ?? [])
 
 const { data: existingScript } = useScriptDetail(scriptId)
+const { data: compatibility, refetch: refetchCompatibility } = useScriptCompatibility(scriptId)
+
+// For compatibility editor we need a flat list of scripts
+const activeOnly = ref(true)
+const categoryFilter = ref<string | ''>('')
+const difficultyFilter = ref<string | ''>('')
+const scriptListQuery = useScriptList({
+  categoryId: categoryFilter,
+  difficulty: difficultyFilter,
+  activeOnly,
+})
 
 const createMutation = useCreateScript()
 const updateMutation = useUpdateScript()
@@ -42,6 +63,9 @@ const form = ref<ScriptFormState>({
   requiredCapabilities: ['ssh'],
   minRamMb: null,
   minDiskGb: null,
+  conflictsWithScriptIds: [],
+  requiresScriptIds: [],
+  parameters: [],
 })
 
 onMounted(() => {
@@ -94,7 +118,13 @@ async function handleSubmit() {
     }
     await updateMutation.mutateAsync({ id: form.value.id, data: payload })
   } else {
-    await createMutation.mutateAsync(form.value)
+    const created = await createMutation.mutateAsync(form.value as CreateScriptRequest)
+    // After creating a script, go straight to the edit view so
+    // compatibility and parameters can be configured immediately.
+    if (created && created.id) {
+      router.push({ name: 'admin-script-edit', params: { id: created.id } })
+      return
+    }
   }
 
   router.push({ name: 'admin-scripts' })
@@ -156,6 +186,11 @@ async function handleSubmit() {
               placeholder="SQL injection in PHP login form"
               required
             />
+            <p class="mt-1 text-[11px] text-slate-500">
+              This is the human-readable title shown in the UI. The identifier above is a stable slug
+              (e.g. <span class="font-mono text-slate-400">sqli-login-v1</span>) and must be lowercase
+              letters, numbers, and hyphens.
+            </p>
           </div>
 
           <div>
@@ -362,6 +397,34 @@ async function handleSubmit() {
               <p class="mt-1 text-[11px] text-slate-500">Octal format (e.g. 0644).</p>
             </div>
           </div>
+        </section>
+
+        <!-- Compatibility & parameters -->
+        <section class="space-y-4 border-t border-slate-800 pt-6">
+          <template v-if="isEditing && existingScript">
+            <ScriptCompatibilityEditor
+              :script="existingScript"
+              :all-scripts="scriptListQuery.data.value ?? []"
+              :compatibility="compatibility || null"
+              @refresh="refetchCompatibility()"
+            />
+            <ScriptParameterEditor :script="existingScript" />
+          </template>
+
+          <template v-else>
+            <ScriptCompatibilityDraftEditor
+              :script-name="form.name || 'this script'"
+              :all-scripts="scriptListQuery.data.value ?? []"
+              :conflicts-with-script-ids="form.conflictsWithScriptIds || []"
+              :requires-script-ids="form.requiresScriptIds || []"
+              @update:conflictsWithScriptIds="(v) => (form.conflictsWithScriptIds = v)"
+              @update:requiresScriptIds="(v) => (form.requiresScriptIds = v)"
+            />
+            <ScriptParameterDraftEditor
+              :parameters="(form.parameters as CreateScriptParameterRequest[]) || []"
+              @update:parameters="(v) => (form.parameters = v)"
+            />
+          </template>
         </section>
 
         <div class="flex justify-end gap-3 pt-4">

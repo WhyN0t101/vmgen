@@ -86,6 +86,7 @@ export interface CategoryList {
   owaspMapping?: string
   displayOrder: number
   scriptCount: number
+  isActive: boolean
 }
 
 export interface ScriptSummary {
@@ -128,6 +129,97 @@ export interface ScriptDetail extends ScriptListItem {
   minDiskGb?: number | null
 }
 
+// Script compatibility & parameters
+
+export interface ScriptCompatibilityInfo {
+  scriptId: string
+  conflictsWith: ScriptSummary[]
+  requires: ScriptSummary[]
+}
+
+export type ParameterType = 'STRING' | 'INTEGER' | 'CHOICE' | 'BOOLEAN' | 'PATH'
+
+export type ValueSource =
+  | 'USER_INPUT'
+  | 'AUTO_RANDOM'
+  | 'AUTO_CHOICE'
+  | 'USER_INPUT_OR_RANDOM'
+
+export interface ValidationRules {
+  pattern?: string
+  min?: number
+  max?: number
+  minLength?: number
+  maxLength?: number
+}
+
+export interface RandomConfig {
+  length?: number
+  charset?: 'alphanumeric' | 'alphanumeric_special' | 'hex' | 'numeric'
+  min?: number
+  max?: number
+}
+
+export interface ParameterChoice {
+  id: string
+  value: string
+  label: string
+  description?: string
+  displayOrder: number
+}
+
+export interface ScriptParameter {
+  id: string
+  parameterName: string
+  displayName: string
+  description?: string
+  parameterType: ParameterType
+  valueSource: ValueSource
+  defaultValue?: string
+  isRequired: boolean
+  validationRules?: ValidationRules
+  randomConfig?: RandomConfig
+  userCanOverride: boolean
+  displayOrder: number
+  choices: ParameterChoice[]
+}
+
+export interface CreateParameterChoice {
+  value: string
+  label: string
+  description?: string
+  displayOrder?: number
+}
+
+export interface CreateScriptParameterRequest {
+  parameterName: string
+  displayName: string
+  description?: string
+  parameterType: ParameterType
+  valueSource: ValueSource
+  defaultValue?: string
+  isRequired?: boolean
+  validationRules?: ValidationRules
+  randomConfig?: RandomConfig
+  userCanOverride?: boolean
+  displayOrder?: number
+  choices?: CreateParameterChoice[]
+}
+
+export interface UpdateScriptParameterRequest {
+  displayName: string
+  description?: string
+  parameterType: ParameterType
+  valueSource: ValueSource
+  defaultValue?: string
+  isRequired?: boolean
+  validationRules?: ValidationRules
+  randomConfig?: RandomConfig
+  userCanOverride?: boolean
+  displayOrder?: number
+  choices?: CreateParameterChoice[]
+}
+
 export interface CreateScriptRequest {
   identifier: string
   version: string
@@ -143,6 +235,9 @@ export interface CreateScriptRequest {
   requiredCapabilities?: string[]
   minRamMb?: number | null
   minDiskGb?: number | null
+  conflictsWithScriptIds?: string[]
+  requiresScriptIds?: string[]
+  parameters?: CreateScriptParameterRequest[]
 }
 
 export interface UpdateScriptRequest {
