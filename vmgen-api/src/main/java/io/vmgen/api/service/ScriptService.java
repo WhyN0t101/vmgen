@@ -28,6 +28,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static io.vmgen.api.service.TemplateService.getScriptListDto;
+
 
 @Service
 @RequiredArgsConstructor
@@ -194,20 +196,7 @@ public class ScriptService {
      * Placeholder empty lists are used for requirements pending entity introduction.
      */
     private ScriptListDto toListDto(Script script) {
-        VulnerabilityCategory category = script.getCategory();
-        return ScriptListDto.builder()
-                .id(script.getId())
-                .identifier(script.getIdentifier())
-                .version(script.getVersion())
-                .name(script.getName())
-                .difficultyLevel(script.getDifficultyLevel())
-                .isActive(script.getIsActive())
-                .categoryId(category != null ? category.getId() : null)
-                .categoryName(category != null ? category.getName() : null)
-                .categoryColor(category != null ? category.getColor() : null)
-                .owaspMapping(category != null ? category.getOwaspMapping() : null)
-                .createdAt(script.getCreatedAt())
-                .build();
+        return getScriptListDto(script);
     }
 
     /**

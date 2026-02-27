@@ -227,6 +227,23 @@ export const api = {
       })
     },
 
+    getTemplateCompatibleScripts: async (id: string): Promise<ScriptListItem[]> => {
+      return apiRequest<ScriptListItem[]>(`/api/admin/templates/${id}/compatible-scripts`)
+    },
+
+    addTemplateCompatibleScript: async (templateId: string, scriptId: string): Promise<void> => {
+      return apiRequest<void>(`/api/admin/templates/${templateId}/compatible-scripts`, {
+        method: 'POST',
+        body: JSON.stringify({ scriptId }),
+      })
+    },
+
+    removeTemplateCompatibleScript: async (templateId: string, scriptId: string): Promise<void> => {
+      return apiRequest<void>(`/api/admin/templates/${templateId}/compatible-scripts/${scriptId}`, {
+        method: 'DELETE',
+      })
+    },
+
     listProxmoxVms: async (node?: string): Promise<ProxmoxVmSummary[]> => {
       const url = node ? `/api/admin/proxmox/vms?node=${node}` : '/api/admin/proxmox/vms'
       return apiRequest<ProxmoxVmSummary[]>(url)
@@ -242,6 +259,9 @@ export const api = {
       const url = queryString ? `/api/admin/scripts?${queryString}` : '/api/admin/scripts'
       return apiRequest<PagedResponse<ScriptListItem>>(url)
     },
+
+    getEnrichedScripts: async (): Promise<ScriptListItem[]> =>
+      apiRequest<ScriptListItem[]>('/api/admin/scripts/enriched'),
 
     getScript: async (id: string): Promise<ScriptDetail> => {
       return apiRequest<ScriptDetail>(`/api/admin/scripts/${id}`)
@@ -382,6 +402,10 @@ export const api = {
 
     getById: async (id: string): Promise<TemplateResponse> => {
       return apiRequest<TemplateResponse>(`/api/templates/${id}`)
+    },
+
+    getCompatibleScripts: async (id: string): Promise<ScriptListItem[]> => {
+      return apiRequest<ScriptListItem[]>(`/api/templates/${id}/scripts`)
     },
   },
 }

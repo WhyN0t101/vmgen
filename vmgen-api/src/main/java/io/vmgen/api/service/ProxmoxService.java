@@ -67,6 +67,7 @@ public class ProxmoxService {
             log.debug("VM {} not found on node {}", vmid, targetNode);
             return false;
         } catch (ResourceAccessException e) {
+            //noinspection LoggingSimilarMessage
             log.error("Proxmox connection timeout for VMID {} on node {}: {}", vmid, targetNode, e.getMessage());
             throw new ProxmoxConnectionException("Proxmox connection timeout", e);
         } catch (RestClientException e) {

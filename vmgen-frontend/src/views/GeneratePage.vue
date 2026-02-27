@@ -1,25 +1,62 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useTemplates } from '@/composables/useTemplates'
-import { useVulnerabilities } from '@/composables/useVulnerabilities'
+import { ref, computed, watch } from 'vue'
+import { useTemplates, usePublicCompatibleScripts } from '@/composables/useTemplates'
 import { useCreateBuild } from '@/composables/useBuilds'
 import TemplateSelector from '@/components/templates/TemplateSelector.vue'
 import VulnerabilitySelector from '@/components/vulnerabilities/VulnerabilitySelector.vue'
 import ConfigurationPanel from '@/components/generate/ConfigurationPanel.vue'
-import type { Template } from '@/types'
+import type { Vulnerability, Template } from '@/types'
 
-const selectedTemplateId = ref<string>()
+const selectedTemplateId = ref<string | null>(null)
 const selectedVulnIds = ref<string[]>([])
 const difficulty = ref<'easy' | 'medium' | 'hard'>('medium')
 const telemetryEnabled = ref(false)
 
 const { data: templates, isLoading: templatesLoading } = useTemplates()
-const { data: vulnerabilities, isLoading: vulnsLoading } = useVulnerabilities(selectedTemplateId)
+const { data: compatibleScripts, isLoading: scriptsLoading } = usePublicCompatibleScripts(selectedTemplateId)
 const { mutate: createBuild, isPending: isCreating } = useCreateBuild()
 
-const selectedTemplate = computed(() => 
+// Clear selections whenever the template changes so stale IDs are not submitted.
+watch(selectedTemplateId, () => { selectedVulnIds.value = [] })
+
+const selectedTemplate = computed<Template | undefined>(() =>
   templates.value?.find(t => t.id === selectedTemplateId.value)
 )
+
+// Derive vulnerability list from the real compatible-scripts response so IDs
+// always match the conflict / dependency maps below.
+const vulnerabilities = computed<Vulnerability[]>(() =>
+  (compatibleScripts.value ?? []).map(s => ({
+    id: s.id,
+    name: s.name,
+    category: s.categoryName ?? 'Other',
+    difficulty: s.difficultyLevel,
+    requires_capabilities: [],
+    description: undefined,
+  }))
+)
+
+// Conflict map: scriptId -> list of conflicting scriptIds (within the compatible set).
+const conflictMap = computed<Record<string, string[]>>(() => {
+  const map: Record<string, string[]> = {}
+  for (const s of (compatibleScripts.value ?? [])) {
+    if (s.conflictsWithIds && s.conflictsWithIds.length > 0) {
+      map[s.id] = s.conflictsWithIds
+    }
+  }
+  return map
+})
+
+// Dependency map: scriptId -> list of required scriptIds.
+const requiresMap = computed<Record<string, string[]>>(() => {
+  const map: Record<string, string[]> = {}
+  for (const s of (compatibleScripts.value ?? [])) {
+    if (s.requiresIds && s.requiresIds.length > 0) {
+      map[s.id] = s.requiresIds
+    }
+  }
+  return map
+})
 
 const estimatedTime = computed(() => {
   const base = 5
@@ -27,13 +64,13 @@ const estimatedTime = computed(() => {
   return `${base + perVuln}-${base + perVuln + 4} min`
 })
 
-const canSubmit = computed(() => 
+const canSubmit = computed(() =>
   selectedTemplateId.value && selectedVulnIds.value.length > 0
 )
 
 function handleSubmit() {
   if (!canSubmit.value || !selectedTemplateId.value) return
-  
+
   createBuild({
     template_id: selectedTemplateId.value,
     vulnerability_ids: selectedVulnIds.value,
@@ -56,7 +93,7 @@ function handleSubmit() {
           Generate vulnerable VM
         </h1>
       </div>
-      
+
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <!-- Left: Templates -->
         <div class="lg:col-span-1">
@@ -66,17 +103,19 @@ function handleSubmit() {
             :loading="templatesLoading"
           />
         </div>
-        
+
         <!-- Center: Vulnerabilities -->
         <div class="lg:col-span-2">
           <VulnerabilitySelector
             v-model="selectedVulnIds"
             :vulnerabilities="vulnerabilities"
-            :loading="vulnsLoading"
+            :loading="scriptsLoading"
             :template="selectedTemplate"
+            :conflict-map="conflictMap"
+            :requires-map="requiresMap"
           />
         </div>
-        
+
         <!-- Right: Config -->
         <div class="lg:col-span-1">
           <ConfigurationPanel

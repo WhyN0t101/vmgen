@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, CheckCircle, Edit, XCircle } from 'lucide-vue-next'
-import { useTemplate, useValidateTemplate, useDeprecateTemplate } from '@/composables/useTemplates'
+import {
+  useTemplate,
+  useValidateTemplate,
+  useDeprecateTemplate,
+  useTemplateCompatibleScripts,
+} from '@/composables/useTemplates'
+import { useScriptList } from '@/composables/useScripts'
 import TemplateStatusBadge from '@/components/templates/TemplateStatusBadge.vue'
 import TemplateCapabilityBadge from '@/components/templates/TemplateCapabilityBadge.vue'
+import TemplateScriptCompatibilityEditor from '@/components/admin/TemplateScriptCompatibilityEditor.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import { useConfirm } from '@/composables/useConfirm'
@@ -17,6 +24,9 @@ const { data: template, isLoading } = useTemplate(templateId)
 const validateMutation = useValidateTemplate()
 const deprecateMutation = useDeprecateTemplate()
 const { confirm } = useConfirm()
+
+const { data: compatibleScripts, refetch: refetchCompatible } = useTemplateCompatibleScripts(templateId)
+const { data: allScripts } = useScriptList({ activeOnly: ref(true) })
 
 function formatDate(dateString?: string) {
   if (!dateString) return 'N/A'
@@ -204,6 +214,15 @@ async function handleDeprecate() {
           </div>
         </BaseCard>
       </div>
+
+      <!-- Compatible Scripts -->
+      <TemplateScriptCompatibilityEditor
+        class="mt-6"
+        :template="template"
+        :all-scripts="allScripts ?? []"
+        :compatible-scripts="compatibleScripts ?? []"
+        @refresh="refetchCompatible()"
+      />
 
       <!-- Validation Info -->
       <BaseCard v-if="template.validatedAt" class="mt-6">

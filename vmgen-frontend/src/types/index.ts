@@ -104,6 +104,10 @@ export interface ScriptListItem extends ScriptSummary {
   categoryColor?: string
   owaspMapping?: string
   createdAt: string
+  /** IDs of scripts this script conflicts with (populated by the compatible-scripts endpoint). */
+  conflictsWithIds?: string[]
+  /** IDs of scripts this script requires as dependencies. */
+  requiresIds?: string[]
 }
 
 export interface PagedResponse<T> {
@@ -325,8 +329,8 @@ export interface ProxmoxVmSummary {
 export interface Vulnerability {
   id: string
   name: string
-  category: 'web' | 'privesc' | 'auth' | 'service' | 'network'
-  difficulty: 'easy' | 'medium' | 'hard'
+  category: string
+  difficulty: string
   requires_capabilities: string[]
   description?: string
 }

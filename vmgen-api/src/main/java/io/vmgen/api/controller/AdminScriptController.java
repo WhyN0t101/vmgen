@@ -47,6 +47,15 @@ public class AdminScriptController {
     private final ScriptCompatibilityService compatibilityService;
     private final ScriptParameterService parameterService;
 
+    /**
+     * Returns all active scripts enriched with their conflict and dependency IDs.
+     * Used by the template registration form to enforce compatibility constraints.
+     */
+    @GetMapping("/enriched")
+    public ResponseEntity<List<ScriptListDto>> getAllEnriched() {
+        return ResponseEntity.ok(compatibilityService.getAllActiveEnriched());
+    }
+
     @GetMapping
     public ResponseEntity<PagedResponse<ScriptListDto>> listScripts(
             @RequestParam(required = false) UUID categoryId,

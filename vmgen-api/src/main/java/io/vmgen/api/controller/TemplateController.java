@@ -1,5 +1,6 @@
 package io.vmgen.api.controller;
 
+import io.vmgen.api.dto.script.ScriptListDto;
 import io.vmgen.api.dto.template.TemplateListResponse;
 import io.vmgen.api.dto.template.TemplateResponse;
 import io.vmgen.api.service.TemplateService;
@@ -33,5 +34,10 @@ public class TemplateController {
     public ResponseEntity<TemplateResponse> getTemplate(@PathVariable UUID id) {
         TemplateResponse response = templateService.getTemplate(id);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/scripts")
+    public ResponseEntity<List<ScriptListDto>> getCompatibleScripts(@PathVariable UUID id) {
+        return ResponseEntity.ok(templateService.getCompatibleScripts(id));
     }
 }

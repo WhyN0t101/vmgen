@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Plus, X } from 'lucide-vue-next'
+import { useQuery } from '@tanstack/vue-query'
 import { useRegisterTemplate, useProxmoxVms } from '@/composables/useTemplates'
 import { api } from '@/api/endpoints'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -12,6 +13,85 @@ import { useToast } from '@/composables/useToast'
 const router = useRouter()
 const registerMutation = useRegisterTemplate()
 const { show } = useToast()
+
+// Compatible scripts selection — load enriched (includes conflict/dep data)
+const selectedCompatibleScriptIds = ref<Set<string>>(new Set())
+const scriptSearch = ref('')
+const { data: allScripts } = useQuery({
+  queryKey: ['admin-scripts-enriched'],
+  queryFn: () => api.admin.getEnrichedScripts(),
+  staleTime: 60 * 1000,
+})
+
+const filteredScripts = computed(() => {
+  const scripts = allScripts.value ?? []
+  const q = scriptSearch.value.trim().toLowerCase()
+  if (!q) return scripts
+  return scripts.filter(s =>
+    s.name.toLowerCase().includes(q) ||
+    s.identifier.toLowerCase().includes(q) ||
+    (s.categoryName ?? '').toLowerCase().includes(q),
+  )
+})
+
+// Conflict map: scriptId → list of conflicting script IDs
+const conflictMap = computed<Record<string, string[]>>(() => {
+  const map: Record<string, string[]> = {}
+  for (const s of (allScripts.value ?? [])) {
+    if (s.conflictsWithIds?.length) map[s.id] = s.conflictsWithIds
+  }
+  return map
+})
+
+// Requires map: scriptId → list of required script IDs
+const requiresMap = computed<Record<string, string[]>>(() => {
+  const map: Record<string, string[]> = {}
+  for (const s of (allScripts.value ?? [])) {
+    if (s.requiresIds?.length) map[s.id] = s.requiresIds
+  }
+  return map
+})
+
+// Name lookup by ID for human-readable messages
+const nameById = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  for (const s of (allScripts.value ?? [])) map[s.id] = s.name
+  return map
+})
+
+// Returns why a script is disabled (conflicts with a selected one), or null if ok
+function conflictReasonFor(id: string): string | null {
+  for (const selectedId of selectedCompatibleScriptIds.value) {
+    if ((conflictMap.value[selectedId] ?? []).includes(id)) {
+      return `Conflicts with "${nameById.value[selectedId] ?? selectedId}"`
+    }
+  }
+  return null
+}
+
+// Returns the IDs that caused this script to be auto-selected as a dependency
+function requiredByLabels(id: string): string[] {
+  const labels: string[] = []
+  for (const selectedId of selectedCompatibleScriptIds.value) {
+    if ((requiresMap.value[selectedId] ?? []).includes(id) && selectedId !== id) {
+      labels.push(nameById.value[selectedId] ?? selectedId)
+    }
+  }
+  return labels
+}
+
+function toggleScript(id: string) {
+  if (conflictReasonFor(id)) return
+  if (selectedCompatibleScriptIds.value.has(id)) {
+    selectedCompatibleScriptIds.value.delete(id)
+  } else {
+    selectedCompatibleScriptIds.value.add(id)
+    // Auto-add all required dependencies
+    for (const reqId of (requiresMap.value[id] ?? [])) {
+      selectedCompatibleScriptIds.value.add(reqId)
+    }
+  }
+}
 
 // Form state
 const form = ref<RegisterTemplateRequest>({
@@ -102,6 +182,17 @@ async function selectVm(vm: any) {
 async function handleSubmit() {
   try {
     const result = await registerMutation.mutateAsync(form.value)
+
+    // Batch-link any selected compatible scripts now that we have the template ID
+    const templateId = result.id.toString()
+    for (const scriptId of selectedCompatibleScriptIds.value) {
+      try {
+        await api.admin.addTemplateCompatibleScript(templateId, scriptId)
+      } catch {
+        // Non-fatal — admin can manage links on the detail page
+      }
+    }
+
     router.push({ name: 'admin-template-detail', params: { id: result.id } })
   } catch (error) {
     // Error handled by mutation via toast.
@@ -452,6 +543,69 @@ async function handleSubmit() {
             </span>
           </div>
         </div>
+      </BaseCard>
+
+      <!-- Compatible Scripts -->
+      <BaseCard>
+        <h2 class="text-xl font-semibold text-slate-100 mb-1">Compatible Scripts</h2>
+        <p class="text-xs text-slate-400 mb-4">
+          Select which vulnerability scripts can be applied to this template.
+          If none are selected, all active scripts will be available (no restriction).
+        </p>
+
+        <input
+          v-model="scriptSearch"
+          type="text"
+          placeholder="Search scripts…"
+          class="w-full mb-3 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+
+        <div class="max-h-56 overflow-y-auto space-y-1 pr-1">
+          <p v-if="filteredScripts.length === 0" class="text-sm text-slate-500 italic py-2">
+            No scripts found.
+          </p>
+          <label
+            v-for="s in filteredScripts"
+            :key="s.id"
+            :class="[
+              'flex items-start gap-3 px-3 py-2 rounded-lg transition-colors',
+              conflictReasonFor(s.id)
+                ? 'opacity-40 cursor-not-allowed'
+                : 'cursor-pointer hover:bg-slate-800/60',
+            ]"
+          >
+            <input
+              type="checkbox"
+              :checked="selectedCompatibleScriptIds.has(s.id)"
+              :disabled="!!conflictReasonFor(s.id)"
+              @change="toggleScript(s.id)"
+              class="mt-0.5 shrink-0"
+            />
+            <div class="min-w-0">
+              <p :class="['text-sm', conflictReasonFor(s.id) ? 'text-slate-400' : 'text-slate-100']">
+                {{ s.name }}
+              </p>
+              <p class="text-[11px] font-mono text-slate-500">
+                {{ s.identifier }}@{{ s.version }}
+                <span v-if="s.categoryName" class="ml-2 text-slate-400">· {{ s.categoryName }}</span>
+                <span class="ml-2 text-slate-500">· {{ s.difficultyLevel }}</span>
+              </p>
+              <p v-if="conflictReasonFor(s.id)" class="text-[11px] text-red-400 mt-0.5">
+                ⚠ {{ conflictReasonFor(s.id) }}
+              </p>
+              <p v-else-if="requiredByLabels(s.id).length > 0" class="text-[11px] text-amber-400 mt-0.5">
+                ↳ Auto-selected: required by "{{ requiredByLabels(s.id).join('", "') }}"
+              </p>
+              <p v-else-if="(requiresMap[s.id] ?? []).length > 0" class="text-[11px] text-sky-400 mt-0.5">
+                Requires: {{ (requiresMap[s.id] ?? []).map(rid => nameById[rid] ?? rid).join(', ') }}
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <p v-if="selectedCompatibleScriptIds.size > 0" class="mt-3 text-xs text-slate-400">
+          {{ selectedCompatibleScriptIds.size }} script{{ selectedCompatibleScriptIds.size === 1 ? '' : 's' }} selected
+        </p>
       </BaseCard>
 
       <!-- Submit -->

@@ -2,6 +2,7 @@ package io.vmgen.api.service;
 
 import io.vmgen.api.dto.script.ScriptCompatibilityInfo;
 import io.vmgen.api.dto.script.ScriptCompatibilityViewDto;
+import io.vmgen.api.dto.script.ScriptListDto;
 import io.vmgen.api.dto.script.ScriptSelectionResult;
 import io.vmgen.api.dto.script.ScriptSummaryDto;
 import io.vmgen.api.exceptions.CircularDependencyException;
@@ -12,6 +13,7 @@ import io.vmgen.api.models.script.ScriptConflictId;
 import io.vmgen.api.models.script.ScriptDependency;
 import io.vmgen.api.models.script.ScriptDependencyId;
 import io.vmgen.api.models.user.User;
+import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
 import io.vmgen.api.repository.ScriptConflictRepository;
 import io.vmgen.api.repository.ScriptDependencyRepository;
 import io.vmgen.api.repository.ScriptRepository;
@@ -73,6 +75,59 @@ public class ScriptCompatibilityService {
         return ScriptSelectionResult.builder()
                 .orderedScriptIds(ordered)
                 .autoAddedScriptIds(autoAdded)
+                .build();
+    }
+
+    /**
+     * Returns all active scripts enriched with their conflict and dependency IDs.
+     * Used by admin UIs that must enforce compatibility constraints at selection time
+     * (e.g. the template registration form when picking compatible scripts).
+     */
+    @Transactional(readOnly = true)
+    public List<ScriptListDto> getAllActiveEnriched() {
+        List<Script> scripts = scriptRepository.findAllActiveWithCategory();
+        List<UUID> allIds = scripts.stream().map(Script::getId).collect(java.util.stream.Collectors.toList());
+        Set<UUID> idSet = new HashSet<>(allIds);
+
+        Map<UUID, List<UUID>> conflictMap = new HashMap<>();
+        for (ScriptConflict edge : conflictRepository.findAllInvolvingAny(allIds)) {
+            UUID a = edge.getScriptId();
+            UUID b = edge.getConflictsWithScriptId();
+            if (idSet.contains(a) && idSet.contains(b)) {
+                conflictMap.computeIfAbsent(a, k -> new ArrayList<>()).add(b);
+                conflictMap.computeIfAbsent(b, k -> new ArrayList<>()).add(a);
+            }
+        }
+
+        Map<UUID, List<UUID>> requiresMap = new HashMap<>();
+        for (ScriptDependency dep : dependencyRepository.findAllByScriptIdIn(allIds)) {
+            requiresMap.computeIfAbsent(dep.getScriptId(), k -> new ArrayList<>())
+                    .add(dep.getRequiresScriptId());
+        }
+
+        return scripts.stream()
+                .map(s -> toEnrichedDto(s, conflictMap, requiresMap))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private ScriptListDto toEnrichedDto(Script script,
+                                        Map<UUID, List<UUID>> conflictMap,
+                                        Map<UUID, List<UUID>> requiresMap) {
+        VulnerabilityCategory category = script.getCategory();
+        return ScriptListDto.builder()
+                .id(script.getId())
+                .identifier(script.getIdentifier())
+                .version(script.getVersion())
+                .name(script.getName())
+                .difficultyLevel(script.getDifficultyLevel())
+                .isActive(script.getIsActive())
+                .categoryId(category != null ? category.getId() : null)
+                .categoryName(category != null ? category.getName() : null)
+                .categoryColor(category != null ? category.getColor() : null)
+                .owaspMapping(category != null ? category.getOwaspMapping() : null)
+                .createdAt(script.getCreatedAt())
+                .conflictsWithIds(conflictMap.getOrDefault(script.getId(), List.of()))
+                .requiresIds(requiresMap.getOrDefault(script.getId(), List.of()))
                 .build();
     }
 

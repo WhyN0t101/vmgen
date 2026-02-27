@@ -1,6 +1,7 @@
 package io.vmgen.api.dto.script;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
@@ -22,5 +23,9 @@ public class ScriptListDto {
     private String categoryColor;
     private String owaspMapping;
     private Instant createdAt;
+    /** IDs of scripts this script conflicts with (within the current compatible set). Null when not enriched. */
+    private List<UUID> conflictsWithIds;
+    /** IDs of scripts this script requires as dependencies. Null when not enriched. */
+    private List<UUID> requiresIds;
 }
 

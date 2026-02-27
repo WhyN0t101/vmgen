@@ -395,9 +395,6 @@ public class ScriptParameterService {
         return choices.get(index).getChoiceValue();
     }
 
-    // -------------------------------------------------------------------------
-    // Result wrapper
-    // -------------------------------------------------------------------------
 
     /**
      * Result of parameter processing for a single script.

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import { api } from '@/api/endpoints'
 import { useToast } from '@/composables/useToast'
-import type { TemplateResponse, TemplateListResponse, RegisterTemplateRequest, UpdateTemplateMetadataRequest } from '@/types'
+import type { TemplateResponse, TemplateListResponse, RegisterTemplateRequest, UpdateTemplateMetadataRequest, ScriptListItem } from '@/types'
 
 // Query keys
 export const TEMPLATE_KEYS = {
@@ -13,6 +13,7 @@ export const TEMPLATE_KEYS = {
   detail: (id: string) => [...TEMPLATE_KEYS.details(), id] as const,
   proxmoxVms: (node?: string) => [...TEMPLATE_KEYS.all, 'proxmox-vms', { node }] as const,
   active: () => [...TEMPLATE_KEYS.all, 'active'] as const,
+  compatibleScripts: (id: string) => [...TEMPLATE_KEYS.detail(id), 'scripts'] as const,
 }
 
 /**
@@ -199,5 +200,76 @@ export function useDeprecateTemplate() {
         'Failed to deprecate template'
       show(message, 'error')
     },
+  })
+}
+
+/**
+ * Admin query to fetch scripts marked as compatible with the given template.
+ */
+export function useTemplateCompatibleScripts(templateId: Ref<string | null>) {
+  return useQuery({
+    queryKey: computed(() => TEMPLATE_KEYS.compatibleScripts(templateId.value ?? '')),
+    queryFn: () => api.admin.getTemplateCompatibleScripts(templateId.value!),
+    enabled: computed(() => !!templateId.value),
+  })
+}
+
+/**
+ * Admin mutation to link a script as compatible with a template.
+ */
+export function useAddTemplateCompatibleScript() {
+  const queryClient = useQueryClient()
+  const { show } = useToast()
+
+  return useMutation({
+    mutationFn: ({ templateId, scriptId }: { templateId: string; scriptId: string }) =>
+      api.admin.addTemplateCompatibleScript(templateId, scriptId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.compatibleScripts(variables.templateId) })
+      show('Script added to compatible list', 'success')
+    },
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.errors?.join?.('\n') ??
+        error.response?.data?.message ??
+        'Failed to add script'
+      show(message, 'error')
+    },
+  })
+}
+
+/**
+ * Admin mutation to remove a script–template compatibility link.
+ */
+export function useRemoveTemplateCompatibleScript() {
+  const queryClient = useQueryClient()
+  const { show } = useToast()
+
+  return useMutation({
+    mutationFn: ({ templateId, scriptId }: { templateId: string; scriptId: string }) =>
+      api.admin.removeTemplateCompatibleScript(templateId, scriptId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.compatibleScripts(variables.templateId) })
+      show('Script removed from compatible list', 'success')
+    },
+    onError: (error: any) => {
+      const message =
+        error.response?.data?.errors?.join?.('\n') ??
+        error.response?.data?.message ??
+        'Failed to remove script'
+      show(message, 'error')
+    },
+  })
+}
+
+/**
+ * Public query for the Generate page — returns scripts compatible with a template.
+ * Falls back to all active scripts if no compatibility entries are configured.
+ */
+export function usePublicCompatibleScripts(templateId: Ref<string | null>) {
+  return useQuery({
+    queryKey: computed(() => ['public-compatible-scripts', templateId.value]),
+    queryFn: () => api.templates.getCompatibleScripts(templateId.value!),
+    enabled: computed(() => !!templateId.value),
   })
 }
