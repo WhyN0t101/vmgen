@@ -16,9 +16,13 @@ import ScriptParameterEditor from '@/components/admin/ScriptParameterEditor.vue'
 import ScriptCompatibilityDraftEditor from '@/components/admin/ScriptCompatibilityDraftEditor.vue'
 import ScriptParameterDraftEditor from '@/components/admin/ScriptParameterDraftEditor.vue'
 import type { CreateScriptRequest, CreateScriptParameterRequest, UpdateScriptRequest } from '@/types'
+import { useToast } from '@/composables/useToast'
 
+// Admin page for creating or editing a vulnerability script, including
+// its metadata, template requirements, flag placement and compatibility.
 const router = useRouter()
 const route = useRoute()
+const { show } = useToast()
 
 const isEditing = computed(() => !!route.params.id)
 const scriptId = computed(() => (route.params.id as string) || '')
@@ -97,7 +101,7 @@ function handleCancel() {
 
 async function handleSubmit() {
   if (!form.value.categoryId) {
-    alert('Please select a vulnerability category.')
+    show('Please select a vulnerability category.', 'error')
     return
   }
 
@@ -116,9 +120,20 @@ async function handleSubmit() {
       minRamMb: form.value.minRamMb,
       minDiskGb: form.value.minDiskGb,
     }
-    await updateMutation.mutateAsync({ id: form.value.id, data: payload })
+    try {
+      await updateMutation.mutateAsync({ id: form.value.id, data: payload })
+    } catch {
+      // Error handled by mutation via toast, keep user on form.
+      return
+    }
   } else {
-    const created = await createMutation.mutateAsync(form.value as CreateScriptRequest)
+    let created: ScriptDetail | undefined
+    try {
+      created = await createMutation.mutateAsync(form.value as CreateScriptRequest)
+    } catch {
+      // Error handled by mutation via toast, keep user on form.
+      return
+    }
     // After creating a script, go straight to the edit view so
     // compatibility and parameters can be configured immediately.
     if (created && created.id) {

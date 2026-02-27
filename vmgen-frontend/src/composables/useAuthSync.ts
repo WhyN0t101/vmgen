@@ -1,10 +1,17 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
 
+/**
+ * Keep authentication state in sync across multiple browser tabs by
+ * listening to storage events for the JWT token and reacting to
+ * login/logout in other tabs.
+ */
 export function useAuthSync() {
   const router = useRouter()
   const authStore = useAuthStore()
+  const { show } = useToast()
 
   function handleStorageChange(event: StorageEvent) {
     // Listen for logout events from other tabs
@@ -12,10 +19,8 @@ export function useAuthSync() {
       // Another tab logged out - sync this tab
       if (authStore.isAuthenticated) {
         authStore.logout()
+        show('You have been logged out in another tab.', 'info')
         router.push('/login')
-        // TODO: Replace with actual notification component
-        // showNotification('You have been logged out', 'info')
-        console.info('Logged out due to logout in another tab')
       }
     }
     

@@ -5,6 +5,7 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useCategoryList } from '@/composables/useCategories'
 import { useScriptList, useDeprecateScript } from '@/composables/useScripts'
+import { useConfirm } from '@/composables/useConfirm'
 
 const router = useRouter()
 
@@ -15,7 +16,7 @@ const activeOnly = ref(true)
 const { data: categoriesData } = useCategoryList(true)
 const categories = computed(() => categoriesData.value ?? [])
 
-const { data: scriptsData, isLoading } = useScriptList({
+const { data: scriptsData, isLoading, refetch } = useScriptList({
   categoryId: selectedCategoryId,
   difficulty: selectedDifficulty,
   activeOnly,
@@ -24,11 +25,22 @@ const { data: scriptsData, isLoading } = useScriptList({
 const scripts = computed(() => scriptsData.value ?? [])
 
 const { mutateAsync: deprecateScript, isPending: isDeprecating } = useDeprecateScript()
+const { confirm } = useConfirm()
 
 async function handleDeprecate(id: string) {
-  if (!confirm('Deprecate this script? It will no longer be available for new builds.')) return
-  await deprecateScript(id)
-  refetch()
+  const ok = await confirm({
+    title: 'Deprecate script',
+    message: 'Deprecate this script? It will no longer be available for new builds.',
+    confirmLabel: 'Deprecate',
+  })
+  if (!ok) return
+
+  try {
+    await deprecateScript(id)
+    refetch()
+  } catch {
+    // Toast already shown by mutation.
+  }
 }
 
 function difficultyBadgeClass(level: string) {

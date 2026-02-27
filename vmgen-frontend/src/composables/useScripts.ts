@@ -11,17 +11,18 @@ import type {
 } from '@/types'
 import { api } from '@/api/endpoints'
 import { computed, type Ref } from 'vue'
+import { useToast } from '@/composables/useToast'
 
+/**
+ * Admin-facing composables for listing, inspecting and mutating
+ * vulnerability scripts, their compatibility and their parameters.
+ */
 export const SCRIPT_KEYS = {
   all: ['scripts'] as const,
   lists: () => [...SCRIPT_KEYS.all, 'list'] as const,
   list: (filters: Record<string, unknown>) => [...SCRIPT_KEYS.lists(), filters] as const,
   details: () => [...SCRIPT_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...SCRIPT_KEYS.details(), id] as const,
-}
-
-function showToast(message: string, type: 'success' | 'error' = 'success') {
-  console.log(`[${type.toUpperCase()}] ${message}`)
 }
 
 export function useScriptList(params: {
@@ -64,15 +65,19 @@ export function useScriptDetail(id: Ref<string>) {
 
 export function useCreateScript() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
   return useMutation({
     mutationFn: (data: CreateScriptRequest) => api.admin.createScript(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SCRIPT_KEYS.lists() })
-      showToast('Script created successfully', 'success')
+      show('Script created successfully', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to create script'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to create script'
+      show(message, 'error')
     },
   })
 }
@@ -87,6 +92,7 @@ export function useScriptCompatibility(id: Ref<string>) {
 
 export function useScriptParameters(id: Ref<string>) {
   const queryClient = useQueryClient()
+  const { show } = useToast()
   const listQuery = useQuery<ScriptParameter[]>({
     queryKey: computed(() => [...SCRIPT_KEYS.detail(id.value), 'parameters']),
     queryFn: () => api.admin.listScriptParameters(id.value),
@@ -100,11 +106,14 @@ export function useScriptParameters(id: Ref<string>) {
       queryClient.invalidateQueries({
         queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
       })
-      showToast('Parameter created', 'success')
+      show('Parameter created', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to create parameter'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to create parameter'
+      show(message, 'error')
     },
   })
 
@@ -118,11 +127,14 @@ export function useScriptParameters(id: Ref<string>) {
       queryClient.invalidateQueries({
         queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
       })
-      showToast('Parameter updated', 'success')
+      show('Parameter updated', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to update parameter'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to update parameter'
+      show(message, 'error')
     },
   })
 
@@ -133,11 +145,14 @@ export function useScriptParameters(id: Ref<string>) {
       queryClient.invalidateQueries({
         queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
       })
-      showToast('Parameter deleted', 'success')
+      show('Parameter deleted', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to delete parameter'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to delete parameter'
+      show(message, 'error')
     },
   })
 
@@ -151,32 +166,40 @@ export function useScriptParameters(id: Ref<string>) {
 
 export function useUpdateScript() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
   return useMutation({
     mutationFn: (payload: { id: string; data: UpdateScriptRequest }) =>
       api.admin.updateScript(payload.id, payload.data),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: SCRIPT_KEYS.lists() })
       queryClient.invalidateQueries({ queryKey: SCRIPT_KEYS.detail(variables.id) })
-      showToast('Script updated successfully', 'success')
+      show('Script updated successfully', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to update script'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to update script'
+      show(message, 'error')
     },
   })
 }
 
 export function useDeprecateScript() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
   return useMutation({
     mutationFn: (id: string) => api.admin.deprecateScript(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SCRIPT_KEYS.lists() })
-      showToast('Script deprecated', 'success')
+      show('Script deprecated', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to deprecate script'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to deprecate script'
+      show(message, 'error')
     },
   })
 }

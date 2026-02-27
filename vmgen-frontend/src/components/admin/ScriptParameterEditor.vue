@@ -13,6 +13,7 @@ import type {
 } from '@/types'
 import { useScriptParameters } from '@/composables/useScripts'
 import { useRoute } from 'vue-router'
+import { useConfirm } from '@/composables/useConfirm'
 
 const props = defineProps<{
   script: ScriptDetail
@@ -22,6 +23,7 @@ const route = useRoute()
 const scriptId = computed(() => (route.params.id as string) || '')
 
 const { listQuery, createMutation, updateMutation, deleteMutation } = useScriptParameters(scriptId)
+const { confirm } = useConfirm()
 
 const editing = ref<ScriptParameter | null>(null)
 const showForm = ref(false)
@@ -139,7 +141,13 @@ async function save() {
 }
 
 async function deleteParam(param: ScriptParameter) {
-  if (!confirm(`Delete parameter ${param.displayName}?`)) return
+  const ok = await confirm({
+    title: 'Delete parameter',
+    message: `Delete parameter ${param.displayName}?`,
+    confirmLabel: 'Delete',
+  })
+  if (!ok) return
+
   await deleteMutation.mutateAsync({ scriptId: props.script.id, parameterId: param.id })
 }
 </script>

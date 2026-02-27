@@ -7,6 +7,7 @@ import TemplateStatusBadge from '@/components/templates/TemplateStatusBadge.vue'
 import TemplateCapabilityBadge from '@/components/templates/TemplateCapabilityBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import { useConfirm } from '@/composables/useConfirm'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,7 @@ const templateId = computed(() => route.params.id as string)
 const { data: template, isLoading } = useTemplate(templateId)
 const validateMutation = useValidateTemplate()
 const deprecateMutation = useDeprecateTemplate()
+const { confirm } = useConfirm()
 
 function formatDate(dateString?: string) {
   if (!dateString) return 'N/A'
@@ -34,7 +36,13 @@ const parsedValidationLogs = computed(() => {
 })
 
 async function handleValidate() {
-  if (!confirm('Are you sure you want to validate this template?')) return
+  const ok = await confirm({
+    title: 'Validate template',
+    message: 'Validate this template now? VMGen will run basic checks against the Proxmox VM.',
+    confirmLabel: 'Validate',
+  })
+  if (!ok) return
+
   try {
     await validateMutation.mutateAsync(templateId.value)
   } catch (error) {
@@ -43,7 +51,13 @@ async function handleValidate() {
 }
 
 async function handleDeprecate() {
-  if (!confirm('Are you sure you want to deprecate this template? This action cannot be undone.')) return
+  const ok = await confirm({
+    title: 'Deprecate template',
+    message: 'Deprecate this template? It will be hidden from new builds. This action cannot be easily undone.',
+    confirmLabel: 'Deprecate',
+  })
+  if (!ok) return
+
   try {
     await deprecateMutation.mutateAsync(templateId.value)
     router.push({ name: 'admin-template-list' })

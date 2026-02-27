@@ -2,6 +2,10 @@ import { useQuery } from '@tanstack/vue-query'
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { api } from '@/api/endpoints'
 
+/**
+ * Poll backend build status for a single request ID and keep it
+ * up to date while the build is queued, building, or exporting.
+ */
 export function useBuildStatus(requestId: MaybeRefOrGetter<string>) {
   const requestIdValue = computed(() => toValue(requestId))
   const queryKey = computed(() => ['build', requestIdValue.value])

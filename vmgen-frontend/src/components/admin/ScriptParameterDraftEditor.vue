@@ -8,6 +8,7 @@ import type {
   ValueSource,
   CreateParameterChoice,
 } from '@/types'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps<{
   parameters: CreateScriptParameterRequest[]
@@ -16,6 +17,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:parameters': [value: CreateScriptParameterRequest[]]
 }>()
+
+const { show } = useToast()
 
 const editingIndex = ref<number | null>(null)
 const showForm = ref(false)
@@ -98,15 +101,15 @@ function deleteParam(index: number) {
 
 function save() {
   if (!form.value.displayName?.trim() || !form.value.parameterName?.trim()) {
-    alert('Parameter name and display name are required.')
+    show('Parameter name and display name are required.', 'error')
     return
   }
   if (!/^[A-Z_]+$/.test(form.value.parameterName.trim())) {
-    alert('Parameter name must be uppercase with underscores (e.g., DATABASE_PASSWORD).')
+    show('Parameter name must be uppercase with underscores (e.g., DATABASE_PASSWORD).', 'error')
     return
   }
   if (hasNameConflict.value) {
-    alert('A parameter with this name already exists in this script.')
+    show('A parameter with this name already exists in this script.', 'error')
     return
   }
 

@@ -8,7 +8,12 @@ import type {
   CategoryReorderRequest,
 } from '@/types'
 import { api } from '@/api/endpoints'
+import { useToast } from '@/composables/useToast'
 
+/**
+ * Admin-facing helpers for listing, creating/updating, deprecating and
+ * reordering vulnerability categories in the script catalog.
+ */
 export const CATEGORY_KEYS = {
   all: ['categories'] as const,
   lists: () => [...CATEGORY_KEYS.all, 'list'] as const,
@@ -42,6 +47,7 @@ export function useCategoryDetail(id: string) {
 
 export function useCreateOrUpdateCategory() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: (payload: { id?: string; data: CreateCategoryRequest | UpdateCategoryRequest }) => {
@@ -55,43 +61,54 @@ export function useCreateOrUpdateCategory() {
       if (variables.id) {
         queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.detail(variables.id) })
       }
-      showToast('Category saved successfully', 'success')
+      show('Category saved successfully', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to save category'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to save category'
+      show(message, 'error')
     },
   })
 }
 
 export function useDeprecateCategory() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: (id: string) => api.admin.deprecateCategory(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
-      showToast('Category deprecated', 'success')
+      show('Category deprecated', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to deprecate category'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to deprecate category'
+      show(message, 'error')
     },
   })
 }
 
 export function useReorderCategories() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: (items: CategoryReorderRequest[]) => api.admin.reorderCategories(items),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
-      showToast('Category order updated', 'success')
+      show('Category order updated', 'success')
     },
     onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Failed to reorder categories'
-      showToast(message, 'error')
+      const message =
+        error?.response?.data?.errors?.join?.('\n') ??
+        error?.response?.data?.message ??
+        'Failed to reorder categories'
+      show(message, 'error')
     },
   })
 }

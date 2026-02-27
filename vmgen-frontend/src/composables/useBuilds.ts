@@ -3,6 +3,9 @@ import { useRouter } from 'vue-router'
 import { api } from '@/api/endpoints'
 import type { BuildSpec } from '@/types'
 
+/**
+ * Fetch the current user's VM build history for dashboard views.
+ */
 export function useBuilds() {
   return useQuery({
     queryKey: ['builds'],
@@ -10,6 +13,10 @@ export function useBuilds() {
   })
 }
 
+/**
+ * Create a new VM build and navigate to its status page,
+ * invalidating any cached build lists on success.
+ */
 export function useCreateBuild() {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -25,6 +32,10 @@ export function useCreateBuild() {
   })
 }
 
+/**
+ * Submit a captured flag for a given build and refresh the
+ * corresponding build status and build list queries.
+ */
 export function useSubmitFlag() {
   const queryClient = useQueryClient()
   

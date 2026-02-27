@@ -7,9 +7,11 @@ import { api } from '@/api/endpoints'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import type { RegisterTemplateRequest } from '@/types'
+import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
 const registerMutation = useRegisterTemplate()
+const { show } = useToast()
 
 // Form state
 const form = ref<RegisterTemplateRequest>({
@@ -93,8 +95,7 @@ async function selectVm(vm: any) {
       form.value.diskStorage = storageResponse.storage
     }
   } catch (error) {
-    console.warn('Could not auto-detect storage for VM:', error)
-    // Keep current value or default
+    show('Could not auto-detect storage for VM. Keeping current disk storage setting.', 'warning')
   }
 }
 
@@ -103,7 +104,7 @@ async function handleSubmit() {
     const result = await registerMutation.mutateAsync(form.value)
     router.push({ name: 'admin-template-detail', params: { id: result.id } })
   } catch (error) {
-    // Error handled by mutation
+    // Error handled by mutation via toast.
   }
 }
 </script>

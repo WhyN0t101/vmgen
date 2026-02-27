@@ -12,6 +12,12 @@ const { mutate: revokeAll, isPending: isRevokingAll } = useRevokeAllUserSessions
 const revokingSessionId = ref<string | null>(null)
 const revokingUserId = ref<string | null>(null)
 
+type ConfirmState =
+  | { kind: 'session'; sessionId: string; userId: string; message: string }
+  | { kind: 'all'; userId: string; message: string }
+
+const confirmState = ref<ConfirmState | null>(null)
+
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString)
   const now = new Date()
@@ -37,28 +43,49 @@ function formatTimestamp(dateString: string) {
 
 function handleRevokeSession(sessionId: string, userId: string) {
   // Allow revoking own session (it's just logging out, which is fine)
-  const message = 'Are you sure you want to revoke this session? The user will be logged out.'
-  if (confirm(message)) {
-    revokingSessionId.value = sessionId
-    revokeSession(sessionId, {
-      onSettled: () => {
-        revokingSessionId.value = null
-      },
-    })
+  confirmState.value = {
+    kind: 'session',
+    sessionId,
+    userId,
+    message: 'Revoke this session? The user will be logged out on this device.',
   }
 }
 
 function handleRevokeAll(userId: string) {
   // Allow revoking own sessions (it's just logging out from all devices)
-  const message = 'Are you sure you want to revoke all sessions for this user? They will be logged out from all devices.'
-  if (confirm(message)) {
-    revokingUserId.value = userId
-    revokeAll(userId, {
+  confirmState.value = {
+    kind: 'all',
+    userId,
+    message:
+      'Revoke all sessions for this user? They will be logged out from all devices.',
+  }
+}
+
+function cancelConfirm() {
+  confirmState.value = null
+}
+
+function confirmAction() {
+  const state = confirmState.value
+  if (!state) return
+
+  if (state.kind === 'session') {
+    revokingSessionId.value = state.sessionId
+    revokeSession(state.sessionId, {
+      onSettled: () => {
+        revokingSessionId.value = null
+      },
+    })
+  } else if (state.kind === 'all') {
+    revokingUserId.value = state.userId
+    revokeAll(state.userId, {
       onSettled: () => {
         revokingUserId.value = null
       },
     })
   }
+
+  confirmState.value = null
 }
 </script>
 
@@ -132,6 +159,33 @@ function handleRevokeAll(userId: string) {
 
     <div v-else class="text-center py-12">
       <p class="text-slate-400">No active sessions</p>
+    </div>
+
+    <!-- Custom confirmation dialog -->
+    <div
+      v-if="confirmState"
+      class="fixed inset-0 z-40 flex items-center justify-center bg-black/60"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="w-full max-w-md rounded-lg bg-slate-950/95 border border-slate-700 shadow-xl">
+        <div class="border-b border-slate-800 px-5 py-3">
+          <h2 class="text-sm font-semibold text-slate-100">
+            {{ confirmState.kind === 'all' ? 'Revoke all sessions' : 'Revoke session' }}
+          </h2>
+        </div>
+        <div class="px-5 py-4 text-sm text-slate-200">
+          {{ confirmState.message }}
+        </div>
+        <div class="flex justify-end gap-3 border-t border-slate-800 px-5 py-3">
+          <BaseButton type="button" variant="ghost" size="sm" @click="cancelConfirm">
+            Cancel
+          </BaseButton>
+          <BaseButton type="button" variant="danger" size="sm" @click="confirmAction">
+            Revoke
+          </BaseButton>
+        </div>
+      </div>
     </div>
   </div>
 </template>

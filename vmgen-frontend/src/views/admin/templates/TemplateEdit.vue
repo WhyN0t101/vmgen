@@ -42,7 +42,7 @@ async function handleSubmit() {
     await updateMutation.mutateAsync({ id: templateId.value, data: form.value })
     router.push({ name: 'admin-template-detail', params: { id: templateId.value } })
   } catch (error) {
-    // Error handled by mutation
+    // Error handled by mutation via toast; keep user on the form.
   }
 }
 </script>

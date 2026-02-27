@@ -114,8 +114,9 @@ router.beforeEach((to, from, next) => {
     
     next()
   } catch (error) {
+    // Fallback: allow navigation but log error for debugging
+    // eslint-disable-next-line no-console
     console.error('Router guard error:', error)
-    // Fallback: allow navigation but log error
     next()
   }
 })

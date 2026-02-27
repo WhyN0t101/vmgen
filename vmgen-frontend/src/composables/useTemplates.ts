@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import { api } from '@/api/endpoints'
+import { useToast } from '@/composables/useToast'
 import type { TemplateResponse, TemplateListResponse, RegisterTemplateRequest, UpdateTemplateMetadataRequest } from '@/types'
 
 // Query keys
@@ -14,14 +15,10 @@ export const TEMPLATE_KEYS = {
   active: () => [...TEMPLATE_KEYS.all, 'active'] as const,
 }
 
-// Simple toast helper (can be replaced with proper toast library later)
-function showToast(message: string, type: 'success' | 'error' = 'success') {
-  // For now, just use console - can be replaced with a toast library
-  console.log(`[${type.toUpperCase()}] ${message}`)
-  // In a real app, you'd use something like vue-toastification or similar
-}
-
-// Admin queries
+/**
+ * Admin-only list query for templates, optionally filtered by status
+ * (e.g. DRAFT, ACTIVE, DEPRECATED).
+ */
 export function useTemplateList(status?: Ref<string | undefined>) {
   return useQuery({
     queryKey: TEMPLATE_KEYS.list(status?.value),
@@ -30,6 +27,9 @@ export function useTemplateList(status?: Ref<string | undefined>) {
   })
 }
 
+/**
+ * Admin-only detail query for a single template by ID.
+ */
 export function useTemplate(id: Ref<string>) {
   return useQuery({
     queryKey: computed(() => TEMPLATE_KEYS.detail(id.value)),
@@ -38,6 +38,10 @@ export function useTemplate(id: Ref<string>) {
   })
 }
 
+/**
+ * Lazy Proxmox VM listing used by the template registration flow.
+ * Does not auto-fetch; caller must trigger refetch manually.
+ */
 export function useProxmoxVms(node?: Ref<string | undefined> | string | (() => string)) {
   const getNodeValue = () => {
     if (typeof node === 'function') return node()
@@ -55,7 +59,9 @@ export function useProxmoxVms(node?: Ref<string | undefined> | string | (() => s
   })
 }
 
-// Public queries
+/**
+ * Public list query for active templates shown in the catalog.
+ */
 export function useActiveTemplates() {
   return useQuery({
     queryKey: TEMPLATE_KEYS.active(),
@@ -64,8 +70,8 @@ export function useActiveTemplates() {
   })
 }
 
-// Backward compatibility: Legacy useTemplates() for existing pages
-// Maps to useActiveTemplates() but returns data in old Template[] format
+// Backward compatibility: Legacy useTemplates() for existing pages.
+// Maps to useActiveTemplates() but returns data in old Template[] format.
 export function useTemplates() {
   const query = useActiveTemplates()
   
@@ -87,6 +93,9 @@ export function useTemplates() {
   }
 }
 
+/**
+ * Public detail query for a single template by ID.
+ */
 export function usePublicTemplate(id: Ref<string>) {
   return useQuery({
     queryKey: [...TEMPLATE_KEYS.details(), 'public', id.value],
@@ -95,27 +104,37 @@ export function usePublicTemplate(id: Ref<string>) {
   })
 }
 
-// Mutations
+/**
+ * Admin mutation to register a new template and refresh relevant lists.
+ */
 export function useRegisterTemplate() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: (data: RegisterTemplateRequest) => api.admin.registerTemplate(data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.lists() })
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.active() })
-      showToast('Template registered successfully', 'success')
+      show('Template registered successfully', 'success')
       return data
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to register template'
-      showToast(message, 'error')
+      const message =
+        error.response?.data?.errors?.join?.('\n') ??
+        error.response?.data?.message ??
+        'Failed to register template'
+      show(message, 'error')
     },
   })
 }
 
+/**
+ * Admin mutation to validate a template in Proxmox and mark it ACTIVE.
+ */
 export function useValidateTemplate() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: (id: string) => api.admin.validateTemplate(id),
@@ -123,45 +142,62 @@ export function useValidateTemplate() {
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.lists() })
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.active() })
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.detail(id) })
-      showToast('Template validated successfully', 'success')
+      show('Template validated successfully', 'success')
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to validate template'
-      showToast(message, 'error')
+      const message =
+        error.response?.data?.errors?.join?.('\n') ??
+        error.response?.data?.message ??
+        'Failed to validate template'
+      show(message, 'error')
     },
   })
 }
 
+/**
+ * Admin mutation to update mutable template metadata fields.
+ */
 export function useUpdateTemplateMetadata() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTemplateMetadataRequest }) =>
       api.admin.updateTemplateMetadata(id, data),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.detail(variables.id) })
-      showToast('Template metadata updated successfully', 'success')
+      show('Template metadata updated successfully', 'success')
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to update template'
-      showToast(message, 'error')
+      const message =
+        error.response?.data?.errors?.join?.('\n') ??
+        error.response?.data?.message ??
+        'Failed to update template'
+      show(message, 'error')
     },
   })
 }
 
+/**
+ * Admin mutation to deprecate a template and remove it from active lists.
+ */
 export function useDeprecateTemplate() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: (id: string) => api.admin.deprecateTemplate(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.lists() })
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.active() })
-      showToast('Template deprecated successfully', 'success')
+      show('Template deprecated successfully', 'success')
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to deprecate template'
-      showToast(message, 'error')
+      const message =
+        error.response?.data?.errors?.join?.('\n') ??
+        error.response?.data?.message ??
+        'Failed to deprecate template'
+      show(message, 'error')
     },
   })
 }

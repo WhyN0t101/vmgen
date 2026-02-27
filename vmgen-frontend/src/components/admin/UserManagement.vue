@@ -5,10 +5,14 @@ import { useAuthStore } from '@/stores/auth'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 
 const authStore = useAuthStore()
 const { data: sessions } = useActiveSessions()
 const { mutate: updateRole, isPending: isUpdating } = useUpdateUserRole()
+const { show } = useToast()
+const { confirm } = useConfirm()
 
 const updatingUserId = ref<string | null>(null)
 
@@ -68,31 +72,36 @@ const adminCount = computed(() => {
   return users.value.filter(u => (u.role || '').toLowerCase() === 'admin').length
 })
 
-function handleRoleChange(userId: string, currentRole: 'user' | 'admin', newRole: 'user' | 'admin') {
+async function handleRoleChange(userId: string, currentRole: 'user' | 'admin', newRole: 'user' | 'admin') {
   // Prevent self-demotion
   if (currentUserId.value === userId && newRole === 'user') {
-    alert('You cannot demote yourself. Ask another administrator to do this.')
+    show('You cannot demote yourself. Ask another administrator to do this.', 'error')
     return
   }
   
   // Warn if demoting last admin
   if (currentRole === 'admin' && newRole === 'user' && adminCount.value <= 1) {
-    alert('Cannot demote the last administrator account.')
+    show('Cannot demote the last administrator account.', 'error')
     return
   }
   
   const action = newRole === 'admin' ? 'promote to admin' : 'demote to user'
-  if (confirm(`Are you sure you want to ${action}? All their sessions will be revoked and they will need to log in again.`)) {
-    updatingUserId.value = userId
-    updateRole(
-      { userId, role: newRole },
-      {
-        onSettled: () => {
-          updatingUserId.value = null
-        },
-      }
-    )
-  }
+  const confirmed = await confirm({
+    title: 'Confirm role change',
+    message: `Are you sure you want to ${action}? All their sessions will be revoked and they will need to log in again.`,
+    confirmLabel: 'Yes, continue',
+  })
+  if (!confirmed) return
+
+  updatingUserId.value = userId
+  updateRole(
+    { userId, role: newRole },
+    {
+      onSettled: () => {
+        updatingUserId.value = null
+      },
+    }
+  )
 }
 
 const isCurrentUser = (userId: string) => currentUserId.value === userId

@@ -4,14 +4,18 @@ import { useCategoryList, useCreateOrUpdateCategory, useDeprecateCategory, useRe
 import type { CategoryList, CreateCategoryRequest, UpdateCategoryRequest } from '@/types'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import { useConfirm } from '@/composables/useConfirm'
 
 type CategoryFormState = (CreateCategoryRequest & { id?: string })
 
+// Admin page for managing vulnerability categories: listing, reordering,
+// creating/editing and deprecating categories used to group scripts.
 const showForm = ref(false)
 const editingCategory = ref<CategoryFormState | null>(null)
 const activeOnly = ref(true)
 
 const { data: categoriesData, isLoading, refetch } = useCategoryList(activeOnly)
+const { confirm } = useConfirm()
 const categories = computed(() => categoriesData.value ?? [])
 
 const saveMutation = useCreateOrUpdateCategory()
@@ -54,15 +58,29 @@ function closeForm() {
 
 async function handleSave() {
   if (!editingCategory.value) return
-  await saveMutation.mutateAsync({ id: editingCategory.value.id, data: editingCategory.value })
-  closeForm()
-  refetch()
+  try {
+    await saveMutation.mutateAsync({ id: editingCategory.value.id, data: editingCategory.value })
+    closeForm()
+    refetch()
+  } catch {
+    // Error is surfaced via toast; keep form open for corrections.
+  }
 }
 
 async function handleDeprecate(id: string) {
-  if (!confirm('Deprecate this category? It will no longer be available for new scripts.')) return
-  await deprecateMutation.mutateAsync(id)
-  refetch()
+  const ok = await confirm({
+    title: 'Deprecate category',
+    message: 'Deprecate this category? It will no longer be available for new scripts.',
+    confirmLabel: 'Deprecate',
+  })
+  if (!ok) return
+
+  try {
+    await deprecateMutation.mutateAsync(id)
+    refetch()
+  } catch {
+    // Toast already shown.
+  }
 }
 
 async function moveCategory(cat: CategoryList, direction: 'up' | 'down') {
@@ -84,8 +102,12 @@ async function moveCategory(cat: CategoryList, direction: 'up' | 'down') {
     newOrder: idx,
   }))
 
-  await reorderMutation.mutateAsync(payload)
-  refetch()
+  try {
+    await reorderMutation.mutateAsync(payload)
+    refetch()
+  } catch {
+    // Toast already shown.
+  }
 }
 </script>
 

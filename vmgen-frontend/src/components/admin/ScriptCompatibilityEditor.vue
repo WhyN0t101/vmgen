@@ -4,7 +4,10 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import type { ScriptDetail, ScriptCompatibilityInfo, ScriptListItem } from '@/types'
 import { api } from '@/api/endpoints'
+import { useToast } from '@/composables/useToast'
 
+// Interactive editor for configuring script-to-script conflicts and
+// dependencies for a single vulnerability script.
 const props = defineProps<{
   script: ScriptDetail
   allScripts: ScriptListItem[]
@@ -14,6 +17,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   refresh: []
 }>()
+
+const { show } = useToast()
 
 const selectedConflict = ref('')
 const selectedDependency = ref('')
@@ -56,8 +61,11 @@ async function addConflict() {
   try {
     await api.admin.addScriptConflict(props.script.id, selectedConflict.value)
   } catch (err: any) {
-    const msg = err?.response?.data?.message || 'Failed to add conflict'
-    alert(msg)
+    const msg =
+      err?.response?.data?.errors?.join?.('\n') ??
+      err?.response?.data?.message ??
+      'Failed to add conflict'
+    show(msg, 'error')
   } finally {
     selectedConflict.value = ''
     emit('refresh')
@@ -74,8 +82,11 @@ async function addDependency() {
   try {
     await api.admin.addScriptDependency(props.script.id, selectedDependency.value)
   } catch (err: any) {
-    const msg = err?.response?.data?.message || 'Failed to add dependency'
-    alert(msg)
+    const msg =
+      err?.response?.data?.errors?.join?.('\n') ??
+      err?.response?.data?.message ??
+      'Failed to add dependency'
+    show(msg, 'error')
   } finally {
     selectedDependency.value = ''
     emit('refresh')
