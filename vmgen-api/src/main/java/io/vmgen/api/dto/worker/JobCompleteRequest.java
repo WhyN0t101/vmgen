@@ -1,5 +1,7 @@
 package io.vmgen.api.dto.worker;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.util.List;
@@ -10,11 +12,16 @@ import java.util.List;
  */
 @Data
 public class JobCompleteRequest {
+    @NotBlank
     private String workerId;
+    @NotBlank
     private String ovaPath;
+    @NotBlank
     private String ovaChecksum;  // SHA256
     private Long ovaSizeBytes;
+    @Valid
     private Provenance provenance;
+    @Valid
     private List<FlagInfo> flags;
     
     @Data
@@ -22,6 +29,7 @@ public class JobCompleteRequest {
         private String templateIdentifier;
         private String templateVersion;
         private String templateSha256;
+        @Valid
         private List<ScriptRecord> scripts;
         private String buildSeed;
         private String flagDerivationTimestamp;

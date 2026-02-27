@@ -10,6 +10,7 @@ import io.vmgen.api.models.template.Template;
 import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestState;
 import io.vmgen.api.repository.VmRequestRepository;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,7 +70,7 @@ public class WorkerService {
             .orElseThrow(() -> new ResourceNotFoundException("VmRequest not found: " + requestId));
         
         // Verify worker owns this job
-        if (!update.getWorkerId().equals(request.getClaimedByWorkerId())) {
+        if (!Objects.equals(update.getWorkerId(), request.getClaimedByWorkerId())) {
             throw new ConflictException("Worker " + update.getWorkerId() + " does not own this job");
         }
         
@@ -84,7 +85,7 @@ public class WorkerService {
         request.setWorkerLastHeartbeatAt(Instant.now());
         
         // Transition to exporting if indicated
-        if ("exporting".equals(update.getStage()) && request.getState() == VmRequestState.BUILDING) {
+        if ("exporting".equalsIgnoreCase(update.getStage()) && request.getState() == VmRequestState.BUILDING) {
             request.setState(VmRequestState.EXPORTING);
             request.setExportingStartedAt(Instant.now());
         }
@@ -195,7 +196,7 @@ public class WorkerService {
      */
     @Transactional
     public void markStaleJobsAsFailed(Duration timeout){
-    Instant threshold = Instant.now().minus(timeout);
+        Instant threshold = Instant.now().minus(timeout);
         List<VmRequest> staleJobs = vmRequestRepository.findStaleJobs(
                 List.of(VmRequestState.BUILDING, VmRequestState.EXPORTING), threshold);
 

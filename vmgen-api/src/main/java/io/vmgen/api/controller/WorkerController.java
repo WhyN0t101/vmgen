@@ -1,14 +1,24 @@
 package io.vmgen.api.controller;
 
-import io.vmgen.api.dto.worker.*;
-import jakarta.validation.Valid;
+import io.vmgen.api.dto.worker.ClaimJobRequest;
+import io.vmgen.api.dto.worker.ClaimJobResponse;
+import io.vmgen.api.dto.worker.JobCompleteRequest;
+import io.vmgen.api.dto.worker.JobFailRequest;
+import io.vmgen.api.dto.worker.ProgressUpdateRequest;
+import io.vmgen.api.dto.worker.WorkerAckResponse;
+import io.vmgen.api.dto.worker.WorkerRegisteredResponse;
 import io.vmgen.api.service.WorkerService;
+import jakarta.validation.Valid;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 
 /**

@@ -4,6 +4,7 @@ import java.time.Duration;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+
 @Service
 public class ScheduledTasksService {
     private final SessionService sessionService;

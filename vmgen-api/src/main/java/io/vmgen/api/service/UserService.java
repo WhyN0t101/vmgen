@@ -10,10 +10,10 @@ import io.vmgen.api.repository.UserRepository;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 
 @Service
 public class UserService {

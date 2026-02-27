@@ -6,7 +6,11 @@ import io.vmgen.api.dto.script.ScriptSelectionResult;
 import io.vmgen.api.dto.script.ScriptSummaryDto;
 import io.vmgen.api.exceptions.CircularDependencyException;
 import io.vmgen.api.exceptions.ScriptConflictException;
-import io.vmgen.api.models.script.*;
+import io.vmgen.api.models.script.Script;
+import io.vmgen.api.models.script.ScriptConflict;
+import io.vmgen.api.models.script.ScriptConflictId;
+import io.vmgen.api.models.script.ScriptDependency;
+import io.vmgen.api.models.script.ScriptDependencyId;
 import io.vmgen.api.models.user.User;
 import io.vmgen.api.repository.ScriptConflictRepository;
 import io.vmgen.api.repository.ScriptDependencyRepository;
@@ -28,12 +32,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-/**
- * Encapsulates script compatibility and dependency resolution rules.
- *
- * <p>This service is used both at VM-request time to validate a selection of
- * scripts and by admin endpoints to inspect compatibility metadata.</p>
- */
+
 @Service
 @RequiredArgsConstructor
 @Slf4j

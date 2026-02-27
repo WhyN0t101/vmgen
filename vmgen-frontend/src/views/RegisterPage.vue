@@ -129,7 +129,7 @@ async function handleSubmit() {
           {{ successMessage }}
         </p>
 
-        <BaseButton class="w-full" :loading="isSubmitting" :disabled="isSubmitting">
+        <BaseButton type="submit" class="w-full" :loading="isSubmitting" :disabled="isSubmitting">
           Register
         </BaseButton>
       </form>

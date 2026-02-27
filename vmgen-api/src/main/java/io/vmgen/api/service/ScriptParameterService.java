@@ -28,10 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 
-/**
- * Application service for managing script parameters and
- * deriving concrete values for VM requests.
- */
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -65,6 +62,7 @@ public class ScriptParameterService {
 
         ScriptParameter parameter = new ScriptParameter();
         parameter.setScript(script);
+        parameter.setParameterName(request.getParameterName());
         applyMutableFields(parameter, request.getDisplayName(), request.getDescription(),
                 request.getParameterType(), request.getValueSource(), request.getDefaultValue(),
                 request.getIsRequired(), request.getValidationRules(), request.getRandomConfig(),

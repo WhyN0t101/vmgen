@@ -1,5 +1,6 @@
 package io.vmgen.api.dto.worker;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 /**
@@ -7,5 +8,6 @@ import lombok.Data;
  */
 @Data
 public class ClaimJobRequest {
+    @NotBlank
     private String workerId;
 }
