@@ -1,4 +1,4 @@
-package io.vmgen.api.service;
+package io.vmgen.api.service.script;
 
 import io.vmgen.api.dto.script.CreateScriptParameterRequest;
 import io.vmgen.api.dto.script.ParameterChoiceDto;
@@ -13,9 +13,9 @@ import io.vmgen.api.models.script.RandomConfig;
 import io.vmgen.api.models.script.ScriptParameter;
 import io.vmgen.api.models.script.ScriptParameterChoice;
 import io.vmgen.api.models.script.ValidationRules;
-import io.vmgen.api.repository.ScriptParameterChoiceRepository;
-import io.vmgen.api.repository.ScriptParameterRepository;
-import io.vmgen.api.repository.ScriptRepository;
+import io.vmgen.api.repository.script.ScriptParameterChoiceRepository;
+import io.vmgen.api.repository.script.ScriptParameterRepository;
+import io.vmgen.api.repository.script.ScriptRepository;
 import jakarta.transaction.Transactional;
 import java.security.SecureRandom;
 import java.util.ArrayList;

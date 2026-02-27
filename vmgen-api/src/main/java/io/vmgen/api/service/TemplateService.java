@@ -14,29 +14,23 @@ import io.vmgen.api.exceptions.DuplicateTemplateException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.TemplateNotFoundException;
 import io.vmgen.api.exceptions.TemplateValidationException;
+import io.vmgen.api.mapper.ScriptListDtoMapper;
 import io.vmgen.api.models.script.Script;
 import io.vmgen.api.models.template.ScriptCompatibility;
 import io.vmgen.api.models.template.Template;
 import io.vmgen.api.models.template.TemplateCapability;
 import io.vmgen.api.models.template.TemplateStatus;
 import io.vmgen.api.models.user.User;
-import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
-import io.vmgen.api.models.script.ScriptConflict;
-import io.vmgen.api.models.script.ScriptDependency;
-import io.vmgen.api.repository.ScriptCompatibilityRepository;
-import io.vmgen.api.repository.ScriptConflictRepository;
-import io.vmgen.api.repository.ScriptDependencyRepository;
-import io.vmgen.api.repository.ScriptRepository;
-import io.vmgen.api.repository.TemplateCapabilityRepository;
-import io.vmgen.api.repository.TemplateRepository;
+import io.vmgen.api.repository.script.ScriptCompatibilityRepository;
+import io.vmgen.api.repository.script.ScriptRepository;
+import io.vmgen.api.repository.template.TemplateCapabilityRepository;
+import io.vmgen.api.repository.template.TemplateRepository;
 import io.vmgen.api.repository.UserRepository;
+import io.vmgen.api.service.script.ScriptCompatibilityService;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -53,8 +47,7 @@ public class TemplateService {
     private final TemplateCapabilityRepository capabilityRepository;
     private final ScriptCompatibilityRepository scriptCompatibilityRepository;
     private final ScriptRepository scriptRepository;
-    private final ScriptConflictRepository scriptConflictRepository;
-    private final ScriptDependencyRepository scriptDependencyRepository;
+    private final ScriptCompatibilityService scriptCompatibilityService;
     private final UserRepository userRepository;
     private final ProxmoxService proxmoxService;
     private final ObjectMapper objectMapper;
@@ -480,31 +473,7 @@ public class TemplateService {
             scripts = scriptRepository.findActiveByIdsWithCategory(scriptIds);
         }
 
-        List<UUID> allIds = scripts.stream().map(Script::getId).collect(Collectors.toList());
-        Set<UUID> idSet = new HashSet<>(allIds);
-
-        // Build conflict map: scriptId -> list of conflicting scriptIds (within the compatible set)
-        Map<UUID, List<UUID>> conflictMap = new HashMap<>();
-        for (ScriptConflict edge : scriptConflictRepository.findAllInvolvingAny(allIds)) {
-            UUID a = edge.getScriptId();
-            UUID b = edge.getConflictsWithScriptId();
-            // Only include edges where both endpoints are in the compatible set
-            if (idSet.contains(a) && idSet.contains(b)) {
-                conflictMap.computeIfAbsent(a, k -> new ArrayList<>()).add(b);
-                conflictMap.computeIfAbsent(b, k -> new ArrayList<>()).add(a);
-            }
-        }
-
-        // Build dependency map: scriptId -> list of required scriptIds
-        Map<UUID, List<UUID>> requiresMap = new HashMap<>();
-        for (ScriptDependency dep : scriptDependencyRepository.findAllByScriptIdIn(allIds)) {
-            requiresMap.computeIfAbsent(dep.getScriptId(), k -> new ArrayList<>())
-                    .add(dep.getRequiresScriptId());
-        }
-
-        return scripts.stream()
-                .map(s -> toScriptListDtoEnriched(s, conflictMap, requiresMap))
-                .collect(Collectors.toList());
+        return scriptCompatibilityService.getEnrichedForScripts(scripts);
     }
 
     /**
@@ -546,53 +515,10 @@ public class TemplateService {
     }
 
     /**
-     * Maps a {@link Script} entity to a {@link ScriptListDto}.
-     * Mirrors the mapping in ScriptService to avoid a circular service dependency.
+     * Maps a {@link Script} entity to a {@link ScriptListDto} without conflict/dependency metadata.
      */
-    private ScriptListDto toScriptListDto(Script script) {
-        return getScriptListDto(script);
-    }
-
-    /**
-     * Maps a {@link Script} entity to a {@link ScriptListDto} enriched with conflict
-     * and dependency IDs pre-scoped to the compatible set for this template.
-     */
-    private ScriptListDto toScriptListDtoEnriched(Script script,
-                                                   Map<UUID, List<UUID>> conflictMap,
-                                                   Map<UUID, List<UUID>> requiresMap) {
-        VulnerabilityCategory category = script.getCategory();
-        return ScriptListDto.builder()
-                .id(script.getId())
-                .identifier(script.getIdentifier())
-                .version(script.getVersion())
-                .name(script.getName())
-                .difficultyLevel(script.getDifficultyLevel())
-                .isActive(script.getIsActive())
-                .categoryId(category != null ? category.getId() : null)
-                .categoryName(category != null ? category.getName() : null)
-                .categoryColor(category != null ? category.getColor() : null)
-                .owaspMapping(category != null ? category.getOwaspMapping() : null)
-                .createdAt(script.getCreatedAt())
-                .conflictsWithIds(conflictMap.getOrDefault(script.getId(), List.of()))
-                .requiresIds(requiresMap.getOrDefault(script.getId(), List.of()))
-                .build();
-    }
-
-    static ScriptListDto getScriptListDto(Script script) {
-        VulnerabilityCategory category = script.getCategory();
-        return ScriptListDto.builder()
-                .id(script.getId())
-                .identifier(script.getIdentifier())
-                .version(script.getVersion())
-                .name(script.getName())
-                .difficultyLevel(script.getDifficultyLevel())
-                .isActive(script.getIsActive())
-                .categoryId(category != null ? category.getId() : null)
-                .categoryName(category != null ? category.getName() : null)
-                .categoryColor(category != null ? category.getColor() : null)
-                .owaspMapping(category != null ? category.getOwaspMapping() : null)
-                .createdAt(script.getCreatedAt())
-                .build();
+    public static ScriptListDto getScriptListDto(Script script) {
+        return ScriptListDtoMapper.toBase(script);
     }
 
     // Validation result holder

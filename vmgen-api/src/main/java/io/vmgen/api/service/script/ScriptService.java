@@ -1,4 +1,4 @@
-package io.vmgen.api.service;
+package io.vmgen.api.service.script;
 
 import io.vmgen.api.dto.script.CreateScriptRequest;
 import io.vmgen.api.dto.script.ScriptDetailDto;
@@ -9,7 +9,7 @@ import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ScriptConflictException;
 import io.vmgen.api.models.script.Script;
 import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
-import io.vmgen.api.repository.ScriptRepository;
+import io.vmgen.api.repository.script.ScriptRepository;
 import io.vmgen.api.repository.UserRepository;
 import io.vmgen.api.repository.VulnerabilityCategoryRepository;
 import java.time.Instant;

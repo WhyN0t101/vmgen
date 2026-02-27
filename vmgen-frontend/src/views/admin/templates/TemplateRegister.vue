@@ -591,7 +591,7 @@ async function handleSubmit() {
                 <span class="ml-2 text-slate-500">· {{ s.difficultyLevel }}</span>
               </p>
               <p v-if="conflictReasonFor(s.id)" class="text-[11px] text-red-400 mt-0.5">
-                ⚠ {{ conflictReasonFor(s.id) }}
+                 {{ conflictReasonFor(s.id) }}
               </p>
               <p v-else-if="requiredByLabels(s.id).length > 0" class="text-[11px] text-amber-400 mt-0.5">
                 ↳ Auto-selected: required by "{{ requiredByLabels(s.id).join('", "') }}"

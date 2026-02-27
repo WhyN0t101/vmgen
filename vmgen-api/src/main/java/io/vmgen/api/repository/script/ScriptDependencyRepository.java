@@ -1,4 +1,4 @@
-package io.vmgen.api.repository;
+package io.vmgen.api.repository.script;
 
 import io.vmgen.api.models.script.ScriptDependency;
 import io.vmgen.api.models.script.ScriptDependencyId;

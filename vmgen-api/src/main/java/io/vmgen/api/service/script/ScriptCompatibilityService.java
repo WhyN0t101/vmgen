@@ -1,4 +1,4 @@
-package io.vmgen.api.service;
+package io.vmgen.api.service.script;
 
 import io.vmgen.api.dto.script.ScriptCompatibilityInfo;
 import io.vmgen.api.dto.script.ScriptCompatibilityViewDto;
@@ -13,11 +13,12 @@ import io.vmgen.api.models.script.ScriptConflictId;
 import io.vmgen.api.models.script.ScriptDependency;
 import io.vmgen.api.models.script.ScriptDependencyId;
 import io.vmgen.api.models.user.User;
-import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
-import io.vmgen.api.repository.ScriptConflictRepository;
-import io.vmgen.api.repository.ScriptDependencyRepository;
-import io.vmgen.api.repository.ScriptRepository;
+import io.vmgen.api.repository.script.ScriptConflictRepository;
+import io.vmgen.api.repository.script.ScriptDependencyRepository;
+import io.vmgen.api.repository.script.ScriptRepository;
 import io.vmgen.api.repository.UserRepository;
+import io.vmgen.api.mapper.ScriptListDtoMapper;
+import io.vmgen.api.mapper.ScriptSummaryDtoMapper;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -86,7 +87,26 @@ public class ScriptCompatibilityService {
     @Transactional(readOnly = true)
     public List<ScriptListDto> getAllActiveEnriched() {
         List<Script> scripts = scriptRepository.findAllActiveWithCategory();
-        List<UUID> allIds = scripts.stream().map(Script::getId).collect(java.util.stream.Collectors.toList());
+        return enrichScripts(scripts);
+    }
+
+    /**
+     * Returns the given scripts enriched with their conflict and dependency IDs.
+     * The conflict/dependency maps are scoped to the provided script set.
+     */
+    @Transactional(readOnly = true)
+    public List<ScriptListDto> getEnrichedForScripts(List<Script> scripts) {
+        if (scripts == null || scripts.isEmpty()) {
+            return List.of();
+        }
+        return enrichScripts(scripts);
+    }
+
+    private List<ScriptListDto> enrichScripts(List<Script> scripts) {
+        List<UUID> allIds = scripts.stream()
+                .map(Script::getId)
+                .toList();
+
         Set<UUID> idSet = new HashSet<>(allIds);
 
         Map<UUID, List<UUID>> conflictMap = new HashMap<>();
@@ -107,28 +127,13 @@ public class ScriptCompatibilityService {
 
         return scripts.stream()
                 .map(s -> toEnrichedDto(s, conflictMap, requiresMap))
-                .collect(java.util.stream.Collectors.toList());
+                .toList();
     }
 
     private ScriptListDto toEnrichedDto(Script script,
                                         Map<UUID, List<UUID>> conflictMap,
                                         Map<UUID, List<UUID>> requiresMap) {
-        VulnerabilityCategory category = script.getCategory();
-        return ScriptListDto.builder()
-                .id(script.getId())
-                .identifier(script.getIdentifier())
-                .version(script.getVersion())
-                .name(script.getName())
-                .difficultyLevel(script.getDifficultyLevel())
-                .isActive(script.getIsActive())
-                .categoryId(category != null ? category.getId() : null)
-                .categoryName(category != null ? category.getName() : null)
-                .categoryColor(category != null ? category.getColor() : null)
-                .owaspMapping(category != null ? category.getOwaspMapping() : null)
-                .createdAt(script.getCreatedAt())
-                .conflictsWithIds(conflictMap.getOrDefault(script.getId(), List.of()))
-                .requiresIds(requiresMap.getOrDefault(script.getId(), List.of()))
-                .build();
+        return ScriptListDtoMapper.toEnriched(script, conflictMap, requiresMap);
     }
 
     /**
@@ -266,29 +271,17 @@ public class ScriptCompatibilityService {
                 .collect(HashMap::new, (m, s) -> m.put(s.getId(), s), Map::putAll);
 
         List<ScriptSummaryDto> conflicts = info.getConflictsWith().stream()
-                .map(id -> toSummary(relatedScripts.get(id)))
+                .map(id -> ScriptSummaryDtoMapper.toScriptSummary(relatedScripts.get(id)))
                 .toList();
 
         List<ScriptSummaryDto> dependencies = info.getRequires().stream()
-                .map(id -> toSummary(relatedScripts.get(id)))
+                .map(id -> ScriptSummaryDtoMapper.toScriptSummary(relatedScripts.get(id)))
                 .toList();
 
         return ScriptCompatibilityViewDto.builder()
                 .scriptId(scriptId)
                 .conflictsWith(conflicts)
                 .requires(dependencies)
-                .build();
-    }
-
-    private ScriptSummaryDto toSummary(Script script) {
-        if (script == null) {
-            return null;
-        }
-        return ScriptSummaryDto.builder()
-                .id(script.getId())
-                .identifier(script.getIdentifier())
-                .version(script.getVersion())
-                .name(script.getName())
                 .build();
     }
 

@@ -1,4 +1,4 @@
-package io.vmgen.api.repository;
+package io.vmgen.api.repository.template;
 
 import io.vmgen.api.models.template.TemplateCapability;
 import io.vmgen.api.models.template.TemplateCapabilityId;

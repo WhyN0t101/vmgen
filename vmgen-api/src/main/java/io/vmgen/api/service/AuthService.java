@@ -1,5 +1,6 @@
 package io.vmgen.api.service;
 
+import io.vmgen.api.config.JwtProperties;
 import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.auth.AuthResponse;
 import io.vmgen.api.dto.auth.LoginRequest;
@@ -31,7 +32,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final SessionService sessionService;
     private final AuditService auditService;
-    private final io.vmgen.api.config.JwtProperties jwtProperties;
+    private final JwtProperties jwtProperties;
 
 
 

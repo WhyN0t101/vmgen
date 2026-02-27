@@ -30,7 +30,7 @@ public class SessionService {
      * Guards against session ID collisions, which are theoretically possible with UUID v4.
      */
     @Transactional
-    public Session createSession(User user, UUID sessionId, String tokenHash, Instant expiresAt) {
+    public void createSession(User user, UUID sessionId, String tokenHash, Instant expiresAt) {
         if (user == null || sessionId == null || tokenHash == null || expiresAt == null) {
             throw new IllegalArgumentException("All session parameters are required");
         }
@@ -45,13 +45,11 @@ public class SessionService {
         session.setUser(user);
         session.setTokenHash(tokenHash);
         session.setExpiresAt(expiresAt);
-
-        session = sessionRepository.save(session);
+        sessionRepository.save(session);
 
         log.info("Session created for user {} (session: {}, expires: {})",
                 user.getUsername(), sessionId, expiresAt);
 
-        return session;
     }
 
 

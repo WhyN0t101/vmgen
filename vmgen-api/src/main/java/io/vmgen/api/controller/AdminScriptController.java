@@ -12,9 +12,9 @@ import io.vmgen.api.dto.script.ScriptListDto;
 import io.vmgen.api.dto.script.ScriptParameterDto;
 import io.vmgen.api.dto.script.UpdateScriptParameterRequest;
 import io.vmgen.api.dto.script.UpdateScriptRequest;
-import io.vmgen.api.service.ScriptCompatibilityService;
-import io.vmgen.api.service.ScriptParameterService;
-import io.vmgen.api.service.ScriptService;
+import io.vmgen.api.service.script.ScriptCompatibilityService;
+import io.vmgen.api.service.script.ScriptParameterService;
+import io.vmgen.api.service.script.ScriptService;
 import io.vmgen.api.service.UserService;
 import jakarta.validation.Valid;
 
