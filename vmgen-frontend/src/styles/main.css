@@ -1,19 +1,66 @@
+/* Typography: distinctive, cyber-ops feel */
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-slate-950 text-slate-100;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  :root {
+    --vmgen-bg: #020617;
+    --vmgen-surface: rgba(15, 23, 42, 0.92);
+    --vmgen-border-subtle: rgba(148, 163, 184, 0.25);
+    --vmgen-accent: #38bdf8;
+    --vmgen-accent-soft: rgba(56, 189, 248, 0.16);
   }
+
+  body {
+    @apply text-slate-100;
+    font-family: 'Sora', system-ui, -apple-system, sans-serif;
+    background-color: var(--vmgen-bg);
+  }
+}
+
+@layer components {
+  .app-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.08), transparent 55%),
+      radial-gradient(circle at 100% 0%, rgba(129, 140, 248, 0.10), transparent 55%),
+      radial-gradient(circle at 50% 100%, rgba(15, 23, 42, 0.95), #020617);
+  }
+
+  .app-panel {
+    @apply border border-slate-800/80 bg-slate-900/80 backdrop-blur-md;
+    box-shadow:
+      0 18px 45px rgba(15, 23, 42, 0.85),
+      0 0 0 1px rgba(15, 23, 42, 0.6);
+  }
+
+  /* Home hero: staggered reveal */
+  @keyframes hero-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .hero-reveal {
+    animation: hero-reveal 0.6s ease-out forwards;
+  }
+  .hero-reveal-1 { animation-delay: 0.1s; opacity: 0; }
+  .hero-reveal-2 { animation-delay: 0.25s; opacity: 0; }
+  .hero-reveal-3 { animation-delay: 0.4s; opacity: 0; }
+  .hero-reveal-4 { animation-delay: 0.55s; opacity: 0; }
+  .hero-reveal-5 { animation-delay: 0.75s; opacity: 0; }
 }
 
 @layer utilities {
   .font-mono {
-    font-family: 'Fira Code', 'Courier New', monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
   }
 }
-
-
 

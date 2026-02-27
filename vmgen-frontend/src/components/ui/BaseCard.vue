@@ -16,7 +16,12 @@ const paddingClasses = {
 </script>
 
 <template>
-  <div :class="['bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-lg shadow-lg shadow-slate-900/50', paddingClasses[padding]]">
+  <div
+    :class="[
+      'bg-slate-900/75 border border-slate-800/80 rounded-xl backdrop-blur-md shadow-[0_18px_45px_rgba(15,23,42,0.85),0_0_0_1px_rgba(15,23,42,0.6)]',
+      paddingClasses[padding],
+    ]"
+  >
     <slot />
   </div>
 </template>

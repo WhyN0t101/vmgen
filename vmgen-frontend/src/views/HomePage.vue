@@ -6,58 +6,71 @@ const router = useRouter()
 </script>
 
 <template>
-  <div class="min-h-screen relative overflow-hidden">
-    <!-- Animated background grid -->
-    <div class="absolute inset-0 opacity-20">
-      <div class="absolute inset-0" style="background-image: linear-gradient(rgba(14, 165, 233, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(14, 165, 233, 0.1) 1px, transparent 1px); background-size: 50px 50px;"></div>
+  <div class="min-h-screen relative overflow-hidden flex flex-col">
+    <!-- Background: diagonal grid + gradient bleed -->
+    <div class="absolute inset-0 pointer-events-none">
+      <div
+        class="absolute inset-0 opacity-[0.06]"
+        style="
+          background-image:
+            linear-gradient(to bottom right, transparent 49.5%, rgba(56, 189, 248, 0.15) 49.5%, rgba(56, 189, 248, 0.15) 50.5%, transparent 50.5%),
+            linear-gradient(to top right, transparent 49.5%, rgba(56, 189, 248, 0.12) 49.5%, rgba(56, 189, 248, 0.12) 50.5%, transparent 50.5%);
+          background-size: 64px 64px;
+        "
+      />
+      <div
+        class="absolute top-0 right-0 w-[80vmax] h-[80vmax] rounded-full opacity-30"
+        style="background: radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, transparent 70%); transform: translate(30%, -30%);"
+      />
     </div>
-    
-    <!-- Main content -->
-    <div class="relative z-10 min-h-screen flex flex-col">
-      <!-- Hero section -->
-      <div class="flex-1 flex items-center justify-center px-6 py-20">
-        <div class="max-w-4xl mx-auto text-center">
-          <!-- Logo/Brand -->
-          <div class="mb-8 flex justify-center">
-            <div class="relative">
-              <div class="absolute inset-0 bg-primary-500/20 blur-3xl rounded-full"></div>
-              <div class="relative bg-slate-900/80 backdrop-blur-sm border border-primary-500/30 rounded-2xl p-6">
-                <svg class="w-16 h-16 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Headline -->
-          <h1 class="text-6xl md:text-7xl font-bold text-slate-100 mb-6 leading-tight">
-            Build
-            <span class="text-primary-500">Vulnerable</span>
-            <br />
-            Training Environments
+
+    <div class="relative z-10 flex-1 flex items-center px-6 py-16 sm:px-8 md:px-12 lg:px-16">
+      <div class="w-full max-w-5xl">
+        <!-- Wordmark: the one thing they remember -->
+        <div class="hero-reveal hero-reveal-1 mb-2">
+          <h1
+            class="font-mono text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold tracking-tight text-slate-100"
+            style="text-shadow: 0 0 60px rgba(56, 189, 248, 0.15);"
+          >
+            VMGEN
           </h1>
-          
-          <!-- Value proposition -->
-          <p class="text-xl md:text-2xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Deterministic VM generation for cybersecurity education. 
-            <span class="text-primary-400">Reproducible</span>, 
-            <span class="text-primary-400">traceable</span>, and 
-            <span class="text-primary-400">portable</span>.
-          </p>
-          
-          <!-- Single CTA -->
-          <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <BaseButton size="lg" class="text-lg px-8 py-4" @click="router.push({ name: 'generate' })">
-              Generate Your First VM
-            </BaseButton>
-            <BaseButton 
-              variant="ghost" 
-              size="lg" 
-              class="text-lg px-8 py-4"
-              @click="router.push({ name: 'dashboard' })"
-            >
-              View Dashboard
-            </BaseButton>
+          <div
+            class="mt-2 h-1 w-24 rounded-full bg-sky-400/90"
+            style="box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);"
+          />
+        </div>
+
+        <!-- Tagline -->
+        <p class="hero-reveal hero-reveal-2 mt-6 text-xl sm:text-2xl md:text-3xl text-slate-300 font-light tracking-tight max-w-xl">
+          Build vulnerable training environments.
+        </p>
+
+        <!-- Value + CTAs in a panel (asymmetric: sits under the wordmark, not centered) -->
+        <div class="hero-reveal hero-reveal-3 mt-10 sm:mt-12">
+          <div class="app-panel rounded-2xl p-6 sm:p-8 md:p-10 max-w-2xl">
+            <p class="hero-reveal hero-reveal-4 text-slate-400 text-sm sm:text-base leading-relaxed">
+              Deterministic VM generation for cybersecurity education:
+              <span class="text-sky-300/95 font-medium">reproducible</span>,
+              <span class="text-sky-300/95 font-medium">traceable</span>, and
+              <span class="text-sky-300/95 font-medium">portable</span>.
+            </p>
+            <div class="hero-reveal hero-reveal-5 mt-8 flex flex-col sm:flex-row gap-4">
+              <BaseButton
+                size="lg"
+                class="text-base px-6 py-3 w-full sm:w-auto"
+                @click="router.push({ name: 'generate' })"
+              >
+                Generate VM
+              </BaseButton>
+              <BaseButton
+                variant="ghost"
+                size="lg"
+                class="text-base px-6 py-3 w-full sm:w-auto border border-slate-600/80 hover:border-slate-500 hover:bg-slate-800/60"
+                @click="router.push({ name: 'dashboard' })"
+              >
+                Dashboard
+              </BaseButton>
+            </div>
           </div>
         </div>
       </div>

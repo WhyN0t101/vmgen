@@ -25,7 +25,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-950">
+  <div class="app-shell">
     <AppNavbar />
     <main>
       <RouterView />

@@ -46,42 +46,49 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div class="container mx-auto px-6 py-8 max-w-7xl">
-    <h1 class="text-3xl font-bold text-slate-100 mb-8">
-      Generate Vulnerable VM
-    </h1>
-    
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <!-- Left: Templates -->
-      <div class="lg:col-span-1">
-        <TemplateSelector
-          v-model="selectedTemplateId"
-          :templates="templates"
-          :loading="templatesLoading"
-        />
+  <div class="max-w-7xl mx-auto px-6 py-10">
+    <div class="app-panel rounded-2xl px-6 py-6 md:px-8 md:py-7 space-y-6">
+      <div>
+        <p class="text-[11px] font-mono tracking-[0.25em] uppercase text-slate-500 mb-1">
+          Flow // Generate
+        </p>
+        <h1 class="text-2xl md:text-3xl font-semibold text-slate-50">
+          Generate vulnerable VM
+        </h1>
       </div>
       
-      <!-- Center: Vulnerabilities -->
-      <div class="lg:col-span-2">
-        <VulnerabilitySelector
-          v-model="selectedVulnIds"
-          :vulnerabilities="vulnerabilities"
-          :loading="vulnsLoading"
-          :template="selectedTemplate"
-        />
-      </div>
-      
-      <!-- Right: Config -->
-      <div class="lg:col-span-1">
-        <ConfigurationPanel
-          v-model:difficulty="difficulty"
-          :telemetry-enabled="telemetryEnabled"
-          :estimated-time="estimatedTime"
-          :can-submit="!!canSubmit"
-          :is-submitting="isCreating"
-          @update:telemetry="(value: boolean) => telemetryEnabled = value"
-          @submit="handleSubmit"
-        />
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Left: Templates -->
+        <div class="lg:col-span-1">
+          <TemplateSelector
+            v-model="selectedTemplateId"
+            :templates="templates"
+            :loading="templatesLoading"
+          />
+        </div>
+        
+        <!-- Center: Vulnerabilities -->
+        <div class="lg:col-span-2">
+          <VulnerabilitySelector
+            v-model="selectedVulnIds"
+            :vulnerabilities="vulnerabilities"
+            :loading="vulnsLoading"
+            :template="selectedTemplate"
+          />
+        </div>
+        
+        <!-- Right: Config -->
+        <div class="lg:col-span-1">
+          <ConfigurationPanel
+            v-model:difficulty="difficulty"
+            :telemetry-enabled="telemetryEnabled"
+            :estimated-time="estimatedTime"
+            :can-submit="!!canSubmit"
+            :is-submitting="isCreating"
+            @update:telemetry="(value: boolean) => telemetryEnabled = value"
+            @submit="handleSubmit"
+          />
+        </div>
       </div>
     </div>
   </div>

@@ -65,9 +65,6 @@ function removeCapability(cap: string) {
   }
 }
 
-const testingConnection = ref(false)
-const testResult = ref<{ success: boolean; message: string } | null>(null)
-
 async function selectVm(vm: any) {
   if (!vm) return
   form.value.proxmoxVmid = vm.vmid
@@ -98,31 +95,6 @@ async function selectVm(vm: any) {
   } catch (error) {
     console.warn('Could not auto-detect storage for VM:', error)
     // Keep current value or default
-  }
-}
-
-async function testConnection() {
-  if (!form.value.proxmoxVmid) {
-    testResult.value = {
-      success: false,
-      message: 'Please select a Proxmox template and VMID first.',
-    }
-    return
-  }
-
-  testingConnection.value = true
-  testResult.value = null
-
-  try {
-    // Placeholder: backend/worker SSH validation is not yet implemented.
-    // This keeps the UI flow ready while avoiding failing API calls.
-    await new Promise(resolve => setTimeout(resolve, 800))
-    testResult.value = {
-      success: false,
-      message: 'Backend SSH test endpoint is not implemented yet. This is a planned feature.',
-    }
-  } finally {
-    testingConnection.value = false
   }
 }
 
@@ -408,20 +380,6 @@ async function handleSubmit() {
               placeholder="vmbr1"
             />
           </div>
-        </div>
-
-        <div class="mt-4 flex items-center gap-3">
-          <BaseButton type="button" variant="secondary" @click="testConnection" :disabled="testingConnection">
-            {{ testingConnection ? 'Testing...' : 'Test SSH Connection (planned)' }}
-          </BaseButton>
-          <p class="text-xs text-slate-500">
-            This will eventually perform a quick SSH connectivity check against the template. For
-            now it is a placeholder and does not perform any backend calls.
-          </p>
-        </div>
-
-        <div v-if="testResult" class="mt-3 text-xs" :class="testResult.success ? 'text-emerald-400' : 'text-amber-400'">
-          {{ testResult.message }}
         </div>
       </BaseCard>
 

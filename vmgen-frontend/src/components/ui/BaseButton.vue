@@ -16,13 +16,13 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const buttonClasses = computed(() => {
-  const base = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed'
+  const base = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed border'
   
   const variants = {
-    primary: 'bg-primary-500 text-white hover:bg-primary-600 focus:ring-primary-500',
-    secondary: 'bg-slate-800 text-slate-100 hover:bg-slate-700 focus:ring-slate-500',
-    danger: 'bg-danger-500 text-white hover:bg-danger-600 focus:ring-danger-500',
-    ghost: 'text-slate-300 hover:bg-slate-800 focus:ring-slate-500',
+    primary: 'bg-primary-500 text-white border-primary-500 hover:bg-primary-500/90 hover:border-primary-500 focus:ring-primary-500 shadow-[0_0_20px_rgba(14,165,233,0.3)]',
+    secondary: 'bg-slate-700/90 text-slate-100 border-slate-600 hover:bg-slate-600 hover:border-slate-500 focus:ring-slate-500',
+    danger: 'bg-danger-500 text-white border-danger-500 hover:opacity-90 focus:ring-danger-500',
+    ghost: 'bg-slate-800/80 text-slate-200 border-slate-600/90 hover:bg-slate-700 hover:border-slate-500 hover:text-slate-100 focus:ring-slate-500',
   }
   
   const sizes = {
