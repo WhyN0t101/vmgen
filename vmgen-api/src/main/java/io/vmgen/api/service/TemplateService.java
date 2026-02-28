@@ -443,6 +443,7 @@ public class TemplateService {
                 .identifier(template.getIdentifier())
                 .version(template.getVersion())
                 .osFamily(template.getOsFamily())
+                .description(template.getDescription())
                 .status(template.getStatus())
                 .createdAt(template.getCreatedAt())
                 .build();

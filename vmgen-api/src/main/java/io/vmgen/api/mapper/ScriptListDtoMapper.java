@@ -46,6 +46,7 @@ public final class ScriptListDtoMapper {
                 .identifier(script.getIdentifier())
                 .version(script.getVersion())
                 .name(script.getName())
+                .description(script.getDescription())
                 .difficultyLevel(script.getDifficultyLevel())
                 .isActive(script.getIsActive())
                 .categoryId(category != null ? category.getId() : null)

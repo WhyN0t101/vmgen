@@ -3,7 +3,6 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBuildStatus } from '@/composables/useBuildStatus'
 import BaseCard from '@/components/ui/BaseCard.vue'
-import BaseProgress from '@/components/ui/BaseProgress.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 
@@ -25,18 +24,30 @@ const stateInfo = computed(() => {
   return stateConfig[build.value.state]
 })
 
+const isActive = computed(() =>
+  build.value?.state === 'queued' ||
+  build.value?.state === 'building' ||
+  build.value?.state === 'exporting'
+)
+
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMins = Math.floor(diffMs / 60000)
-  
+
   if (diffMins < 1) return 'just now'
   if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
   const diffHours = Math.floor(diffMins / 60)
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
   const diffDays = Math.floor(diffHours / 24)
   return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+}
+
+function formatBytes(bytes?: number) {
+  if (!bytes) return ''
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`
 }
 </script>
 
@@ -47,7 +58,7 @@ function formatTimeAgo(dateString: string) {
         <div class="h-8 bg-slate-900/60 rounded animate-pulse" />
         <div class="h-64 bg-slate-900/60 rounded animate-pulse" />
       </div>
-      
+
       <div v-else-if="build" class="space-y-6">
         <!-- Header -->
         <div>
@@ -60,75 +71,90 @@ function formatTimeAgo(dateString: string) {
               {{ stateInfo.icon }} {{ stateInfo.label }}
             </BaseBadge>
           </div>
-          <div class="flex items-center gap-4 text-sm text-slate-400">
-            <span class="font-mono">{{ build.request_id }}</span>
+          <div class="flex items-center gap-4 text-sm text-slate-400 flex-wrap">
+            <span class="font-mono">{{ build.id }}</span>
             <span>•</span>
-            <span>Created: {{ formatTimeAgo(build.created_at) }}</span>
+            <span>{{ build.templateName }}</span>
+            <span>•</span>
+            <span>Submitted {{ formatTimeAgo(build.submittedAt) }}</span>
           </div>
         </div>
-        
-        <!-- Progress -->
-        <BaseCard v-if="build.progress !== undefined" padding="md">
-          <BaseProgress :value="build.progress" />
-          <p v-if="build.message" class="text-sm text-slate-400 mt-2">
-            {{ build.message }}
-          </p>
+
+        <!-- Scripts list -->
+        <BaseCard v-if="build.scripts.length > 0" padding="md">
+          <p class="text-xs font-mono tracking-widest uppercase text-slate-400 mb-3">Scripts</p>
+          <div class="space-y-1">
+            <div
+              v-for="s in build.scripts"
+              :key="s.scriptId"
+              class="flex items-center gap-2 text-sm text-slate-300"
+            >
+              <span class="text-slate-600 font-mono w-5 text-right">{{ s.executionOrder }}.</span>
+              <span>{{ s.scriptName }}</span>
+            </div>
+          </div>
         </BaseCard>
-        
-        <!-- Ready State -->
+
+        <!-- Active build progress -->
+        <BaseCard v-if="isActive" padding="md">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-4 h-4 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
+            <span class="text-sm text-slate-300 font-medium">Build in progress…</span>
+          </div>
+          <p v-if="build.currentWorkerStage" class="text-xs text-slate-500 font-mono">
+            {{ build.currentWorkerStage }}
+          </p>
+          <p v-else class="text-xs text-slate-500">Waiting for worker to pick up the job</p>
+        </BaseCard>
+
+        <!-- Ready state -->
         <BaseCard v-if="build.state === 'ready'" padding="lg">
           <div class="text-center mb-6">
             <div class="text-4xl mb-2">✓</div>
             <h2 class="text-2xl font-bold text-slate-100 mb-2">Build Complete</h2>
             <p class="text-slate-400">Your vulnerable VM is ready for download.</p>
           </div>
-          
+
           <div class="space-y-4">
             <div class="bg-slate-800/60 rounded-lg p-4">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-slate-300">📦 vm-{{ build.request_id }}.ova</span>
-                <span class="text-sm text-slate-400">2.4 GB</span>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-slate-300 font-mono text-sm">
+                  {{ build.ovaFilename ?? `vm-${build.id}.ova` }}
+                </span>
+                <span class="text-sm text-slate-400">{{ formatBytes(build.ovaSizeBytes) }}</span>
               </div>
+              <p v-if="build.ovaSha256" class="text-xs text-slate-600 font-mono truncate mb-2">
+                SHA256: {{ build.ovaSha256 }}
+              </p>
               <BaseButton class="w-full mt-2">Download OVA</BaseButton>
             </div>
-            
+
             <div class="bg-slate-800/60 rounded-lg p-4">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-slate-300">📄 provenance-{{ build.request_id }}.json</span>
-                <span class="text-sm text-slate-400">8 KB</span>
-              </div>
+              <span class="text-slate-300 font-mono text-sm">provenance-{{ build.id }}.json</span>
               <BaseButton variant="secondary" class="w-full mt-2">Download Manifest</BaseButton>
             </div>
           </div>
-          
+
           <div class="mt-6 pt-6 border-t border-slate-800 flex gap-4">
             <BaseButton variant="primary" class="flex-1">Submit Flag</BaseButton>
-            <BaseButton variant="secondary" class="flex-1">Clone Configuration</BaseButton>
           </div>
         </BaseCard>
-        
-        <!-- Failed State -->
+
+        <!-- Failed state -->
         <BaseCard v-if="build.state === 'failed'" padding="lg">
           <div class="text-center mb-6">
             <div class="text-4xl mb-2">✗</div>
             <h2 class="text-2xl font-bold text-danger-500 mb-2">Build Failed</h2>
-            <p v-if="build.error_message" class="text-slate-400 font-mono text-sm bg-slate-800/60 p-4 rounded">
-              {{ build.error_message }}
+            <p v-if="build.failureReason" class="text-slate-400 font-mono text-sm bg-slate-800/60 p-4 rounded">
+              {{ build.failureReason }}
             </p>
-          </div>
-          <div class="flex gap-4">
-            <BaseButton variant="primary" class="flex-1">Retry Build</BaseButton>
-            <BaseButton variant="secondary" class="flex-1">Clone Configuration</BaseButton>
           </div>
         </BaseCard>
       </div>
-      
+
       <div v-else class="text-center py-12">
         <p class="text-slate-400">Build not found</p>
       </div>
     </div>
   </div>
 </template>
-
-
-

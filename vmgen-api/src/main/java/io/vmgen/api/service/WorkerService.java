@@ -9,7 +9,7 @@ import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.models.template.Template;
 import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestState;
-import io.vmgen.api.repository.VmRequestRepository;
+import io.vmgen.api.repository.vm.VmRequestRepository;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

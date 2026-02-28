@@ -68,6 +68,19 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminId));
     }
 
+    /**
+     * Resolves the authenticated user's {@link User} entity from the security context.
+     * Works for both USER and ADMIN roles.
+     */
+    public User requireUser(Authentication authentication) {
+        JwtAuthenticationFilter.AuthPrincipal principal = (JwtAuthenticationFilter.AuthPrincipal) Objects.requireNonNull(
+                authentication.getPrincipal(), "Authentication principal must not be null"
+        );
+        UUID userId = UUID.fromString(principal.userId());
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+    }
+
 }
 
 

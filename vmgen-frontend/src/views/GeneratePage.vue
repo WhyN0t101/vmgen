@@ -82,10 +82,11 @@ watch(selectedVulnIds, async (newIds, oldIds) => {
       try {
         const params = await api.scripts.getParameters(id)
         scriptParamsCache.value = { ...scriptParamsCache.value, [id]: params }
-        // Pre-fill default values.
+        // Pre-fill default values. Use != null so "0" and other falsy-but-valid
+        // defaults (e.g. integer zero) are still applied.
         const defaults: Record<string, string> = {}
         for (const p of params) {
-          if (p.defaultValue) defaults[p.parameterName] = p.defaultValue
+          if (p.defaultValue != null && p.defaultValue !== '') defaults[p.parameterName] = p.defaultValue
         }
         if (Object.keys(defaults).length) {
           parameterValues.value = {
@@ -113,7 +114,7 @@ const vulnerabilities = computed<Vulnerability[]>(() =>
     category: s.categoryName ?? 'Other',
     difficulty: s.difficultyLevel,
     requires_capabilities: [],
-    description: undefined,
+    description: s.description,
   }))
 )
 
@@ -172,8 +173,10 @@ const requiredParamsFilled = computed(() => {
   return true
 })
 
+const parameterErrors = ref(false)
+
 const canSubmit = computed(() =>
-  !!selectedTemplateId.value && selectedVulnIds.value.length > 0 && requiredParamsFilled.value
+  !!selectedTemplateId.value && selectedVulnIds.value.length > 0 && requiredParamsFilled.value && !parameterErrors.value
 )
 
 function handleSubmit() {
@@ -192,13 +195,11 @@ function handleSubmit() {
   }
 
   createBuild({
-    template_id: selectedTemplateId.value,
-    vulnerability_ids: selectedVulnIds.value,
-    parameters: {
-      difficulty: difficulty.value,
-      telemetry_enabled: telemetryEnabled.value,
-    },
-    ...(Object.keys(scriptParams).length ? { script_parameters: scriptParams } : {}),
+    templateId: selectedTemplateId.value,
+    vulnerabilityIds: selectedVulnIds.value,
+    difficulty: difficulty.value,
+    telemetryEnabled: telemetryEnabled.value,
+    ...(Object.keys(scriptParams).length ? { scriptParameters: scriptParams } : {}),
   })
 }
 </script>
@@ -239,6 +240,7 @@ function handleSubmit() {
           <ScriptParameterInputs
             v-model="parameterValues"
             v-model:randomize-flags="randomizeFlags"
+            v-model:has-errors="parameterErrors"
             :scripts="scriptsWithUserInputParams"
           />
         </div>

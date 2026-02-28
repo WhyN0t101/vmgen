@@ -5,6 +5,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import type {
   CreateScriptParameterRequest,
   ParameterType,
+  ValidationRules,
   ValueSource,
   CreateParameterChoice,
 } from '@/types'
@@ -99,6 +100,20 @@ function deleteParam(index: number) {
   emit('update:parameters', next)
 }
 
+function cleanRules(type: ParameterType, rules: ValidationRules | undefined): ValidationRules | undefined {
+  if (!rules) return undefined
+  const out: ValidationRules = {}
+  if (type === 'INTEGER') {
+    if (rules.min != null && rules.min !== ('' as any)) out.min = Number(rules.min)
+    if (rules.max != null && rules.max !== ('' as any)) out.max = Number(rules.max)
+  } else if (type === 'STRING' || type === 'PATH') {
+    if (rules.minLength != null && rules.minLength !== ('' as any)) out.minLength = Number(rules.minLength)
+    if (rules.maxLength != null && rules.maxLength !== ('' as any)) out.maxLength = Number(rules.maxLength)
+    if (rules.pattern?.trim()) out.pattern = rules.pattern.trim()
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 function save() {
   if (!form.value.displayName?.trim() || !form.value.parameterName?.trim()) {
     show('Parameter name and display name are required.', 'error')
@@ -119,6 +134,7 @@ function save() {
     parameterName: form.value.parameterName.trim(),
     displayName: form.value.displayName.trim(),
     displayOrder: form.value.displayOrder ?? next.length,
+    validationRules: cleanRules(form.value.parameterType, form.value.validationRules),
   }
 
   if (editingIndex.value != null) {
@@ -261,6 +277,55 @@ function save() {
           type="text"
           class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
         />
+      </div>
+
+      <!-- Validation rules for STRING / PATH -->
+      <div
+        v-if="form.parameterType === 'STRING' || form.parameterType === 'PATH'"
+        class="grid gap-4 md:grid-cols-2"
+      >
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Min length (optional)</label>
+          <input
+            v-model.number="form.validationRules!.minLength"
+            type="number"
+            min="0"
+            placeholder="No minimum"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Max length (optional)</label>
+          <input
+            v-model.number="form.validationRules!.maxLength"
+            type="number"
+            min="0"
+            placeholder="No maximum"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+      </div>
+
+      <!-- Validation rules for INTEGER -->
+      <div v-if="form.parameterType === 'INTEGER'" class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Min value (optional)</label>
+          <input
+            v-model.number="form.validationRules!.min"
+            type="number"
+            placeholder="No minimum"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Max value (optional)</label>
+          <input
+            v-model.number="form.validationRules!.max"
+            type="number"
+            placeholder="No maximum"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
       </div>
 
       <div class="flex justify-end gap-2">

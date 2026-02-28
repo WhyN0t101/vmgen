@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import type {
@@ -7,6 +7,7 @@ import type {
   ScriptParameter,
   ParameterType,
   ValueSource,
+  ValidationRules,
   CreateScriptParameterRequest,
   UpdateScriptParameterRequest,
   CreateParameterChoice,
@@ -75,8 +76,10 @@ function openEdit(param: ScriptParameter) {
     valueSource: param.valueSource,
     defaultValue: param.defaultValue,
     isRequired: param.isRequired,
-    validationRules: param.validationRules,
-    randomConfig: param.randomConfig,
+    // Deep-clone so v-model mutations never touch TanStack Query's cache object.
+    // `?? {}` guards against null when no rules have been saved yet.
+    validationRules: { ...(param.validationRules ?? {}) },
+    randomConfig: { ...(param.randomConfig ?? {}) },
     userCanOverride: param.userCanOverride,
     displayOrder: param.displayOrder,
     choices: param.choices?.map(c => ({
@@ -111,6 +114,25 @@ function removeChoice(index: number) {
   form.value.choices?.splice(index, 1)
 }
 
+/**
+ * Strips fields irrelevant to the current type and removes empty-string
+ * artefacts left by v-model.number on untouched number inputs.
+ * Returns undefined when no rules are actually set so the backend stores null.
+ */
+function cleanRules(type: ParameterType, rules: ValidationRules | undefined): ValidationRules | undefined {
+  if (!rules) return undefined
+  const out: ValidationRules = {}
+  if (type === 'INTEGER') {
+    if (rules.min != null && rules.min !== ('' as any)) out.min = Number(rules.min)
+    if (rules.max != null && rules.max !== ('' as any)) out.max = Number(rules.max)
+  } else if (type === 'STRING' || type === 'PATH') {
+    if (rules.minLength != null && rules.minLength !== ('' as any)) out.minLength = Number(rules.minLength)
+    if (rules.maxLength != null && rules.maxLength !== ('' as any)) out.maxLength = Number(rules.maxLength)
+    if (rules.pattern?.trim()) out.pattern = rules.pattern.trim()
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 async function save() {
   if (editing.value) {
     const payload: UpdateScriptParameterRequest = {
@@ -120,7 +142,7 @@ async function save() {
       valueSource: form.value.valueSource,
       defaultValue: form.value.defaultValue,
       isRequired: form.value.isRequired,
-      validationRules: form.value.validationRules,
+      validationRules: cleanRules(form.value.parameterType, form.value.validationRules),
       randomConfig: form.value.randomConfig,
       userCanOverride: form.value.userCanOverride,
       displayOrder: form.value.displayOrder,
@@ -134,7 +156,10 @@ async function save() {
   } else {
     await createMutation.mutateAsync({
       scriptId: props.script.id,
-      data: form.value,
+      data: {
+        ...form.value,
+        validationRules: cleanRules(form.value.parameterType, form.value.validationRules),
+      },
     })
   }
   closeForm()

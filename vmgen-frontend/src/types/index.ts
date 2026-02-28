@@ -53,6 +53,7 @@ export interface TemplateListResponse {
   identifier: string
   version: string
   osFamily: OsFamily
+  description?: string
   status: TemplateStatus
   createdAt: string
 }
@@ -100,6 +101,7 @@ export interface ScriptSummary {
 }
 
 export interface ScriptListItem extends ScriptSummary {
+  description?: string
   categoryId?: string
   categoryName?: string
   categoryColor?: string
@@ -337,38 +339,43 @@ export interface Vulnerability {
 }
 
 export interface BuildSpec {
-  template_id: string
-  vulnerability_ids: string[]
-  parameters: {
-    difficulty: 'easy' | 'medium' | 'hard'
-    telemetry_enabled: boolean
-    include_decoys?: boolean
-  }
+  templateId: string
+  vulnerabilityIds: string[]
+  difficulty: 'easy' | 'medium' | 'hard'
+  telemetryEnabled: boolean
   /** scriptId → paramName → value for USER_INPUT parameters. */
-  script_parameters?: Record<string, Record<string, string>>
+  scriptParameters?: Record<string, Record<string, string>>
+}
+
+export interface BuildScript {
+  scriptId: string
+  scriptName: string
+  executionOrder: number
 }
 
 export interface Build {
-  request_id: string
-  user_id: string
-  spec: BuildSpec
+  id: string
   state: 'queued' | 'building' | 'exporting' | 'ready' | 'failed' | 'archived'
-  progress?: number
-  message?: string
-  created_at: string
-  updated_at: string
-  completed_at?: string
-  error_message?: string
-  ova_url?: string
-  provenance_url?: string
-  flag_validated: boolean
+  templateId: string
+  templateName: string
+  scripts: BuildScript[]
+  difficulty?: string
+  telemetryEnabled: boolean
+  currentWorkerStage?: string
+  submittedAt: string
+  completedAt?: string
+  failedAt?: string
+  failureReason?: string
+  ovaFilename?: string
+  ovaSha256?: string
+  ovaSizeBytes?: number
 }
 
 export interface Provenance {
   request_id: string
   template: { id: string; version: string; sha256: string }
   vulnerabilities: Array<{ id: string; version: string }>
-  parameters: BuildSpec['parameters']
+  parameters: { difficulty: string; telemetry_enabled: boolean }
   seed: number
   build_timestamp: string
   ova_sha256: string

@@ -71,7 +71,7 @@ public class ScriptParameterService {
         ScriptParameter saved = parameterRepository.save(parameter);
 
         if (request.getChoices() != null && !request.getChoices().isEmpty()) {
-            saved.setChoices(persistChoices(saved, request.getChoices()));
+            saved.getChoices().addAll(persistChoices(saved, request.getChoices()));
         }
 
         return toDto(saved);
@@ -91,10 +91,11 @@ public class ScriptParameterService {
                 request.getIsRequired(), request.getValidationRules(), request.getRandomConfig(),
                 request.getUserCanOverride(), request.getDisplayOrder());
 
-        // Replace choices if provided.
+        // Replace choices if provided — mutate the PersistentBag in-place.
+        // orphanRemoval = true on the mapping handles deletion of cleared entries.
         if (request.getChoices() != null) {
-            choiceRepository.deleteByParameter_Id(existing.getId());
-            existing.setChoices(persistChoices(existing, request.getChoices()));
+            existing.getChoices().clear();
+            existing.getChoices().addAll(persistChoices(existing, request.getChoices()));
         }
 
         ScriptParameter saved = parameterRepository.save(existing);
@@ -274,23 +275,70 @@ public class ScriptParameterService {
     }
 
     private void validateValue(ScriptParameter param, String value) {
-        ValidationRules rules = param.getValidationRules();
-        if (rules == null) {
-            return;
-        }
-
         List<String> errors = new ArrayList<>();
+        ValidationRules rules = param.getValidationRules();
 
         switch (param.getParameterType()) {
-            case STRING, PATH -> validateStringLike(param, value, rules, errors);
-            case INTEGER -> validateIntegerLike(param, value, rules, errors);
-            case BOOLEAN, CHOICE -> {
-                // Validated elsewhere (e.g. by choice set); nothing to do here.
+            case STRING -> {
+                if (rules != null) validateStringLike(param, value, rules, errors);
             }
+            case PATH -> {
+                validatePathFormat(param, value, errors);
+                if (rules != null) validateStringLike(param, value, rules, errors);
+            }
+            case INTEGER -> {
+                if (rules != null) validateIntegerLike(param, value, rules, errors);
+                else validateIntegerFormat(param, value, errors);
+            }
+            case BOOLEAN -> validateBoolean(param, value, errors);
+            case CHOICE -> validateChoice(param, value, errors);
         }
 
         if (!errors.isEmpty()) {
             throw new ParameterValidationException("Parameter validation failed", errors);
+        }
+    }
+
+    /** Ensures a PATH value is absolute, free of traversal sequences, and has no whitespace. */
+    private void validatePathFormat(ScriptParameter param, String value, List<String> errors) {
+        if (!value.startsWith("/")) {
+            errors.add(param.getDisplayName() + " must be an absolute path (must start with /)");
+        }
+        if (value.contains("..")) {
+            errors.add(param.getDisplayName() + " must not contain path traversal sequences (..)");
+        }
+        if (value.chars().anyMatch(Character::isWhitespace)) {
+            errors.add(param.getDisplayName() + " must not contain whitespace");
+        }
+    }
+
+    /** Ensures the value is a valid integer even when no range rules are defined. */
+    private void validateIntegerFormat(ScriptParameter param, String value, List<String> errors) {
+        try {
+            Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            errors.add(param.getDisplayName() + " must be a whole number");
+        }
+    }
+
+    /** Ensures a BOOLEAN value is exactly "true" or "false" (case-insensitive). */
+    private void validateBoolean(ScriptParameter param, String value, List<String> errors) {
+        if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
+            errors.add(param.getDisplayName() + " must be 'true' or 'false'");
+        }
+    }
+
+    /** Ensures a CHOICE value is one of the admin-defined allowed choice values. */
+    private void validateChoice(ScriptParameter param, String value, List<String> errors) {
+        List<ScriptParameterChoice> choices = param.getChoices();
+        if (choices == null || choices.isEmpty()) {
+            // No choices defined — admin configuration error; reject to be safe.
+            errors.add(param.getDisplayName() + " has no defined choices");
+            return;
+        }
+        boolean valid = choices.stream().anyMatch(c -> c.getChoiceValue().equals(value));
+        if (!valid) {
+            errors.add(param.getDisplayName() + " must be one of the allowed values");
         }
     }
 

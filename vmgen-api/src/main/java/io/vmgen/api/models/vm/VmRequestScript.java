@@ -36,4 +36,7 @@ public class VmRequestScript {
 
     @Column(name = "execution_order", nullable = false)
     private Integer executionOrder;
+
+    @Column(name = "auto_added", nullable = false)
+    private Boolean autoAdded = false;
 }

@@ -12,7 +12,7 @@ export function useBuildStatus(requestId: MaybeRefOrGetter<string>) {
   
   return useQuery({
     queryKey,
-    queryFn: () => api.getBuildStatus(requestIdValue.value),
+    queryFn: () => api.getBuild(requestIdValue.value),
     refetchInterval: (query) => {
       // Poll every 2 seconds if building, stop if complete/failed
       const data = query.state.data

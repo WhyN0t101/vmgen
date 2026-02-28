@@ -102,8 +102,8 @@ export function useScriptParameters(id: Ref<string>) {
   const createMutation = useMutation({
     mutationFn: (payload: { scriptId: string; data: CreateScriptParameterRequest }) =>
       api.admin.createScriptParameter(payload.scriptId, payload.data),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
       })
       show('Parameter created', 'success')
@@ -123,8 +123,8 @@ export function useScriptParameters(id: Ref<string>) {
       parameterId: string
       data: UpdateScriptParameterRequest
     }) => api.admin.updateScriptParameter(payload.scriptId, payload.parameterId, payload.data),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
       })
       show('Parameter updated', 'success')
@@ -141,8 +141,8 @@ export function useScriptParameters(id: Ref<string>) {
   const deleteMutation = useMutation({
     mutationFn: (payload: { scriptId: string; parameterId: string }) =>
       api.admin.deleteScriptParameter(payload.scriptId, payload.parameterId),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: [...SCRIPT_KEYS.detail(variables.scriptId), 'parameters'],
       })
       show('Parameter deleted', 'success')

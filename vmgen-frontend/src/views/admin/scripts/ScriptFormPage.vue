@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -72,28 +72,27 @@ const form = ref<ScriptFormState>({
   parameters: [],
 })
 
-onMounted(() => {
-  if (isEditing.value && existingScript.value) {
-    const s = existingScript.value
-    form.value = {
-      id: s.id,
-      identifier: s.identifier,
-      version: s.version,
-      name: s.name,
-      description: s.description,
-      categoryId: s.categoryId || '',
-      difficultyLevel: s.difficultyLevel,
-      scriptContent: s.scriptContent,
-      flagLocation: s.flagLocation,
-      flagOwnership: s.flagOwnership,
-      flagPermissions: s.flagPermissions || '0644',
-      requiredOsFamilies: s.requiredOsFamilies || ['linux'],
-      requiredCapabilities: s.requiredCapabilities || ['ssh'],
-      minRamMb: s.minRamMb ?? null,
-      minDiskGb: s.minDiskGb ?? null,
-    }
+// Populate form when existing script data loads (onMounted fires before async query resolves).
+watch(existingScript, (s) => {
+  if (!s || !isEditing.value) return
+  form.value = {
+    id: s.id,
+    identifier: s.identifier,
+    version: s.version,
+    name: s.name,
+    description: s.description,
+    categoryId: s.categoryId || '',
+    difficultyLevel: s.difficultyLevel,
+    scriptContent: s.scriptContent,
+    flagLocation: s.flagLocation,
+    flagOwnership: s.flagOwnership,
+    flagPermissions: s.flagPermissions || '0644',
+    requiredOsFamilies: s.requiredOsFamilies || ['linux'],
+    requiredCapabilities: s.requiredCapabilities || ['ssh'],
+    minRamMb: s.minRamMb ?? null,
+    minDiskGb: s.minDiskGb ?? null,
   }
-})
+}, { immediate: true })
 
 // Auto-detect {{PARAM_NAME}} placeholders in script content and add missing parameters.
 // Only runs in create mode — in edit mode parameters are managed via the API.

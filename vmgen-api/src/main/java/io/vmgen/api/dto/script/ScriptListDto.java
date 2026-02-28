@@ -16,6 +16,7 @@ public class ScriptListDto {
     private String identifier;
     private String version;
     private String name;
+    private String description;
     private String difficultyLevel;
     private Boolean isActive;
     private UUID categoryId;

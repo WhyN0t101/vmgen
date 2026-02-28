@@ -24,6 +24,7 @@ public class TemplateListResponse {
     private String identifier;
     private String version;
     private String osFamily;
+    private String description;
     private TemplateStatus status;
     
     @JsonFormat(shape = JsonFormat.Shape.STRING)

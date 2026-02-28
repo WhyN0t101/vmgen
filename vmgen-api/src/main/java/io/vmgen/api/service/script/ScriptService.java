@@ -11,7 +11,7 @@ import io.vmgen.api.models.script.Script;
 import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
 import io.vmgen.api.repository.script.ScriptRepository;
 import io.vmgen.api.repository.UserRepository;
-import io.vmgen.api.repository.VulnerabilityCategoryRepository;
+import io.vmgen.api.repository.vm.VulnerabilityCategoryRepository;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;

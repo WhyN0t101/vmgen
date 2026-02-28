@@ -27,7 +27,7 @@ export function useCreateBuild() {
       // Invalidate builds list
       queryClient.invalidateQueries({ queryKey: ['builds'] })
       // Navigate to status page
-      router.push({ name: 'build-status', params: { requestId: data.request_id } })
+      router.push({ name: 'build-status', params: { requestId: data.id } })
     },
   })
 }

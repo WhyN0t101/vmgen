@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Search } from 'lucide-vue-next'
 import { useActiveTemplates } from '@/composables/useTemplates'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import OsIcon from '@/components/ui/OsIcon.vue'
 
 const { data: templates, isLoading } = useActiveTemplates()
 const searchQuery = ref('')
@@ -10,23 +11,29 @@ const osFilter = ref<string>('')
 
 const filteredTemplates = computed(() => {
   if (!templates.value) return []
-  
+
   let filtered = templates.value
-  
+
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(t => 
+    filtered = filtered.filter(t =>
       t.identifier.toLowerCase().includes(query) ||
-      t.version.toLowerCase().includes(query)
+      t.version.toLowerCase().includes(query) ||
+      (t.description ?? '').toLowerCase().includes(query)
     )
   }
-  
+
   if (osFilter.value) {
     filtered = filtered.filter(t => t.osFamily === osFilter.value)
   }
-  
+
   return filtered
 })
+
+// Derive a readable display name from the identifier (e.g. "ubuntu-22-04" → "Ubuntu 22.04")
+function formatIdentifier(id: string): string {
+  return id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
 </script>
 
 <template>
@@ -37,58 +44,78 @@ const filteredTemplates = computed(() => {
           Module // Templates
         </p>
         <h1 class="text-2xl md:text-3xl font-semibold text-slate-50">Available templates</h1>
+        <p class="text-sm text-slate-400 mt-1">Base VM images you can build vulnerable environments from.</p>
       </div>
 
       <!-- Filter Bar -->
-      <BaseCard class="mb-2">
-        <div class="flex flex-col md:flex-row gap-4">
-          <div class="flex-1 relative">
-            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search templates..."
-              class="w-full pl-10 pr-4 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/70"
-            />
-          </div>
-          <select
-            v-model="osFilter"
-            class="px-4 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/70"
-          >
-            <option value="">All OS</option>
-            <option value="linux">Linux</option>
-            <option value="windows">Windows</option>
-          </select>
+      <div class="flex flex-col md:flex-row gap-3">
+        <div class="flex-1 relative">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search by name or description…"
+            class="w-full pl-9 pr-4 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500/70"
+          />
         </div>
-      </BaseCard>
-
-      <!-- Template Grid -->
-      <div v-if="isLoading" class="text-center py-12 text-slate-400">
-        Loading templates...
+        <select
+          v-model="osFilter"
+          class="px-4 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500/70"
+        >
+          <option value="">All OS families</option>
+          <option value="linux">Linux</option>
+          <option value="ubuntu">Ubuntu</option>
+          <option value="debian">Debian</option>
+          <option value="kali-linux">Kali Linux</option>
+          <option value="fedora">Fedora</option>
+          <option value="centos">CentOS</option>
+          <option value="windows">Windows</option>
+        </select>
       </div>
 
-      <div v-else-if="filteredTemplates.length === 0" class="text-center py-12 text-slate-400">
+      <!-- Loading skeleton -->
+      <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div v-for="i in 6" :key="i" class="h-32 bg-slate-900/60 rounded-xl animate-pulse" />
+      </div>
+
+      <!-- Empty -->
+      <div v-else-if="filteredTemplates.length === 0" class="text-center py-16 text-slate-500">
         No templates found
       </div>
 
-      <div
-        v-else
-        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-      >
+      <!-- Grid -->
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <BaseCard
           v-for="template in filteredTemplates"
           :key="template.id"
-          class="cursor-pointer hover:border-sky-500/40 transition-colors"
+          padding="md"
+          class="hover:border-sky-500/40 transition-colors"
         >
-          <div class="p-6">
-            <h3 class="text-xl font-semibold text-slate-100 mb-1">
-              {{ template.identifier }}
-            </h3>
-            <p class="text-sm text-slate-400 mb-2">{{ template.version }}</p>
-            <p class="text-xs text-slate-500 capitalize">{{ template.osFamily }}</p>
+          <div class="flex items-start gap-3">
+            <OsIcon :os-family="template.osFamily" :size="32" class="mt-0.5 shrink-0" />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-2 mb-0.5">
+                <h3 class="font-semibold text-slate-100 leading-snug">
+                  {{ formatIdentifier(template.identifier) }}
+                </h3>
+                <span class="text-[10px] font-mono text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded shrink-0">
+                  {{ template.version }}
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 mb-2 capitalize">{{ template.osFamily }}</p>
+              <p v-if="template.description" class="text-xs text-slate-400 leading-relaxed line-clamp-2">
+                {{ template.description }}
+              </p>
+              <p v-else class="text-xs text-slate-600 italic">No description provided.</p>
+            </div>
           </div>
         </BaseCard>
       </div>
+
+      <!-- Count footer -->
+      <p v-if="!isLoading && filteredTemplates.length > 0" class="text-xs text-slate-600 text-right">
+        {{ filteredTemplates.length }} template{{ filteredTemplates.length !== 1 ? 's' : '' }} available
+      </p>
     </div>
   </div>
 </template>

@@ -51,7 +51,7 @@ function logout() {
               class="text-slate-400 hover:text-slate-100 transition-colors"
               active-class="text-primary-500"
             >
-              Admin
+              Admin Panel
             </router-link>
           </div>
         </div>
