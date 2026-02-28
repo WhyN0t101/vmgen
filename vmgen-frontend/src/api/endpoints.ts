@@ -408,6 +408,14 @@ export const api = {
       return apiRequest<ScriptListItem[]>(`/api/templates/${id}/scripts`)
     },
   },
+
+  // Public script endpoints (user-facing, non-admin)
+  scripts: {
+    /** Returns only USER_INPUT and USER_INPUT_OR_RANDOM parameters for the given script. */
+    getParameters: async (id: string): Promise<ScriptParameter[]> => {
+      return apiRequest<ScriptParameter[]>(`/api/scripts/${id}/parameters`)
+    },
+  },
 }
 
 

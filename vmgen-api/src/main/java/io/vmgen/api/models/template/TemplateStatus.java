@@ -1,5 +1,7 @@
 package io.vmgen.api.models.template;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum TemplateStatus {
     DRAFT,
     VALIDATING,
@@ -7,6 +9,7 @@ public enum TemplateStatus {
     FAILED,
     DEPRECATED;
 
+    @JsonValue
     public String getValue() {
         return name().toLowerCase();
     }

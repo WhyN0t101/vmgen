@@ -138,7 +138,8 @@ function save() {
       <div>
         <h2 class="text-lg font-semibold text-slate-100">Parameters</h2>
         <p class="text-xs text-slate-400">
-          Optional inputs or auto-generated values this script can use during execution.
+          Define variables referenced in the script as <span v-pre class="font-mono text-primary-400">{{PARAMETER_NAME}}</span>.
+          The worker resolves each one before executing the script.
         </p>
       </div>
       <BaseButton type="button" size="sm" variant="secondary" @click="openCreate">

@@ -1,7 +1,6 @@
 package io.vmgen.api.models.script;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -22,6 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Parameter definition attached to a vulnerability script.
@@ -70,12 +71,12 @@ public class ScriptParameter {
     @Column(name = "is_required", nullable = false)
     private Boolean isRequired = Boolean.TRUE;
 
-    @Convert(converter = ValidationRulesConverter.class)
-    @Column(name = "validation_rules", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "validation_rules")
     private ValidationRules validationRules;
 
-    @Convert(converter = RandomConfigConverter.class)
-    @Column(name = "random_config", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "random_config")
     private RandomConfig randomConfig;
 
     @Column(name = "user_can_override", nullable = false)

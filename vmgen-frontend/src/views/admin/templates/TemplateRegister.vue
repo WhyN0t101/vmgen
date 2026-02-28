@@ -7,7 +7,8 @@ import { useRegisterTemplate, useProxmoxVms } from '@/composables/useTemplates'
 import { api } from '@/api/endpoints'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
-import type { RegisterTemplateRequest } from '@/types'
+import OsIcon from '@/components/ui/OsIcon.vue'
+import type { RegisterTemplateRequest, OsFamily } from '@/types'
 import { useToast } from '@/composables/useToast'
 
 const router = useRouter()
@@ -92,6 +93,17 @@ function toggleScript(id: string) {
     }
   }
 }
+
+// Computed difficulty from selected scripts' average
+const DIFFICULTY_SCORE: Record<string, number> = { EASY: 1, MEDIUM: 2, HARD: 3 }
+const computedDifficulty = computed(() => {
+  const selected = (allScripts.value ?? []).filter(s => selectedCompatibleScriptIds.value.has(s.id))
+  if (!selected.length) return null
+  const avg = selected.reduce((sum, s) => sum + (DIFFICULTY_SCORE[s.difficultyLevel?.toUpperCase() ?? ''] ?? 2), 0) / selected.length
+  if (avg < 1.5) return { label: 'EASY', color: 'text-green-400' }
+  if (avg <= 2.5) return { label: 'MEDIUM', color: 'text-yellow-400' }
+  return { label: 'HARD', color: 'text-red-400' }
+})
 
 // Form state
 const form = ref<RegisterTemplateRequest>({
@@ -289,7 +301,7 @@ async function handleSubmit() {
             </BaseButton>
             <div v-if="proxmoxTemplates && proxmoxTemplates.length > 0" class="mt-4">
               <select
-                @change="selectVm(proxmoxTemplates.find((v: any) => v.vmid === Number($event.target.value)))"
+                @change="selectVm(proxmoxTemplates.find((v: any) => v.vmid === Number(($event.target as HTMLSelectElement).value)))"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">Select a VM...</option>
@@ -320,16 +332,31 @@ async function handleSubmit() {
         <h2 class="text-xl font-semibold text-slate-100 mb-4">Operating System</h2>
         <div class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-slate-300 mb-2">OS Family</label>
-            <div class="flex gap-4">
-              <label class="flex items-center">
-                <input v-model="form.osFamily" type="radio" value="linux" class="mr-2" />
-                <span class="text-slate-300">Linux</span>
-              </label>
-              <label class="flex items-center">
-                <input v-model="form.osFamily" type="radio" value="windows" class="mr-2" />
-                <span class="text-slate-300">Windows</span>
-              </label>
+            <label class="block text-sm font-medium text-slate-300 mb-2">OS Distribution</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button
+                v-for="os in ([
+                  { value: 'ubuntu',    label: 'Ubuntu'    },
+                  { value: 'debian',    label: 'Debian'    },
+                  { value: 'kali-linux',label: 'Kali Linux'},
+                  { value: 'fedora',    label: 'Fedora'    },
+                  { value: 'centos',    label: 'CentOS'    },
+                  { value: 'windows',   label: 'Windows'   },
+                  { value: 'linux',     label: 'Generic'   },
+                ] as { value: OsFamily; label: string }[])"
+                :key="os.value"
+                type="button"
+                @click="form.osFamily = os.value"
+                :class="[
+                  'flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg border transition-colors',
+                  form.osFamily === os.value
+                    ? 'border-primary-500 bg-primary-500/10 text-primary-300'
+                    : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600 hover:text-slate-300',
+                ]"
+              >
+                <OsIcon :os-family="os.value" :size="26" />
+                <span class="text-xs font-medium">{{ os.label }}</span>
+              </button>
             </div>
           </div>
 
@@ -603,9 +630,15 @@ async function handleSubmit() {
           </label>
         </div>
 
-        <p v-if="selectedCompatibleScriptIds.size > 0" class="mt-3 text-xs text-slate-400">
-          {{ selectedCompatibleScriptIds.size }} script{{ selectedCompatibleScriptIds.size === 1 ? '' : 's' }} selected
-        </p>
+        <div v-if="selectedCompatibleScriptIds.size > 0" class="mt-3 flex items-center justify-between">
+          <p class="text-xs text-slate-400">
+            {{ selectedCompatibleScriptIds.size }} script{{ selectedCompatibleScriptIds.size === 1 ? '' : 's' }} selected
+          </p>
+          <p v-if="computedDifficulty" class="text-xs text-slate-400">
+            Computed difficulty:
+            <span :class="['font-semibold', computedDifficulty.color]">{{ computedDifficulty.label }}</span>
+          </p>
+        </div>
       </BaseCard>
 
       <!-- Submit -->

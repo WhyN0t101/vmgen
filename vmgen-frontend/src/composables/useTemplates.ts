@@ -266,7 +266,7 @@ export function useRemoveTemplateCompatibleScript() {
  * Public query for the Generate page — returns scripts compatible with a template.
  * Falls back to all active scripts if no compatibility entries are configured.
  */
-export function usePublicCompatibleScripts(templateId: Ref<string | null>) {
+export function usePublicCompatibleScripts(templateId: Ref<string | null | undefined>) {
   return useQuery({
     queryKey: computed(() => ['public-compatible-scripts', templateId.value]),
     queryFn: () => api.templates.getCompatibleScripts(templateId.value!),

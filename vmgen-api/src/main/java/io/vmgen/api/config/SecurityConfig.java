@@ -76,6 +76,9 @@ public class SecurityConfig {
                         // Worker API endpoints (protected by WorkerApiKeyFilter)
                         .requestMatchers("/api/worker/**").permitAll()
 
+                        // OpenAPI / Swagger UI (dev tooling — disable in prod via springdoc.api-docs.enabled=false)
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+
                         // Admin endpoints require ADMIN role
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
