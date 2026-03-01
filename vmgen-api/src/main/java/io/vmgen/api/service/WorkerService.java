@@ -10,6 +10,7 @@ import io.vmgen.api.models.template.Template;
 import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestState;
 import io.vmgen.api.repository.vm.VmRequestRepository;
+import java.nio.file.Paths;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -124,6 +125,7 @@ public class WorkerService {
         request.setState(VmRequestState.READY);
         request.setCompletedAt(Instant.now());
         request.setStoragePath(completion.getOvaPath());
+        request.setOvaFilename(Paths.get(completion.getOvaPath()).getFileName().toString());
         request.setOvaSha256(completion.getOvaChecksum());
         request.setOvaSizeBytes(completion.getOvaSizeBytes());
         request.setLastProgressAt(Instant.now());

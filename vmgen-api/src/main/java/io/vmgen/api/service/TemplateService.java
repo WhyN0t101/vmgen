@@ -27,6 +27,7 @@ import io.vmgen.api.repository.template.TemplateCapabilityRepository;
 import io.vmgen.api.repository.template.TemplateRepository;
 import io.vmgen.api.repository.UserRepository;
 import io.vmgen.api.service.script.ScriptCompatibilityService;
+import io.vmgen.api.dto.common.PagedResponse;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +36,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -194,14 +198,26 @@ public class TemplateService {
 
 
     /**
-     * Returns all active templates ordered by creation date descending.
+     * Returns active templates, paginated, with optional server-side filtering.
+     * {@code search} matches against identifier, version, and description (case-insensitive).
+     * {@code osFamily} is matched exactly (case-insensitive). Pass {@code null} to skip either filter.
      * Intended for end-user consumption; excludes draft, failed, and deprecated templates.
      */
     @Transactional(readOnly = true)
-    public List<TemplateListResponse> listActiveTemplates() {
-        return templateRepository.findAllByStatusOrderByCreatedAtDesc(TemplateStatus.ACTIVE).stream()
+    public PagedResponse<TemplateListResponse> listActiveTemplates(int page, int size, String search, String osFamily) {
+        String searchPattern = (search == null || search.isBlank()) ? null : "%" + search.trim().toLowerCase() + "%";
+        String osFamilyNorm = (osFamily == null || osFamily.isBlank()) ? null : osFamily.trim().toLowerCase();
+
+        Page<Template> paged = templateRepository.findActiveFiltered(
+                TemplateStatus.ACTIVE,
+                searchPattern,
+                osFamilyNorm,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        List<TemplateListResponse> content = paged.getContent().stream()
                 .map(this::toListResponse)
                 .collect(Collectors.toList());
+        return new PagedResponse<>(content, paged.getNumber(), paged.getSize(),
+                paged.getTotalElements(), paged.getTotalPages(), paged.isLast());
     }
 
 

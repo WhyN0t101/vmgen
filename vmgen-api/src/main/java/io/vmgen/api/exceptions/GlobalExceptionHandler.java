@@ -19,6 +19,15 @@ public class GlobalExceptionHandler {
                 .body(Map.of("message", ex.getPublicMessage()));
     }
 
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountLocked(AccountLockedException ex) {
+        return ResponseEntity.status(HttpStatus.LOCKED)
+                .body(Map.of(
+                        "message", ex.getPublicMessage(),
+                        "retryAfter", ex.getRetryAfterSeconds()
+                ));
+    }
+
     @ExceptionHandler(InvalidTokenException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidToken(InvalidTokenException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

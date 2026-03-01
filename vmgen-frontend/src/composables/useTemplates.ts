@@ -63,11 +63,35 @@ export function useProxmoxVms(node?: Ref<string | undefined> | string | (() => s
 
 /**
  * Public list query for active templates shown in the catalog.
+ * Supports optional server-side filtering (search, osFamily) and pagination.
+ * Reactive refs are included in the queryKey so TanStack Query re-fetches on change.
+ *
+ * - Pass `size` to override the page size (e.g. 100 for a full-list selector).
+ * - Search is matched against identifier, version, and description server-side.
  */
-export function useActiveTemplates() {
+export function useActiveTemplates(options?: {
+  search?: Ref<string>
+  osFamily?: Ref<string>
+  page?: Ref<number>
+  size?: number
+}) {
   return useQuery({
-    queryKey: TEMPLATE_KEYS.active(),
-    queryFn: () => api.templates.listActive(),
+    queryKey: computed(() => [
+      ...TEMPLATE_KEYS.active(),
+      {
+        page: options?.page?.value ?? 0,
+        size: options?.size ?? 20,
+        search: options?.search?.value || undefined,
+        osFamily: options?.osFamily?.value || undefined,
+      },
+    ]),
+    queryFn: () =>
+      api.templates.listActive(
+        options?.page?.value ?? 0,
+        options?.size ?? 20,
+        options?.search?.value || undefined,
+        options?.osFamily?.value || undefined,
+      ),
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 }

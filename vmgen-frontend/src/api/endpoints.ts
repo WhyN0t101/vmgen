@@ -279,8 +279,11 @@ export const api = {
 
   // Public template endpoints
   templates: {
-    listActive: async (): Promise<TemplateListResponse[]> => {
-      return apiRequest<TemplateListResponse[]>('/api/templates')
+    listActive: async (page = 0, size = 20, search?: string, osFamily?: string): Promise<PagedResponse<TemplateListResponse>> => {
+      const params = new URLSearchParams({ page: String(page), size: String(size) })
+      if (search) params.set('search', search)
+      if (osFamily) params.set('osFamily', osFamily)
+      return apiRequest<PagedResponse<TemplateListResponse>>(`/api/templates?${params}`)
     },
 
     getById: async (id: string): Promise<TemplateResponse> => {

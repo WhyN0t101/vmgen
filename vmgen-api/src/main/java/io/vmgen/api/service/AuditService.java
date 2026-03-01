@@ -140,7 +140,7 @@ public class AuditService {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
-            log.warn("Metadata serialization failed: {}", e.getMessage());
+            log.warn("Metadata serialization failed (keys: {}): {}", obj.keySet(), e.getMessage());
             return "{\"error\":\"metadata_serialization_failed\"}";
         }
     }

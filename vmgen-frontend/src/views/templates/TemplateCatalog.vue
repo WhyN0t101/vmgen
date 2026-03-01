@@ -1,33 +1,28 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, watch } from 'vue'
 import { Search } from 'lucide-vue-next'
 import { useActiveTemplates } from '@/composables/useTemplates'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import OsIcon from '@/components/ui/OsIcon.vue'
 
-const { data: templates, isLoading } = useActiveTemplates()
 const searchQuery = ref('')
+const debouncedSearch = ref('')
 const osFilter = ref<string>('')
+const currentPage = ref(0)
 
-const filteredTemplates = computed(() => {
-  if (!templates.value) return []
+// Debounce search input: waits 300 ms after the user stops typing before re-fetching.
+watch(searchQuery, (val, _old, onCleanup) => {
+  const timer = setTimeout(() => { debouncedSearch.value = val }, 300)
+  onCleanup(() => clearTimeout(timer))
+})
 
-  let filtered = templates.value
+// Reset to page 0 whenever the filters change.
+watch([debouncedSearch, osFilter], () => { currentPage.value = 0 })
 
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(t =>
-      t.identifier.toLowerCase().includes(query) ||
-      t.version.toLowerCase().includes(query) ||
-      (t.description ?? '').toLowerCase().includes(query)
-    )
-  }
-
-  if (osFilter.value) {
-    filtered = filtered.filter(t => t.osFamily === osFilter.value)
-  }
-
-  return filtered
+const { data: templates, isLoading } = useActiveTemplates({
+  search: debouncedSearch,
+  osFamily: osFilter,
+  page: currentPage,
 })
 
 // Derive a readable display name from the identifier (e.g. "ubuntu-22-04" → "Ubuntu 22.04")
@@ -79,14 +74,14 @@ function formatIdentifier(id: string): string {
       </div>
 
       <!-- Empty -->
-      <div v-else-if="filteredTemplates.length === 0" class="text-center py-16 text-slate-500">
+      <div v-else-if="!templates?.content?.length" class="text-center py-16 text-slate-500">
         No templates found
       </div>
 
       <!-- Grid -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <BaseCard
-          v-for="template in filteredTemplates"
+          v-for="template in templates.content"
           :key="template.id"
           padding="md"
           class="hover:border-sky-500/40 transition-colors"
@@ -112,9 +107,29 @@ function formatIdentifier(id: string): string {
         </BaseCard>
       </div>
 
+      <!-- Pagination controls -->
+      <div
+        v-if="!isLoading && templates && templates.totalPages > 1"
+        class="flex items-center justify-center gap-4"
+      >
+        <button
+          :disabled="currentPage === 0"
+          @click="currentPage--"
+          class="px-3 py-1.5 text-sm bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >← Prev</button>
+        <span class="text-xs text-slate-500">
+          Page {{ currentPage + 1 }} of {{ templates.totalPages }}
+        </span>
+        <button
+          :disabled="templates.last"
+          @click="currentPage++"
+          class="px-3 py-1.5 text-sm bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >Next →</button>
+      </div>
+
       <!-- Count footer -->
-      <p v-if="!isLoading && filteredTemplates.length > 0" class="text-xs text-slate-600 text-right">
-        {{ filteredTemplates.length }} template{{ filteredTemplates.length !== 1 ? 's' : '' }} available
+      <p v-if="!isLoading && templates && templates.totalElements > 0" class="text-xs text-slate-600 text-right">
+        {{ templates.totalElements }} template{{ templates.totalElements !== 1 ? 's' : '' }} available
       </p>
     </div>
   </div>

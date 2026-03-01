@@ -3,28 +3,41 @@ package io.vmgen.api.service;
 import io.vmgen.api.config.JwtAuthenticationFilter;
 import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.exceptions.ForbiddenException;
+import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ValidationException;
 import io.vmgen.api.models.user.User;
 import io.vmgen.api.models.user.UserRole;
 import io.vmgen.api.repository.UserRepository;
+import io.vmgen.api.repository.vm.VmRequestRepository;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 
 @Service
+@Slf4j
 public class UserService {
+    static final int MAX_FLAG_FAILURES_PER_BUILD = 5;
+    static final int EXHAUSTED_BUILDS_THRESHOLD = 3;
+    static final Duration LOCKOUT_DURATION = Duration.ofHours(1);
+
     private final UserRepository userRepository;
     private final SessionService sessionService;
     private final AuditService auditService;
+    private final VmRequestRepository vmRequestRepository;
 
-    public UserService(UserRepository userRepository, SessionService sessionService, AuditService auditService) {
+    public UserService(UserRepository userRepository, SessionService sessionService,
+                       AuditService auditService, VmRequestRepository vmRequestRepository) {
         this.userRepository = userRepository;
         this.sessionService = sessionService;
         this.auditService = auditService;
+        this.vmRequestRepository = vmRequestRepository;
     }
 
     /**
@@ -66,6 +79,35 @@ public class UserService {
         UUID adminId = UUID.fromString(principal.userId());
         return userRepository.findById(adminId)
                 .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminId));
+    }
+
+    /**
+     * Locks the given user account until {@code now + duration}.
+     * Callable from any service that enforces attempt limits (auth, flag submission).
+     */
+    @Transactional
+    public void lockAccount(UUID userId, Duration duration) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        user.setLockedUntil(Instant.now().plus(duration));
+        userRepository.save(user);
+        log.warn("Account locked for user {} until {}", userId, user.getLockedUntil());
+    }
+
+    /**
+     * Records a failed flag submission attempt for the given build.
+     * Triggers a {@link #LOCKOUT_DURATION} account lockout when the user has
+     * {@link #EXHAUSTED_BUILDS_THRESHOLD} or more builds where failed attempts
+     * reached {@link #MAX_FLAG_FAILURES_PER_BUILD}.
+     */
+    @Transactional
+    public void recordFlagFailure(UUID buildId, UUID userId) {
+        vmRequestRepository.incrementFlagFailures(buildId);
+        long exhausted = vmRequestRepository.countExhaustedBuilds(userId, MAX_FLAG_FAILURES_PER_BUILD);
+        if (exhausted >= EXHAUSTED_BUILDS_THRESHOLD) {
+            lockAccount(userId, LOCKOUT_DURATION);
+            log.warn("User {} locked after {} exhausted flag attempt builds", userId, exhausted);
+        }
     }
 
     /**

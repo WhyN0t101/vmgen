@@ -89,4 +89,18 @@ public interface VmRequestRepository extends JpaRepository<VmRequest, UUID> {
      */
     @Query("SELECT vr FROM VmRequest vr LEFT JOIN FETCH vr.user LEFT JOIN FETCH vr.template WHERE vr.id = :id")
     Optional<VmRequest> findByIdWithUserAndTemplate(@Param("id") UUID id);
+
+    /**
+     * Increment the failed flag attempt counter for a single build.
+     */
+    @Modifying
+    @Query("UPDATE VmRequest vr SET vr.failedFlagAttempts = vr.failedFlagAttempts + 1 WHERE vr.id = :buildId")
+    void incrementFlagFailures(@Param("buildId") UUID buildId);
+
+    /**
+     * Count builds owned by a user whose failed flag attempts have reached or exceeded the threshold.
+     * Used to determine when to trigger a flag-based account lockout.
+     */
+    @Query("SELECT COUNT(vr) FROM VmRequest vr WHERE vr.user.id = :userId AND vr.failedFlagAttempts >= :threshold")
+    long countExhaustedBuilds(@Param("userId") UUID userId, @Param("threshold") int threshold);
 }

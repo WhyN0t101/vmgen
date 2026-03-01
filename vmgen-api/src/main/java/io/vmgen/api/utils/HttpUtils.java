@@ -14,8 +14,12 @@ public class HttpUtils {
     public static String getClientIp(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            // X-Forwarded-For can contain multiple IPs, take the first one
-            return xForwardedFor.split(",")[0].trim();
+            // X-Forwarded-For can contain multiple IPs; take the first non-empty one.
+            // A crafted header like " , 1.2.3.4" must not yield an empty key.
+            String first = xForwardedFor.split(",")[0].trim();
+            if (!first.isEmpty()) {
+                return first;
+            }
         }
         String xRealIp = request.getHeader("X-Real-IP");
         if (xRealIp != null && !xRealIp.isEmpty()) {

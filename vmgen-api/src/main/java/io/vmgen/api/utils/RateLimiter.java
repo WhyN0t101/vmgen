@@ -1,6 +1,7 @@
 package io.vmgen.api.utils;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -69,10 +70,10 @@ public class RateLimiter {
 
         synchronized boolean tryConsume() {
             Instant now = Instant.now();
-            long elapsed = now.getEpochSecond() - windowStart.getEpochSecond();
+            long elapsedMs = ChronoUnit.MILLIS.between(windowStart, now);
 
             // Reset window if expired
-            if (elapsed >= windowSeconds) {
+            if (elapsedMs >= windowSeconds * 1000L) {
                 count.set(0);
                 windowStart = now;
             }
@@ -89,9 +90,9 @@ public class RateLimiter {
 
         synchronized int getRemaining() {
             Instant now = Instant.now();
-            long elapsed = now.getEpochSecond() - windowStart.getEpochSecond();
+            long elapsedMs = ChronoUnit.MILLIS.between(windowStart, now);
 
-            if (elapsed >= windowSeconds) {
+            if (elapsedMs >= windowSeconds * 1000L) {
                 return maxRequests;
             }
 
@@ -100,18 +101,18 @@ public class RateLimiter {
 
         synchronized long getResetSeconds() {
             Instant now = Instant.now();
-            long elapsed = now.getEpochSecond() - windowStart.getEpochSecond();
+            long elapsedMs = ChronoUnit.MILLIS.between(windowStart, now);
 
-            if (elapsed >= windowSeconds) {
+            if (elapsedMs >= windowSeconds * 1000L) {
                 return 0;
             }
 
-            return windowSeconds - elapsed;
+            return (windowSeconds * 1000L - elapsedMs) / 1000L;
         }
 
         boolean isExpired(Instant now) {
-            long elapsed = now.getEpochSecond() - windowStart.getEpochSecond();
-            return elapsed >= windowSeconds;
+            long elapsedMs = ChronoUnit.MILLIS.between(windowStart, now);
+            return elapsedMs >= windowSeconds * 1000L;
         }
     }
 }

@@ -14,7 +14,9 @@ const selectedVulnIds = ref<string[]>([])
 const difficulty = ref<'easy' | 'medium' | 'hard'>('medium')
 const telemetryEnabled = ref(false)
 
-const { data: templates, isLoading: templatesLoading } = useActiveTemplates()
+// size: 100 loads the full catalog without pagination — the template selector
+// needs all available options visible at once.
+const { data: templates, isLoading: templatesLoading } = useActiveTemplates({ size: 100 })
 const { data: compatibleScripts, isLoading: scriptsLoading } = usePublicCompatibleScripts(selectedTemplateId)
 const { mutate: createBuild, isPending: isCreating } = useCreateBuild()
 
@@ -102,7 +104,7 @@ watch(selectedVulnIds, async (newIds, oldIds) => {
 })
 
 const selectedTemplate = computed<TemplateListResponse | undefined>(() =>
-  templates.value?.find(t => t.id === selectedTemplateId.value)
+  templates.value?.content?.find(t => t.id === selectedTemplateId.value)
 )
 
 // Derive vulnerability list from the real compatible-scripts response so IDs
@@ -221,7 +223,7 @@ function handleSubmit() {
         <div class="lg:col-span-1">
           <TemplateSelector
             v-model="selectedTemplateId"
-            :templates="templates"
+            :templates="templates?.content"
             :loading="templatesLoading"
           />
         </div>

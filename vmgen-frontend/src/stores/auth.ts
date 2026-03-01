@@ -2,6 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { User } from '@/types'
 
+// Resolved once at module load — mirrors the same logic in api/client.ts.
+// Cannot import API_BASE from client.ts because client.ts imports this store (circular).
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
 const AUTH_CHANNEL = 'vmgen_auth'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -17,7 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => (user.value?.role || role.value)?.toLowerCase() === 'admin')
 
   async function login(identifier: string, password: string) {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/login`, {
+    const response = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password }),
@@ -53,7 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     // Best-effort server logout; session revocation is enforced server-side.
     const t = token.value
-    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/logout`, {
+    fetch(`${API_BASE}/api/auth/logout`, {
       method: 'POST',
       headers: t ? { Authorization: `Bearer ${t}` } : undefined,
     }).catch(() => {})

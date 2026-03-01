@@ -26,7 +26,7 @@ import io.vmgen.api.repository.template.TemplateRepository;
 import io.vmgen.api.service.script.ScriptCompatibilityService;
 import io.vmgen.api.service.script.ScriptParameterService;
 import io.vmgen.api.service.script.ScriptParameterService.ParameterProcessingResult;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -64,6 +64,15 @@ public class VmRequestService {
      */
     @Transactional
     public BuildResponse createBuild(User user, CreateBuildRequest request) {
+        // 0. Reject duplicate script IDs up front — the count check below would otherwise
+        //    report them as "not found or inactive", which is a misleading error.
+        List<UUID> requestedIds = request.getVulnerabilityIds();
+        Set<UUID> uniqueIds = new HashSet<>(requestedIds);
+        if (uniqueIds.size() != requestedIds.size()) {
+            throw new ValidationException("Validation failed",
+                    List.of("Duplicate script IDs in request"));
+        }
+
         // 1. Validate template exists and is ACTIVE.
         Template template = templateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
@@ -192,7 +201,7 @@ public class VmRequestService {
      * Returns builds for the given user, most recent first, paginated.
      * Defaults to page 0, 20 items per page.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public PagedResponse<BuildResponse> getUserBuilds(User user, int page, int size) {
         Page<VmRequest> paged = vmRequestRepository.findByUser_IdOrderBySubmittedAtDesc(
                 user.getId(), PageRequest.of(page, size));
@@ -207,7 +216,7 @@ public class VmRequestService {
      * Returns a single build visible to the requesting user.
      * Throws 404 if not found, 403 if owned by another user.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public BuildResponse getBuild(UUID requestId, User user) {
         VmRequest request = vmRequestRepository.findByIdWithTemplate(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + requestId));

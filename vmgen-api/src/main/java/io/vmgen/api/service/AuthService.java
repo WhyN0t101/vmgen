@@ -5,6 +5,7 @@ import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.auth.AuthResponse;
 import io.vmgen.api.dto.auth.LoginRequest;
 import io.vmgen.api.dto.auth.RegisterRequest;
+import io.vmgen.api.exceptions.AccountLockedException;
 import io.vmgen.api.exceptions.AuthenticationFailedException;
 import io.vmgen.api.exceptions.ValidationException;
 import io.vmgen.api.models.user.User;
@@ -12,6 +13,8 @@ import io.vmgen.api.models.user.UserRole;
 import io.vmgen.api.repository.UserRepository;
 import io.vmgen.api.utils.PasswordPolicyValidator;
 import io.vmgen.api.utils.TokenHashUtil;
+import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -33,6 +36,15 @@ public class AuthService {
     private final SessionService sessionService;
     private final AuditService auditService;
     private final JwtProperties jwtProperties;
+
+    // Pre-computed using the live encoder so timing matches a real verification.
+    // Prevents response-time enumeration of whether an account exists.
+    private String dummyPasswordHash;
+
+    @PostConstruct
+    void initDummyHash() {
+        dummyPasswordHash = passwordEncoder.encode("vmgen-dummy-password-for-timing");
+    }
 
 
 
@@ -74,8 +86,10 @@ public class AuthService {
     /**
      * Authenticates a user by email or username.
      * Uses constant-time password verification to prevent timing attacks.
+     * Lockout status is only surfaced after credentials are verified to prevent account enumeration.
      * Revokes all existing sessions before issuing a new one.
      * Throws {@link AuthenticationFailedException} on invalid credentials or session creation failure.
+     * Throws {@link AccountLockedException} when the account is currently locked (e.g. due to flag failures).
      */
     @Transactional
     public AuthResponse login(LoginRequest req, AuditContext ctx) {
@@ -86,7 +100,7 @@ public class AuthService {
                 .orElse(null);
 
         // Constant-time password verification to prevent timing attacks
-        String passwordHash = user != null ? user.getPasswordHash() : "$2a$10$dummyHashToPreventTimingAttack";
+        String passwordHash = user != null ? user.getPasswordHash() : dummyPasswordHash;
         boolean passwordMatches = passwordEncoder.matches(req.password(), passwordHash);
 
         if (user == null || !passwordMatches) {
@@ -94,15 +108,20 @@ public class AuthService {
             throw new AuthenticationFailedException();
         }
 
-        // TODO: Check if user is locked/disabled/email unverified
-        // if (user.isLocked()) throw new AccountLockedException();
-        // if (!user.isEmailVerified()) throw new EmailNotVerifiedException();
+        // Lockout check is performed after credential verification.
+        // Revealing lockout status only to callers who know the correct password
+        // prevents account enumeration via differential responses.
+        Instant now = Instant.now();
+        if (user.getLockedUntil() != null && now.isBefore(user.getLockedUntil())) {
+            long retryAfterSeconds = Duration.between(now, user.getLockedUntil()).getSeconds();
+            auditService.logLoginFailed(identifier, ctx);
+            throw new AccountLockedException(retryAfterSeconds);
+        }
 
         // Only revoke sessions after successful authentication
         sessionService.revokeAllSessionsForUser(user.getId());
 
         UUID sessionId = UUID.randomUUID();
-        Instant now = Instant.now();
         long ttlSeconds = user.getRole() == UserRole.ADMIN
                 ? jwtProperties.getAdminTtlSeconds()
                 : jwtProperties.getUserTtlSeconds();

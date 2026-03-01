@@ -40,6 +40,9 @@ public class User {
     @Column(name = "email_verified_at")
     private Instant emailVerifiedAt;
 
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

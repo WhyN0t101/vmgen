@@ -1,6 +1,12 @@
 import { useAuthStore } from '@/stores/auth'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const _configuredUrl = import.meta.env.VITE_API_URL
+if (!_configuredUrl && import.meta.env.PROD) {
+  console.error('[vmgen] VITE_API_URL is not set. All API calls will fail in production.')
+} else if (!_configuredUrl) {
+  console.warn('[vmgen] VITE_API_URL is not set; falling back to http://localhost:8080 (dev only).')
+}
+export const API_BASE: string = _configuredUrl || 'http://localhost:8080'
 
 // Global handler for 401 errors - will be set by App.vue
 let onUnauthorized: ((message: string) => void) | null = null
