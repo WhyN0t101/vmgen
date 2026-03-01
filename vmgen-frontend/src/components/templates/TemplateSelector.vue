@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Template } from '@/types'
+import type { TemplateListResponse } from '@/types'
 import TemplateCard from './TemplateCard.vue'
 
 interface Props {
-  templates?: Template[]
+  templates?: TemplateListResponse[]
   loading?: boolean
   modelValue?: string
 }
@@ -19,7 +19,7 @@ const selectedId = computed({
   set: (value) => emit('update:modelValue', value),
 })
 
-function handleSelect(template: Template) {
+function handleSelect(template: TemplateListResponse) {
   selectedId.value = template.id
 }
 </script>
@@ -27,11 +27,11 @@ function handleSelect(template: Template) {
 <template>
   <div>
     <h2 class="text-lg font-semibold text-slate-100 mb-4">Choose Base Template</h2>
-    
+
     <div v-if="loading" class="space-y-3">
       <div v-for="i in 3" :key="i" class="h-32 bg-slate-800/50 rounded-lg animate-pulse" />
     </div>
-    
+
     <div v-else-if="templates && templates.length > 0" class="space-y-3">
       <TemplateCard
         v-for="template in templates"
@@ -41,12 +41,9 @@ function handleSelect(template: Template) {
         @select="handleSelect"
       />
     </div>
-    
+
     <div v-else class="text-center py-8 text-slate-500">
       No templates available
     </div>
   </div>
 </template>
-
-
-

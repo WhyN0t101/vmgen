@@ -3,44 +3,36 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 
+const AUTH_CHANNEL = 'vmgen_auth'
+
 /**
- * Keep authentication state in sync across multiple browser tabs by
- * listening to storage events for the JWT token and reacting to
- * login/logout in other tabs.
+ * Keep authentication state in sync across multiple browser tabs using
+ * BroadcastChannel. No localStorage is involved — messages are delivered
+ * only to other tabs in the same origin during the same browser session.
  */
 export function useAuthSync() {
   const router = useRouter()
   const authStore = useAuthStore()
   const { show } = useToast()
 
-  function handleStorageChange(event: StorageEvent) {
-    // Listen for logout events from other tabs
-    if (event.key === 'vmgen_token' && event.newValue === null) {
-      // Another tab logged out - sync this tab
-      if (authStore.isAuthenticated) {
-        authStore.logout()
-        show('You have been logged out in another tab.', 'info')
-        router.push('/login')
-      }
-    }
-    
-    // Listen for login events from other tabs (optional - for consistency)
-    if (event.key === 'vmgen_token' && event.newValue !== null && !authStore.isAuthenticated) {
-      // Another tab logged in - refresh auth state
-      const token = localStorage.getItem('vmgen_token')
-      const role = localStorage.getItem('vmgen_role')
-      if (token && role) {
-        // Reload page to sync state (simpler than manually updating store)
-        window.location.reload()
-      }
+  let channel: BroadcastChannel | null = null
+
+  function handleMessage(event: MessageEvent) {
+    if (event.data?.type === 'logout' && authStore.isAuthenticated) {
+      authStore.logout()
+      show('You have been logged out in another tab.', 'info')
+      router.push('/login')
     }
   }
 
   onMounted(() => {
-    window.addEventListener('storage', handleStorageChange)
+    try {
+      channel = new BroadcastChannel(AUTH_CHANNEL)
+      channel.addEventListener('message', handleMessage)
+    } catch { /* BroadcastChannel unavailable in some environments */ }
   })
 
   onUnmounted(() => {
-    window.removeEventListener('storage', handleStorageChange)
+    channel?.close()
   })
 }

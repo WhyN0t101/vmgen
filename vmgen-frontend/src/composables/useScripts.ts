@@ -12,6 +12,7 @@ import type {
 import { api } from '@/api/endpoints'
 import { computed, type Ref } from 'vue'
 import { useToast } from '@/composables/useToast'
+import { extractApiError } from '@/utils/apiError'
 
 /**
  * Admin-facing composables for listing, inspecting and mutating
@@ -74,9 +75,7 @@ export function useCreateScript() {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to create script'
+        extractApiError(error, 'Failed to create script')
       show(message, 'error')
     },
   })
@@ -110,9 +109,7 @@ export function useScriptParameters(id: Ref<string>) {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to create parameter'
+        extractApiError(error, 'Failed to create parameter')
       show(message, 'error')
     },
   })
@@ -131,9 +128,7 @@ export function useScriptParameters(id: Ref<string>) {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to update parameter'
+        extractApiError(error, 'Failed to update parameter')
       show(message, 'error')
     },
   })
@@ -149,9 +144,7 @@ export function useScriptParameters(id: Ref<string>) {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to delete parameter'
+        extractApiError(error, 'Failed to delete parameter')
       show(message, 'error')
     },
   })
@@ -177,9 +170,7 @@ export function useUpdateScript() {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to update script'
+        extractApiError(error, 'Failed to update script')
       show(message, 'error')
     },
   })
@@ -196,9 +187,7 @@ export function useDeprecateScript() {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to deprecate script'
+        extractApiError(error, 'Failed to deprecate script')
       show(message, 'error')
     },
   })

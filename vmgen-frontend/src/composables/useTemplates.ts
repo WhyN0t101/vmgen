@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { computed, type Ref } from 'vue'
 import { api } from '@/api/endpoints'
 import { useToast } from '@/composables/useToast'
-import type { TemplateResponse, TemplateListResponse, RegisterTemplateRequest, UpdateTemplateMetadataRequest, ScriptListItem } from '@/types'
+import { extractApiError } from '@/utils/apiError'
+import type { RegisterTemplateRequest, UpdateTemplateMetadataRequest } from '@/types'
 
 // Query keys
 export const TEMPLATE_KEYS = {
@@ -71,29 +72,6 @@ export function useActiveTemplates() {
   })
 }
 
-// Backward compatibility: Legacy useTemplates() for existing pages.
-// Maps to useActiveTemplates() but returns data in old Template[] format.
-export function useTemplates() {
-  const query = useActiveTemplates()
-  
-  return {
-    ...query,
-    data: computed(() => {
-      // Transform TemplateListResponse[] to legacy Template[] format
-      if (!query.data.value) return undefined
-      return query.data.value.map(t => ({
-        id: t.id,
-        name: t.identifier,
-        os_family: t.osFamily as any,
-        version: t.version,
-        arch: 'x86_64' as const, // Default, since we don't have arch in list response
-        capabilities: [], // Not available in list response
-        description: undefined,
-      }))
-    }),
-  }
-}
-
 /**
  * Public detail query for a single template by ID.
  */
@@ -114,17 +92,14 @@ export function useRegisterTemplate() {
 
   return useMutation({
     mutationFn: (data: RegisterTemplateRequest) => api.admin.registerTemplate(data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.lists() })
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.active() })
       show('Template registered successfully', 'success')
-      return data
     },
     onError: (error: any) => {
       const message =
-        error.response?.data?.errors?.join?.('\n') ??
-        error.response?.data?.message ??
-        'Failed to register template'
+        extractApiError(error, 'Failed to register template')
       show(message, 'error')
     },
   })
@@ -139,7 +114,7 @@ export function useValidateTemplate() {
 
   return useMutation({
     mutationFn: (id: string) => api.admin.validateTemplate(id),
-    onSuccess: (data, id) => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.lists() })
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.active() })
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.detail(id) })
@@ -147,9 +122,7 @@ export function useValidateTemplate() {
     },
     onError: (error: any) => {
       const message =
-        error.response?.data?.errors?.join?.('\n') ??
-        error.response?.data?.message ??
-        'Failed to validate template'
+        extractApiError(error, 'Failed to validate template')
       show(message, 'error')
     },
   })
@@ -165,15 +138,13 @@ export function useUpdateTemplateMetadata() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTemplateMetadataRequest }) =>
       api.admin.updateTemplateMetadata(id, data),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: TEMPLATE_KEYS.detail(variables.id) })
       show('Template metadata updated successfully', 'success')
     },
     onError: (error: any) => {
       const message =
-        error.response?.data?.errors?.join?.('\n') ??
-        error.response?.data?.message ??
-        'Failed to update template'
+        extractApiError(error, 'Failed to update template')
       show(message, 'error')
     },
   })
@@ -195,9 +166,7 @@ export function useDeprecateTemplate() {
     },
     onError: (error: any) => {
       const message =
-        error.response?.data?.errors?.join?.('\n') ??
-        error.response?.data?.message ??
-        'Failed to deprecate template'
+        extractApiError(error, 'Failed to deprecate template')
       show(message, 'error')
     },
   })
@@ -230,9 +199,7 @@ export function useAddTemplateCompatibleScript() {
     },
     onError: (error: any) => {
       const message =
-        error.response?.data?.errors?.join?.('\n') ??
-        error.response?.data?.message ??
-        'Failed to add script'
+        extractApiError(error, 'Failed to add script')
       show(message, 'error')
     },
   })
@@ -254,9 +221,7 @@ export function useRemoveTemplateCompatibleScript() {
     },
     onError: (error: any) => {
       const message =
-        error.response?.data?.errors?.join?.('\n') ??
-        error.response?.data?.message ??
-        'Failed to remove script'
+        extractApiError(error, 'Failed to remove script')
       show(message, 'error')
     },
   })

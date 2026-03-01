@@ -5,11 +5,12 @@ import type { BuildSpec } from '@/types'
 
 /**
  * Fetch the current user's VM build history for dashboard views.
+ * Returns paginated results; page defaults to 0, size to 20.
  */
-export function useBuilds() {
+export function useBuilds(page = 0, size = 20) {
   return useQuery({
-    queryKey: ['builds'],
-    queryFn: api.getUserBuilds,
+    queryKey: ['builds', page, size],
+    queryFn: () => api.getUserBuilds(page, size),
   })
 }
 
@@ -20,13 +21,11 @@ export function useBuilds() {
 export function useCreateBuild() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: (spec: BuildSpec) => api.createBuild(spec),
     onSuccess: (data) => {
-      // Invalidate builds list
       queryClient.invalidateQueries({ queryKey: ['builds'] })
-      // Navigate to status page
       router.push({ name: 'build-status', params: { requestId: data.id } })
     },
   })
@@ -38,17 +37,13 @@ export function useCreateBuild() {
  */
 export function useSubmitFlag() {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
     mutationFn: ({ requestId, flag }: { requestId: string; flag: string }) =>
       api.submitFlag(requestId, flag),
     onSuccess: (_, variables) => {
-      // Invalidate build status and builds list
       queryClient.invalidateQueries({ queryKey: ['build', variables.requestId] })
       queryClient.invalidateQueries({ queryKey: ['builds'] })
     },
   })
 }
-
-
-

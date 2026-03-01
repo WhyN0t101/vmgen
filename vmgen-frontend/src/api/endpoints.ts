@@ -30,8 +30,8 @@ export const api = {
     return apiRequest<Build>(`/api/builds/${id}`)
   },
 
-  getUserBuilds: async (): Promise<Build[]> => {
-    return apiRequest<Build[]>('/api/builds')
+  getUserBuilds: async (page = 0, size = 20): Promise<PagedResponse<Build>> => {
+    return apiRequest<PagedResponse<Build>>(`/api/builds?page=${page}&size=${size}`)
   },
 
   // Flags
@@ -232,9 +232,9 @@ export const api = {
 
     deleteScriptParameter: async (scriptId: string, parameterId: string): Promise<StatusResponse> => {
       return apiRequest<StatusResponse>(
-        `/api/admin/scripts/${scriptId}/parameters/${parameterId}/delete`,
+        `/api/admin/scripts/${scriptId}/parameters/${parameterId}`,
         {
-          method: 'POST',
+          method: 'DELETE',
         },
       )
     },

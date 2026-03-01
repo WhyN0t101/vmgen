@@ -1,16 +1,5 @@
 export type OsFamily = 'ubuntu' | 'debian' | 'kali-linux' | 'fedora' | 'centos' | 'windows' | 'linux'
 
-// Legacy Template interface (for backward compatibility with existing code)
-export interface Template {
-  id: string
-  name: string
-  os_family: OsFamily
-  version: string
-  arch: 'x86_64' | 'arm64'
-  capabilities: string[]
-  description?: string
-}
-
 // New Template Management interfaces (matching backend DTOs)
 export type TemplateStatus = 'draft' | 'validating' | 'active' | 'failed' | 'deprecated'
 export type Architecture = 'x64' | 'arm64'

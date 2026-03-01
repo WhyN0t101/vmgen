@@ -5,6 +5,7 @@ import { useBuildStatus } from '@/composables/useBuildStatus'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import { formatTimeAgoVerbose as formatTimeAgo } from '@/utils/dateFormat'
 
 const route = useRoute()
 const requestId = computed(() => route.params.requestId as string)
@@ -30,19 +31,6 @@ const isActive = computed(() =>
   build.value?.state === 'exporting'
 )
 
-function formatTimeAgo(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-}
 
 function formatBytes(bytes?: number) {
   if (!bytes) return ''

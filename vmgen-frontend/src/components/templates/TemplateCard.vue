@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { Template } from '@/types'
+import type { TemplateListResponse } from '@/types'
 import BaseCard from '@/components/ui/BaseCard.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
 import OsIcon from '@/components/ui/OsIcon.vue'
 
 interface Props {
-  template: Template
+  template: TemplateListResponse
   selected?: boolean
 }
 
@@ -14,7 +13,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  select: [template: Template]
+  select: [template: TemplateListResponse]
 }>()
 </script>
 
@@ -28,23 +27,13 @@ const emit = defineEmits<{
     @click="emit('select', template)"
   >
     <div class="flex items-start gap-3">
-      <OsIcon :os-family="template.os_family" :size="28" />
+      <OsIcon :os-family="template.osFamily" :size="28" />
       <div class="flex-1 min-w-0">
-        <h3 class="font-semibold text-slate-100 mb-1">{{ template.name }}</h3>
+        <h3 class="font-semibold text-slate-100 mb-1">{{ template.identifier }}</h3>
         <div class="flex items-center gap-2 text-sm text-slate-400 mb-2">
-          <span class="font-mono">{{ template.arch }}</span>
-          <span>•</span>
           <span>{{ template.version }}</span>
-        </div>
-        <div class="flex flex-wrap gap-1.5 mb-2">
-          <BaseBadge
-            v-for="cap in template.capabilities.slice(0, 3)"
-            :key="cap"
-            variant="info"
-            size="sm"
-          >
-            {{ cap.replace('_', ' ') }}
-          </BaseBadge>
+          <span>•</span>
+          <span class="capitalize">{{ template.osFamily }}</span>
         </div>
         <p v-if="template.description" class="text-xs text-slate-500 mt-2">
           {{ template.description }}
@@ -53,6 +42,3 @@ const emit = defineEmits<{
     </div>
   </BaseCard>
 </template>
-
-
-

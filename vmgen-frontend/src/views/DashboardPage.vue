@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBuilds } from '@/composables/useBuilds'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import { formatTimeAgo, formatTimestamp } from '@/utils/dateFormat'
 
 const router = useRouter()
-const { data: builds, isLoading } = useBuilds()
+const { data: buildsPage, isLoading } = useBuilds()
+const builds = computed(() => buildsPage.value?.content ?? [])
 
 const stateConfig = {
   queued: { label: 'Queued', color: 'info' },
@@ -16,31 +19,6 @@ const stateConfig = {
   failed: { label: 'Failed', color: 'danger' },
   archived: { label: 'Archived', color: 'default' },
 } as const
-
-function formatTimeAgo(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d ago`
-}
-
-function formatTimestamp(dateString: string) {
-  const date = new Date(dateString)
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 </script>
 
 <template>
@@ -62,7 +40,7 @@ function formatTimestamp(dateString: string) {
         <div v-for="i in 5" :key="i" class="h-20 bg-slate-900/60 rounded-lg animate-pulse" />
       </div>
 
-      <div v-else-if="builds && builds.length > 0" class="space-y-4">
+      <div v-else-if="builds.length > 0" class="space-y-4">
         <BaseCard
           v-for="build in builds"
           :key="build.id"

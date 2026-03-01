@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useTemplates, usePublicCompatibleScripts } from '@/composables/useTemplates'
+import { useActiveTemplates, usePublicCompatibleScripts } from '@/composables/useTemplates'
 import { useCreateBuild } from '@/composables/useBuilds'
 import TemplateSelector from '@/components/templates/TemplateSelector.vue'
 import VulnerabilitySelector from '@/components/vulnerabilities/VulnerabilitySelector.vue'
 import ConfigurationPanel from '@/components/generate/ConfigurationPanel.vue'
 import ScriptParameterInputs from '@/components/generate/ScriptParameterInputs.vue'
 import { api } from '@/api/endpoints'
-import type { Vulnerability, Template, ScriptParameter } from '@/types'
+import type { Vulnerability, TemplateListResponse, ScriptParameter } from '@/types'
 
 const selectedTemplateId = ref<string | undefined>(undefined)
 const selectedVulnIds = ref<string[]>([])
 const difficulty = ref<'easy' | 'medium' | 'hard'>('medium')
 const telemetryEnabled = ref(false)
 
-const { data: templates, isLoading: templatesLoading } = useTemplates()
+const { data: templates, isLoading: templatesLoading } = useActiveTemplates()
 const { data: compatibleScripts, isLoading: scriptsLoading } = usePublicCompatibleScripts(selectedTemplateId)
 const { mutate: createBuild, isPending: isCreating } = useCreateBuild()
 
@@ -101,7 +101,7 @@ watch(selectedVulnIds, async (newIds, oldIds) => {
   )
 })
 
-const selectedTemplate = computed<Template | undefined>(() =>
+const selectedTemplate = computed<TemplateListResponse | undefined>(() =>
   templates.value?.find(t => t.id === selectedTemplateId.value)
 )
 

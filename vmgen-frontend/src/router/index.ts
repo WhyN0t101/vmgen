@@ -98,7 +98,7 @@ const router = createRouter({
 })
 
 // Auth guard
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   try {
     const authStore = useAuthStore()
     
@@ -114,10 +114,10 @@ router.beforeEach((to, from, next) => {
     
     next()
   } catch (error) {
-    // Fallback: allow navigation but log error for debugging
+    // Fallback: redirect to login on guard error to avoid exposing protected routes
     // eslint-disable-next-line no-console
     console.error('Router guard error:', error)
-    next()
+    next({ name: 'login' })
   }
 })
 

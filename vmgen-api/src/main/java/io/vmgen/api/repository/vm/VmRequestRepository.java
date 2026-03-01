@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface VmRequestRepository extends JpaRepository<VmRequest, UUID> {
@@ -72,9 +74,9 @@ public interface VmRequestRepository extends JpaRepository<VmRequest, UUID> {
     List<VmRequest> findStaleJobs(@Param("states") List<VmRequestState> states, @Param("threshold") Instant threshold);
 
     /**
-     * Find jobs by user.
+     * Find jobs by user (paginated).
      */
-    List<VmRequest> findByUser_IdOrderBySubmittedAtDesc(UUID userId);
+    Page<VmRequest> findByUser_IdOrderBySubmittedAtDesc(UUID userId, Pageable pageable);
 
     /**
      * Find a VmRequest with its template eagerly loaded (avoids N+1 query).

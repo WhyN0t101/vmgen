@@ -16,7 +16,7 @@ import io.vmgen.api.models.script.ValidationRules;
 import io.vmgen.api.repository.script.ScriptParameterChoiceRepository;
 import io.vmgen.api.repository.script.ScriptParameterRepository;
 import io.vmgen.api.repository.script.ScriptRepository;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +41,7 @@ public class ScriptParameterService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ScriptParameterDto> listParameters(UUID scriptId) {
         scriptRepository.findById(scriptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Script not found: " + scriptId));

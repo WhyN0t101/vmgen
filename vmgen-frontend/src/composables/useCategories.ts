@@ -9,6 +9,7 @@ import type {
 } from '@/types'
 import { api } from '@/api/endpoints'
 import { useToast } from '@/composables/useToast'
+import { extractApiError } from '@/utils/apiError'
 
 /**
  * Admin-facing helpers for listing, creating/updating, deprecating and
@@ -20,11 +21,6 @@ export const CATEGORY_KEYS = {
   list: (activeOnly: boolean) => [...CATEGORY_KEYS.lists(), { activeOnly }] as const,
   details: () => [...CATEGORY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...CATEGORY_KEYS.details(), id] as const,
-}
-
-function showToast(message: string, type: 'success' | 'error' = 'success') {
-  // Simple console-based toast placeholder; can be replaced with real UI toasts.
-  console.log(`[${type.toUpperCase()}] ${message}`)
 }
 
 export function useCategoryList(activeOnly: boolean | Ref<boolean> = true) {
@@ -65,9 +61,7 @@ export function useCreateOrUpdateCategory() {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to save category'
+        extractApiError(error, 'Failed to save category')
       show(message, 'error')
     },
   })
@@ -85,9 +79,7 @@ export function useDeprecateCategory() {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to deprecate category'
+        extractApiError(error, 'Failed to deprecate category')
       show(message, 'error')
     },
   })
@@ -105,9 +97,7 @@ export function useReorderCategories() {
     },
     onError: (error: any) => {
       const message =
-        error?.response?.data?.errors?.join?.('\n') ??
-        error?.response?.data?.message ??
-        'Failed to reorder categories'
+        extractApiError(error, 'Failed to reorder categories')
       show(message, 'error')
     },
   })

@@ -2,14 +2,10 @@
 import { computed, ref } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import type {
-  CreateScriptParameterRequest,
-  ParameterType,
-  ValidationRules,
-  ValueSource,
-  CreateParameterChoice,
-} from '@/types'
+import ParameterFormFields from '@/components/admin/ParameterFormFields.vue'
+import type { CreateScriptParameterRequest } from '@/types'
 import { useToast } from '@/composables/useToast'
+import { cleanRules, defaultParameterForm } from '@/utils/parameterRules'
 
 const props = defineProps<{
   parameters: CreateScriptParameterRequest[]
@@ -24,37 +20,7 @@ const { show } = useToast()
 const editingIndex = ref<number | null>(null)
 const showForm = ref(false)
 
-const emptyForm = (): CreateScriptParameterRequest => ({
-  parameterName: '',
-  displayName: '',
-  description: '',
-  parameterType: 'STRING',
-  valueSource: 'USER_INPUT',
-  defaultValue: '',
-  isRequired: true,
-  validationRules: {},
-  randomConfig: {},
-  userCanOverride: false,
-  displayOrder: props.parameters?.length ?? 0,
-  choices: [],
-})
-
-const form = ref<CreateScriptParameterRequest>(emptyForm())
-
-const valueSourceOptions: { value: ValueSource; label: string }[] = [
-  { value: 'USER_INPUT', label: 'User input' },
-  { value: 'AUTO_RANDOM', label: 'Auto random' },
-  { value: 'AUTO_CHOICE', label: 'Auto choice' },
-  { value: 'USER_INPUT_OR_RANDOM', label: 'User input or random' },
-]
-
-const typeOptions: { value: ParameterType; label: string }[] = [
-  { value: 'STRING', label: 'String' },
-  { value: 'INTEGER', label: 'Integer' },
-  { value: 'CHOICE', label: 'Choice' },
-  { value: 'BOOLEAN', label: 'Boolean' },
-  { value: 'PATH', label: 'Path' },
-]
+const form = ref<CreateScriptParameterRequest>(defaultParameterForm())
 
 const hasNameConflict = computed(() => {
   const name = form.value.parameterName?.trim()
@@ -64,7 +30,7 @@ const hasNameConflict = computed(() => {
 
 function openCreate() {
   editingIndex.value = null
-  form.value = emptyForm()
+  form.value = defaultParameterForm(props.parameters?.length ?? 0)
   showForm.value = true
 }
 
@@ -79,40 +45,12 @@ function closeForm() {
   editingIndex.value = null
 }
 
-function addChoice() {
-  if (!form.value.choices) form.value.choices = []
-  const choice: CreateParameterChoice = {
-    value: '',
-    label: '',
-    description: '',
-    displayOrder: form.value.choices.length,
-  }
-  form.value.choices.push(choice)
-}
-
-function removeChoice(index: number) {
-  form.value.choices?.splice(index, 1)
-}
-
 function deleteParam(index: number) {
   const next = [...(props.parameters ?? [])]
   next.splice(index, 1)
   emit('update:parameters', next)
 }
 
-function cleanRules(type: ParameterType, rules: ValidationRules | undefined): ValidationRules | undefined {
-  if (!rules) return undefined
-  const out: ValidationRules = {}
-  if (type === 'INTEGER') {
-    if (rules.min != null && rules.min !== ('' as any)) out.min = Number(rules.min)
-    if (rules.max != null && rules.max !== ('' as any)) out.max = Number(rules.max)
-  } else if (type === 'STRING' || type === 'PATH') {
-    if (rules.minLength != null && rules.minLength !== ('' as any)) out.minLength = Number(rules.minLength)
-    if (rules.maxLength != null && rules.maxLength !== ('' as any)) out.maxLength = Number(rules.maxLength)
-    if (rules.pattern?.trim()) out.pattern = rules.pattern.trim()
-  }
-  return Object.keys(out).length > 0 ? out : undefined
-}
 
 function save() {
   if (!form.value.displayName?.trim() || !form.value.parameterName?.trim()) {
@@ -180,21 +118,15 @@ function save() {
               {{ param.parameterName }}
             </span>
           </div>
-          <p v-if="param.description" class="text-xs text-slate-400">
-            {{ param.description }}
-          </p>
+          <p v-if="param.description" class="text-xs text-slate-400">{{ param.description }}</p>
           <p class="text-[11px] text-slate-500">
             {{ param.parameterType }} · {{ param.valueSource }}
             <span v-if="param.isRequired" class="ml-1 text-red-400">· required</span>
           </p>
         </div>
         <div class="flex gap-2 shrink-0">
-          <BaseButton type="button" size="sm" variant="secondary" @click="openEdit(idx)">
-            Edit
-          </BaseButton>
-          <BaseButton type="button" size="sm" variant="ghost" @click="deleteParam(idx)">
-            Delete
-          </BaseButton>
+          <BaseButton type="button" size="sm" variant="secondary" @click="openEdit(idx)">Edit</BaseButton>
+          <BaseButton type="button" size="sm" variant="ghost" @click="deleteParam(idx)">Delete</BaseButton>
         </div>
       </div>
     </div>
@@ -209,132 +141,15 @@ function save() {
         </button>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-2">
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Display name</label>
-          <input
-            v-model="form.displayName"
-            type="text"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Parameter name</label>
-          <input
-            v-model="form.parameterName"
-            type="text"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 font-mono"
-            placeholder="DATABASE_PASSWORD"
-          />
-          <p v-if="hasNameConflict" class="mt-1 text-[11px] text-red-400">
-            Parameter name already used.
-          </p>
-        </div>
-      </div>
-
-      <div>
-        <label class="mb-1 block text-xs font-medium text-slate-400">Description</label>
-        <textarea
-          v-model="form.description"
-          rows="2"
-          class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-        />
-      </div>
-
-      <div class="grid gap-4 md:grid-cols-3">
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Type</label>
-          <select
-            v-model="form.parameterType"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-          >
-            <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Value source</label>
-          <select
-            v-model="form.valueSource"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-          >
-            <option v-for="opt in valueSourceOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
-        </div>
-        <div class="flex items-center gap-2 pt-5">
-          <input v-model="form.isRequired" type="checkbox" class="rounded border-slate-600 bg-slate-900" />
-          <span class="text-xs text-slate-300">Required</span>
-        </div>
-      </div>
-
-      <div v-if="form.valueSource === 'USER_INPUT' || form.valueSource === 'USER_INPUT_OR_RANDOM'">
-        <label class="mb-1 block text-xs font-medium text-slate-400">Default value (optional)</label>
-        <input
-          v-model="form.defaultValue"
-          type="text"
-          class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-        />
-      </div>
-
-      <!-- Validation rules for STRING / PATH -->
-      <div
-        v-if="form.parameterType === 'STRING' || form.parameterType === 'PATH'"
-        class="grid gap-4 md:grid-cols-2"
-      >
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Min length (optional)</label>
-          <input
-            v-model.number="form.validationRules!.minLength"
-            type="number"
-            min="0"
-            placeholder="No minimum"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Max length (optional)</label>
-          <input
-            v-model.number="form.validationRules!.maxLength"
-            type="number"
-            min="0"
-            placeholder="No maximum"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-          />
-        </div>
-      </div>
-
-      <!-- Validation rules for INTEGER -->
-      <div v-if="form.parameterType === 'INTEGER'" class="grid gap-4 md:grid-cols-2">
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Min value (optional)</label>
-          <input
-            v-model.number="form.validationRules!.min"
-            type="number"
-            placeholder="No minimum"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-slate-400">Max value (optional)</label>
-          <input
-            v-model.number="form.validationRules!.max"
-            type="number"
-            placeholder="No maximum"
-            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-          />
-        </div>
-      </div>
+      <ParameterFormFields
+        v-model="form"
+        :has-name-conflict="hasNameConflict"
+      />
 
       <div class="flex justify-end gap-2">
         <BaseButton type="button" variant="ghost" size="sm" @click="closeForm">Cancel</BaseButton>
-        <BaseButton type="button" size="sm" :disabled="hasNameConflict" @click="save">
-          Save
-        </BaseButton>
+        <BaseButton type="button" size="sm" :disabled="hasNameConflict" @click="save">Save</BaseButton>
       </div>
     </div>
   </BaseCard>
 </template>
-

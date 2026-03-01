@@ -49,6 +49,15 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(ParameterValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleParameterValidation(ParameterValidationException ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of(
+                        "message", ex.getPublicMessage(),
+                        "errors", ex.getErrors()
+                ));
+    }
+
     @ExceptionHandler(TemplateNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleTemplateNotFound(TemplateNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)

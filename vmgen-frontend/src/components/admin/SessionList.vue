@@ -4,6 +4,7 @@ import { useActiveSessions, useRevokeSession, useRevokeAllUserSessions } from '@
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import { formatTimeAgo, formatTimestamp } from '@/utils/dateFormat'
 
 const { data: sessions, isLoading } = useActiveSessions()
 const { mutate: revokeSession, isPending: isRevoking } = useRevokeSession()
@@ -18,28 +19,6 @@ type ConfirmState =
 
 const confirmState = ref<ConfirmState | null>(null)
 
-function formatTimeAgo(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d ago`
-}
-
-function formatTimestamp(dateString: string) {
-  return new Date(dateString).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function handleRevokeSession(sessionId: string, userId: string) {
   // Allow revoking own session (it's just logging out, which is fine)

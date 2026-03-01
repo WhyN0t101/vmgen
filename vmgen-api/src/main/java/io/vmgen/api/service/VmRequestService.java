@@ -3,6 +3,7 @@ package io.vmgen.api.service;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.BuildScriptDto;
 import io.vmgen.api.dto.build.CreateBuildRequest;
+import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.dto.script.ScriptSelectionResult;
 import io.vmgen.api.exceptions.CircularDependencyException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
@@ -29,6 +30,8 @@ import jakarta.transaction.Transactional;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -186,13 +189,18 @@ public class VmRequestService {
     }
 
     /**
-     * Returns all builds for the given user, most recent first.
+     * Returns builds for the given user, most recent first, paginated.
+     * Defaults to page 0, 20 items per page.
      */
     @Transactional
-    public List<BuildResponse> getUserBuilds(User user) {
-        return vmRequestRepository.findByUser_IdOrderBySubmittedAtDesc(user.getId()).stream()
+    public PagedResponse<BuildResponse> getUserBuilds(User user, int page, int size) {
+        Page<VmRequest> paged = vmRequestRepository.findByUser_IdOrderBySubmittedAtDesc(
+                user.getId(), PageRequest.of(page, size));
+        List<BuildResponse> content = paged.getContent().stream()
                 .map(r -> toResponse(r, loadScripts(r), getScriptOrderFromRequest(r)))
                 .toList();
+        return new PagedResponse<>(content, paged.getNumber(), paged.getSize(),
+                paged.getTotalElements(), paged.getTotalPages(), paged.isLast());
     }
 
     /**
