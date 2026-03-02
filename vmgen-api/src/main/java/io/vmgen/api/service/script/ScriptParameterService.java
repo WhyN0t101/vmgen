@@ -8,6 +8,7 @@ import io.vmgen.api.dto.script.UpdateScriptParameterRequest;
 import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.exceptions.ParameterValidationException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
+import io.vmgen.api.exceptions.ValidationException;
 import io.vmgen.api.models.script.*;
 import io.vmgen.api.repository.script.ScriptParameterChoiceRepository;
 import io.vmgen.api.repository.script.ScriptParameterRepository;
@@ -159,6 +160,12 @@ public class ScriptParameterService {
         parameter.setValueSource(valueSource);
         parameter.setDefaultValue(defaultValue);
         parameter.setIsRequired(isRequired != null ? isRequired : Boolean.TRUE);
+        if (validationRules != null && validationRules.getPattern() != null) {
+            try { java.util.regex.Pattern.compile(validationRules.getPattern()); }
+            catch (java.util.regex.PatternSyntaxException e) {
+                throw new ValidationException("Validation failed", List.of("Invalid regex pattern: " + e.getMessage()));
+            }
+        }
         parameter.setValidationRules(validationRules);
         parameter.setRandomConfig(randomConfig);
         parameter.setUserCanOverride(userCanOverride != null ? userCanOverride : Boolean.FALSE);

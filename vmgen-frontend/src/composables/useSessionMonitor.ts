@@ -1,11 +1,7 @@
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useSessionStore } from '@/stores/session'
 import { useToast } from '@/composables/useToast'
-
-let warningTimeoutId: number | null = null
-let expiryTimeoutId: number | null = null
-const warningShown = ref(false)
 
 /**
  * Track a single JWT/session expiry on the client and show a toast
@@ -14,6 +10,7 @@ const warningShown = ref(false)
 export function useSessionMonitor() {
   const router = useRouter()
   const authStore = useAuthStore()
+  const sessionStore = useSessionStore()
   const { show } = useToast()
 
   function startMonitoring(expiresAt: string) {
@@ -28,17 +25,17 @@ export function useSessionMonitor() {
     const warningTime = timeUntilExpiry - (5 * 60 * 1000)
 
     if (warningTime > 0) {
-      warningTimeoutId = window.setTimeout(() => {
-        if (!warningShown.value && authStore.isAuthenticated) {
+      sessionStore.warningTimeoutId = window.setTimeout(() => {
+        if (!sessionStore.warningShown && authStore.isAuthenticated) {
           show('Your session will expire in 5 minutes. Save your work.', 'warning')
-          warningShown.value = true
+          sessionStore.warningShown = true
         }
       }, warningTime)
     }
 
     // Handle actual expiration
     if (timeUntilExpiry > 0) {
-      expiryTimeoutId = window.setTimeout(() => {
+      sessionStore.expiryTimeoutId = window.setTimeout(() => {
         if (authStore.isAuthenticated) {
           authStore.logout()
           show('Your session has expired. Please log in again.', 'info')
@@ -60,15 +57,7 @@ export function useSessionMonitor() {
   }
 
   function stopMonitoring() {
-    if (warningTimeoutId !== null) {
-      clearTimeout(warningTimeoutId)
-      warningTimeoutId = null
-    }
-    if (expiryTimeoutId !== null) {
-      clearTimeout(expiryTimeoutId)
-      expiryTimeoutId = null
-    }
-    warningShown.value = false
+    sessionStore.clearTimeouts()
   }
 
   return {
