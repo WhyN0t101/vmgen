@@ -3,6 +3,7 @@ package io.vmgen.api.service;
 import io.vmgen.api.config.RateLimitProperties;
 import io.vmgen.api.exceptions.RateLimitExceededException;
 import io.vmgen.api.utils.RateLimiter;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -29,8 +30,9 @@ public class RateLimitService {
     }
 
     /**
-     * Cleanup expired rate limit buckets (call from scheduled task).
+     * Cleanup expired rate limit buckets. Runs every 10 minutes via the Spring scheduler.
      */
+    @Scheduled(fixedRate = 600_000)
     public void cleanup() {
         loginRateLimiter.cleanup();
     }

@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
@@ -48,6 +48,14 @@ export function useSessionMonitor() {
           })
         }
       }, timeUntilExpiry)
+    } else if (authStore.isAuthenticated) {
+      // Token is already expired (e.g. page loaded with a stale stored session).
+      authStore.logout()
+      show('Your session has expired. Please log in again.', 'info')
+      router.push({
+        path: '/login',
+        query: { redirect: router.currentRoute.value.fullPath }
+      })
     }
   }
 

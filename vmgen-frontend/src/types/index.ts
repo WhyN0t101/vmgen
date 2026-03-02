@@ -1,3 +1,8 @@
+/** Typed error thrown by apiRequest and auth.login — shape expected by extractApiError. */
+export interface ApiError extends Error {
+  response: { status: number; data: Record<string, unknown> }
+}
+
 export type OsFamily = 'ubuntu' | 'debian' | 'kali-linux' | 'fedora' | 'centos' | 'windows' | 'linux'
 
 // New Template Management interfaces (matching backend DTOs)

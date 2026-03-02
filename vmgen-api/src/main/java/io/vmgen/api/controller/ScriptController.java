@@ -1,7 +1,6 @@
 package io.vmgen.api.controller;
 
 import io.vmgen.api.dto.script.ScriptParameterDto;
-import io.vmgen.api.models.script.ValueSource;
 import io.vmgen.api.service.script.ScriptParameterService;
 import java.util.List;
 import java.util.UUID;
@@ -21,17 +20,9 @@ public class ScriptController {
 
     private final ScriptParameterService parameterService;
 
-    /**
-     * Returns only the parameters that require explicit user input for the given script.
-     * AUTO_RANDOM and AUTO_CHOICE parameters are resolved by the worker and are not shown.
-     */
+
     @GetMapping("/{id}/parameters")
     public ResponseEntity<List<ScriptParameterDto>> getUserInputParameters(@PathVariable UUID id) {
-        List<ScriptParameterDto> all = parameterService.listParameters(id);
-        List<ScriptParameterDto> userFacing = all.stream()
-                .filter(p -> p.getValueSource() == ValueSource.USER_INPUT
-                        || p.getValueSource() == ValueSource.USER_INPUT_OR_RANDOM)
-                .toList();
-        return ResponseEntity.ok(userFacing);
+        return ResponseEntity.ok(parameterService.listUserInputParameters(id));
     }
 }

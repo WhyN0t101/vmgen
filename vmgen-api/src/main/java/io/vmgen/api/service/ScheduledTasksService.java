@@ -1,11 +1,14 @@
 package io.vmgen.api.service;
 
 import java.time.Duration;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 
 @Service
+@RequiredArgsConstructor
 public class ScheduledTasksService {
     private final SessionService sessionService;
     private final RateLimitService rateLimitService;
@@ -13,11 +16,6 @@ public class ScheduledTasksService {
 
     private static final Duration IDLE_TIMEOUT = Duration.ofHours(24);
 
-    public ScheduledTasksService(SessionService sessionService, RateLimitService rateLimitService, WorkerService workerService) {
-        this.sessionService = sessionService;
-        this.rateLimitService = rateLimitService;
-        this.workerService = workerService;
-    }
 
     @Scheduled(fixedDelay = 300_000) // Every 5 minutes
     public void cleanupSessions() {
@@ -28,6 +26,7 @@ public class ScheduledTasksService {
     public void cleanupRateLimits() {
         rateLimitService.cleanup();
     }
+
     @Scheduled(fixedDelay = 60_000) // Every 1 minute
     public void detectStaleBuilds() {
         workerService.markStaleJobsAsFailed(Duration.ofMinutes(10));

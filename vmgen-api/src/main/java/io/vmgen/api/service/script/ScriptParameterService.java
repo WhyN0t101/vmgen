@@ -8,11 +8,7 @@ import io.vmgen.api.dto.script.UpdateScriptParameterRequest;
 import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.exceptions.ParameterValidationException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
-import io.vmgen.api.models.script.ParameterType;
-import io.vmgen.api.models.script.RandomConfig;
-import io.vmgen.api.models.script.ScriptParameter;
-import io.vmgen.api.models.script.ScriptParameterChoice;
-import io.vmgen.api.models.script.ValidationRules;
+import io.vmgen.api.models.script.*;
 import io.vmgen.api.repository.script.ScriptParameterChoiceRepository;
 import io.vmgen.api.repository.script.ScriptParameterRepository;
 import io.vmgen.api.repository.script.ScriptRepository;
@@ -25,8 +21,9 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
+
+import static io.vmgen.api.models.script.ValueSource.USER_INPUT;
 
 
 @Service
@@ -41,8 +38,13 @@ public class ScriptParameterService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
 
+    /**
+     * Lists all parameters for the given script, ordered by display order.
+     * Throws {@link ResourceNotFoundException} if the script does not exist.
+     */
     @Transactional(readOnly = true)
     public List<ScriptParameterDto> listParameters(UUID scriptId) {
+
         scriptRepository.findById(scriptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Script not found: " + scriptId));
 
@@ -51,9 +53,25 @@ public class ScriptParameterService {
                 .toList();
     }
 
+    /**
+     * Lists only user-facing parameters for the given script.
+     * Filters to {@link ValueSource#USER_INPUT} and {@link ValueSource#USER_INPUT_OR_RANDOM} sources.
+     */
+    @Transactional(readOnly = true)
+    public List<ScriptParameterDto> listUserInputParameters(UUID scriptId) {
+        return listParameters(scriptId).stream()
+                .filter(p -> p.getValueSource() == USER_INPUT
+                        || p.getValueSource() == ValueSource.USER_INPUT_OR_RANDOM)
+                .toList();
+    }
+
+    /**
+     * Creates a new parameter for the given script.
+     * Throws {@link ConflictException} if a parameter with the same name already exists.
+     */
     @Transactional
     public ScriptParameterDto createParameter(UUID scriptId, CreateScriptParameterRequest request) {
-        var script = scriptRepository.findById(scriptId)
+        Script script = scriptRepository.findById(scriptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Script not found: " + scriptId));
 
         if (parameterRepository.existsByScript_IdAndParameterName(scriptId, request.getParameterName())) {
@@ -77,6 +95,10 @@ public class ScriptParameterService {
         return toDto(saved);
     }
 
+    /**
+     * Updates an existing parameter. Replaces choices entirely if provided in the request.
+     * Throws {@link ConflictException} if the parameter does not belong to the given script.
+     */
     @Transactional
     public ScriptParameterDto updateParameter(UUID scriptId, UUID parameterId, UpdateScriptParameterRequest request) {
         ScriptParameter existing = parameterRepository.findById(parameterId)
@@ -102,6 +124,10 @@ public class ScriptParameterService {
         return toDto(saved);
     }
 
+    /**
+     * Deletes a parameter and its associated choices via orphan removal.
+     * Throws {@link ConflictException} if the parameter does not belong to the given script.
+     */
     @Transactional
     public void deleteParameter(UUID scriptId, UUID parameterId) {
         ScriptParameter existing = parameterRepository.findById(parameterId)
@@ -119,7 +145,7 @@ public class ScriptParameterService {
             String displayName,
             String description,
             ParameterType parameterType,
-            io.vmgen.api.models.script.ValueSource valueSource,
+            ValueSource valueSource,
             String defaultValue,
             Boolean isRequired,
             ValidationRules validationRules,
@@ -139,21 +165,17 @@ public class ScriptParameterService {
         parameter.setDisplayOrder(displayOrder != null ? displayOrder : 0);
     }
 
-    private List<ScriptParameterChoice> persistChoices(
-            ScriptParameter parameter,
-            List<ScriptParameterChoiceDefinition> definitions
-    ) {
-        List<ScriptParameterChoice> choices = new ArrayList<>();
-        for (ScriptParameterChoiceDefinition def : definitions) {
+    private List<ScriptParameterChoice> persistChoices(ScriptParameter parameter, List<ScriptParameterChoiceDefinition> definitions) {
+        List<ScriptParameterChoice> choices = definitions.stream().map(def -> {
             ScriptParameterChoice choice = new ScriptParameterChoice();
             choice.setParameter(parameter);
             choice.setChoiceValue(def.getValue());
             choice.setChoiceLabel(def.getLabel());
             choice.setDescription(def.getDescription());
             choice.setDisplayOrder(def.getDisplayOrder() != null ? def.getDisplayOrder() : 0);
-            choices.add(choiceRepository.save(choice));
-        }
-        return choices;
+            return choice;
+        }).toList();
+        return choiceRepository.saveAll(choices);
     }
 
     private ScriptParameterDto toDto(ScriptParameter parameter) {
@@ -257,7 +279,7 @@ public class ScriptParameterService {
         String raw = userValues.get(param.getParameterName());
 
         if ((raw == null || raw.isBlank()) && Boolean.TRUE.equals(param.getIsRequired())
-                && param.getValueSource() == io.vmgen.api.models.script.ValueSource.USER_INPUT) {
+                && param.getValueSource() == USER_INPUT) {
             throw new ParameterValidationException(
                     param.getDisplayName() + " is required");
         }
@@ -412,7 +434,7 @@ public class ScriptParameterService {
         return sb.toString();
     }
 
-    private static @NonNull String getAlphabet(RandomConfig config) {
+    private static String getAlphabet(RandomConfig config) {
         String charset = config.getCharset() != null ? config.getCharset() : "alphanumeric";
         return switch (charset) {
             case "alphanumeric_special" ->

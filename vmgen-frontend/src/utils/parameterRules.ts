@@ -37,7 +37,15 @@ export function cleanRules(
   } else if (type === 'STRING' || type === 'PATH') {
     if (rules.minLength != null && rules.minLength !== ('' as any)) out.minLength = Number(rules.minLength)
     if (rules.maxLength != null && rules.maxLength !== ('' as any)) out.maxLength = Number(rules.maxLength)
-    if (rules.pattern?.trim()) out.pattern = rules.pattern.trim()
+    if (rules.pattern?.trim()) {
+      const trimmed = rules.pattern.trim()
+      try {
+        new RegExp(trimmed) // validate it compiles before persisting
+        out.pattern = trimmed
+      } catch {
+        // invalid regex — skip silently; backend will reject on parameter submission
+      }
+    }
   }
   return Object.keys(out).length > 0 ? out : undefined
 }

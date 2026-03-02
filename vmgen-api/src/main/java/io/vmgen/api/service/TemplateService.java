@@ -335,7 +335,7 @@ public class TemplateService {
                     template.getId(), e.getMessage());
         }
 
-        template.setSha256Hash("pending-worker-validation-" + UUID.randomUUID().toString().replace("-", ""));
+        template.setSha256Hash("PENDING");
         template.setValidatedBy(admin);
         template.setValidatedAt(Instant.now());
         template.setLastValidatedAt(Instant.now());

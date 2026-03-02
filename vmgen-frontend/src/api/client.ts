@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/auth'
+import type { ApiError } from '@/types'
 
 const _configuredUrl = import.meta.env.VITE_API_URL
 if (!_configuredUrl && import.meta.env.PROD) {
@@ -50,14 +51,14 @@ export async function apiRequest<T>(
       }
       
       // Create a proper error object
-      const error = new Error(message) as any
+      const error = new Error(message) as ApiError
       error.response = { status: 401, data: errorData }
       throw error
     }
-    
+
     // Handle other errors
     const errorData = await response.json().catch(() => ({}))
-    const error = new Error(errorData.message || `API Error: ${response.statusText}`) as any
+    const error = new Error(errorData.message || `API Error: ${response.statusText}`) as ApiError
     error.response = { status: response.status, data: errorData }
     throw error
   }

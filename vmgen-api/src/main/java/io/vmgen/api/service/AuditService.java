@@ -108,6 +108,7 @@ public class AuditService {
             Map<String, Object> merged = extraMetadata;
             if (ctx != null && ctx.metadata() != null && !ctx.metadata().isEmpty()) {
                 merged = new HashMap<>(extraMetadata);
+                // ctx.metadata() takes priority over extraMetadata for same-keyed entries.
                 merged.putAll(ctx.metadata());
             }
             auditLog.setMetadataJson(toJsonSafe(merged));

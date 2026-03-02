@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { User } from '@/types'
+import type { User, ApiError } from '@/types'
 
 // Resolved once at module load — mirrors the same logic in api/client.ts.
 // Cannot import API_BASE from client.ts because client.ts imports this store (circular).
@@ -29,7 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      const error = new Error(errorData.message || 'Login failed') as any
+      const error = new Error(errorData.message || 'Login failed') as ApiError
       error.response = { status: response.status, data: errorData }
       throw error
     }

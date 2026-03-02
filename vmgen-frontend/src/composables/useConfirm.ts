@@ -14,6 +14,12 @@ let resolveFn: ((confirmed: boolean) => void) | null = null
 
 export function useConfirm() {
   function confirm(opts: ConfirmOptions): Promise<boolean> {
+    // Resolve any pending confirmation as cancelled to prevent promise deadlock.
+    if (resolveFn) {
+      resolveFn(false)
+      resolveFn = null
+    }
+
     options.value = {
       confirmLabel: 'Confirm',
       cancelLabel: 'Cancel',

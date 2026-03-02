@@ -17,6 +17,7 @@ import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 
@@ -100,7 +101,7 @@ public class UserService {
      * {@link #EXHAUSTED_BUILDS_THRESHOLD} or more builds where failed attempts
      * reached {@link #MAX_FLAG_FAILURES_PER_BUILD}.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public void recordFlagFailure(UUID buildId, UUID userId) {
         vmRequestRepository.incrementFlagFailures(buildId);
         long exhausted = vmRequestRepository.countExhaustedBuilds(userId, MAX_FLAG_FAILURES_PER_BUILD);

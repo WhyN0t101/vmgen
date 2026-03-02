@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -87,6 +88,12 @@ public class SecurityConfig {
 
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
+                )
+
+                // Security headers: deny framing (clickjacking) and disable MIME sniffing.
+                .headers(headers -> headers
+                        .frameOptions(fo -> fo.deny())
+                        .contentTypeOptions(Customizer.withDefaults())
                 )
 
                 // Add filters - use UsernamePasswordAuthenticationFilter as anchor

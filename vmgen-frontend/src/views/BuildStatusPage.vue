@@ -22,7 +22,7 @@ const stateConfig = {
 
 const stateInfo = computed(() => {
   if (!build.value) return null
-  return stateConfig[build.value.state]
+  return stateConfig[build.value.state as keyof typeof stateConfig] ?? null
 })
 
 const isActive = computed(() =>

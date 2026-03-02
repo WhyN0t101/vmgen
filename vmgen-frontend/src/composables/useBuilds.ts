@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/endpoints'
+import { useToast } from '@/composables/useToast'
+import { extractApiError } from '@/utils/apiError'
 import type { BuildSpec } from '@/types'
 
 /**
@@ -37,6 +39,7 @@ export function useCreateBuild() {
  */
 export function useSubmitFlag() {
   const queryClient = useQueryClient()
+  const { show } = useToast()
 
   return useMutation({
     mutationFn: ({ requestId, flag }: { requestId: string; flag: string }) =>
@@ -44,6 +47,9 @@ export function useSubmitFlag() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['build', variables.requestId] })
       queryClient.invalidateQueries({ queryKey: ['builds'] })
+    },
+    onError: (error) => {
+      show(extractApiError(error, 'Flag submission failed. Please try again.'), 'error')
     },
   })
 }

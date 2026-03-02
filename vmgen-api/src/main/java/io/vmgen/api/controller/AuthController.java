@@ -43,7 +43,6 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
-        // Rate limiting: check before processing login
         String clientIp = getClientIp(http);
         rateLimitService.checkLoginRateLimit(clientIp);
         
