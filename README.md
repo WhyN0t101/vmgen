@@ -1,10 +1,10 @@
-# VMGen - Vulnerable VM Generation Platform
+# VVMGen - Vulnerable VM Generation Platform
 
 A platform for generating deterministic, reproducible virtual machines for cybersecurity education and training. Build vulnerable training environments with full provenance tracking and isolated execution.
 
 ## Project Concept
 
-VMGen enables educators and security researchers to:
+VVMGen enables educators and security researchers to:
 
 - **Generate Vulnerable VMs**: Create virtual machines with specific vulnerabilities for training purposes
 - **Deterministic Builds**: Same configuration always produces the same VM (reproducible)
