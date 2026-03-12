@@ -2,8 +2,8 @@ package io.vmgen.api.controller;
 
 import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.dto.script.ScriptListDto;
+import io.vmgen.api.dto.template.PublicTemplateResponse;
 import io.vmgen.api.dto.template.TemplateListResponse;
-import io.vmgen.api.dto.template.TemplateResponse;
 import io.vmgen.api.service.TemplateService;
 import java.util.List;
 import java.util.UUID;
@@ -37,9 +37,8 @@ public class TemplateController {
     }
     
     @GetMapping("/{id}")
-    public ResponseEntity<TemplateResponse> getTemplate(@PathVariable UUID id) {
-        TemplateResponse response = templateService.getTemplate(id);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<PublicTemplateResponse> getTemplate(@PathVariable UUID id) {
+        return ResponseEntity.ok(templateService.getPublicTemplate(id));
     }
 
     @GetMapping("/{id}/scripts")

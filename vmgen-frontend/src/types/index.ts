@@ -365,14 +365,17 @@ export interface Build {
   ovaSizeBytes?: number
 }
 
-export interface Provenance {
-  request_id: string
-  template: { id: string; version: string; sha256: string }
-  vulnerabilities: Array<{ id: string; version: string }>
-  parameters: { difficulty: string; telemetry_enabled: boolean }
-  seed: number
-  build_timestamp: string
-  ova_sha256: string
+export interface ProvenanceResponse {
+  buildId: string
+  templateIdentifier: string
+  templateVersion: string
+  templateSha256: string
+  buildSeed: string
+  difficultyLevel?: string
+  telemetryEnabled: boolean
+  ovaSha256: string
+  flagDerivationTimestamp: string
+  finalisedAt: string
 }
 
 export interface User {

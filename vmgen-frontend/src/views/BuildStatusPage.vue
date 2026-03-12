@@ -1,15 +1,40 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useBuildStatus } from '@/composables/useBuildStatus'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import { formatTimeAgoVerbose as formatTimeAgo } from '@/utils/dateFormat'
+import { api } from '@/api/endpoints'
 
 const route = useRoute()
 const requestId = computed(() => route.params.requestId as string)
 const { data: build, isLoading } = useBuildStatus(requestId)
+
+const downloading = ref(false)
+const downloadingProvenance = ref(false)
+
+async function downloadOva() {
+  if (!build.value) return
+  downloading.value = true
+  try {
+    const filename = build.value.ovaFilename ?? `vm-${build.value.id}.ova`
+    await api.downloadBuild(build.value.id, filename)
+  } finally {
+    downloading.value = false
+  }
+}
+
+async function downloadManifest() {
+  if (!build.value) return
+  downloadingProvenance.value = true
+  try {
+    await api.downloadProvenance(build.value.id)
+  } finally {
+    downloadingProvenance.value = false
+  }
+}
 
 const stateConfig = {
   queued: { label: 'Queued', color: 'info', icon: '⏳' },
@@ -114,12 +139,16 @@ function formatBytes(bytes?: number) {
               <p v-if="build.ovaSha256" class="text-xs text-slate-600 font-mono truncate mb-2">
                 SHA256: {{ build.ovaSha256 }}
               </p>
-              <BaseButton class="w-full mt-2">Download OVA</BaseButton>
+              <BaseButton class="w-full mt-2" :disabled="downloading" @click="downloadOva">
+                {{ downloading ? 'Downloading…' : 'Download OVA' }}
+              </BaseButton>
             </div>
 
             <div class="bg-slate-800/60 rounded-lg p-4">
               <span class="text-slate-300 font-mono text-sm">provenance-{{ build.id }}.json</span>
-              <BaseButton variant="secondary" class="w-full mt-2">Download Manifest</BaseButton>
+              <BaseButton variant="secondary" class="w-full mt-2" :disabled="downloadingProvenance" @click="downloadManifest">
+                {{ downloadingProvenance ? 'Downloading…' : 'Download Manifest' }}
+              </BaseButton>
             </div>
           </div>
 

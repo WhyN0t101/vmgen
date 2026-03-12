@@ -75,11 +75,12 @@ public class AuthService {
      * Throws {@link ValidationException} on conflict.
      */
     private void validateRegistration(RegisterRequest req) {
-        if (userRepository.findByUsernameIgnoreCase(req.username()).isPresent()) {
-            throw new ValidationException("Validation failed", List.of("Username already in use"));
-        }
-        if (userRepository.findByEmailIgnoreCase(req.email()).isPresent()) {
-            throw new ValidationException("Validation failed", List.of("Email already in use"));
+        boolean usernameTaken = userRepository.findByUsernameIgnoreCase(req.username()).isPresent();
+        boolean emailTaken    = userRepository.findByEmailIgnoreCase(req.email()).isPresent();
+        if (usernameTaken || emailTaken) {
+            // Generic message prevents revealing which field is already registered.
+            throw new ValidationException("Validation failed",
+                    List.of("An account with this username or email is already registered"));
         }
     }
 

@@ -1,8 +1,6 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
-
 from dotenv import load_dotenv
 
 @dataclass
@@ -20,6 +18,9 @@ class ProxmoxConfig:
     token_secret: str
     verify_ssl: bool
     node: str
+    isolated_bridge: str
+    ssh_user: str             
+    ssh_key_path: str        
 
 @dataclass
 class BackendConfig:
@@ -39,6 +40,9 @@ class Config:
     worker: WorkerConfig
     backend: BackendConfig
     platform_secret: str
+    export_path: str           # filesystem path where OVAs are written (must be NFS-accessible from worker)
+    vm_ssh_password: str = ""  # used when template sshAuthMethod = "password_reset"
+    vm_static_key_path: str = ""  # used when template sshAuthMethod = "static_key"
     log_level: str = "INFO"
 
     @classmethod
@@ -60,6 +64,9 @@ class Config:
             token_secret=os.getenv("PROXMOX_TOKEN_SECRET", ""),
             verify_ssl=os.getenv("PROXMOX_VERIFY_SSL", "true").lower() == "true",
             node=os.getenv("PROXMOX_NODE", "pve"),
+            isolated_bridge=os.getenv("PROXMOX_ISOLATED_BRIDGE", "vmbr1"),
+            ssh_user=os.getenv("PROXMOX_SSH_USER", "root"),
+            ssh_key_path=os.getenv("PROXMOX_SSH_KEY_PATH", ""),
         )
 
         worker = WorkerConfig(
@@ -75,9 +82,12 @@ class Config:
             database=database,
             proxmox=proxmox,
             worker=worker,
-            platform_secret=os.getenv("PLATFORM_SECRET", ""),
-            log_level=os.getenv("LOG_LEVEL", "INFO"),
             backend=backend,
+            platform_secret=os.getenv("PLATFORM_SECRET", ""),
+            export_path=os.getenv("EXPORT_PATH", "/var/lib/vmgen/exports"),
+            vm_ssh_password=os.getenv("VM_SSH_PASSWORD", ""),
+            vm_static_key_path=os.getenv("VM_STATIC_KEY_PATH", ""),
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
         )
         
     def validate(self) -> list[str]:
@@ -95,17 +105,24 @@ class Config:
             errors.append("PROXMOX_TOKEN_ID is required")
         if not self.proxmox.token_secret:
             errors.append("PROXMOX_TOKEN_SECRET is required")
-        
+        if not self.proxmox.ssh_key_path:
+            errors.append("PROXMOX_SSH_KEY_PATH is required")
+
         # Backend
         if not self.backend.url:
             errors.append("BACKEND_URL is required")
         if not self.backend.api_key:
             errors.append("BACKEND_API_KEY is required")
         
+        # Build output
+        if not self.export_path:
+            errors.append("EXPORT_PATH is required")
+
         # Security
         if not self.platform_secret:
             errors.append("PLATFORM_SECRET is required")
         elif len(self.platform_secret) < 32:
             errors.append("PLATFORM_SECRET should be at least 32 characters")
-        
+     
+       
         return errors

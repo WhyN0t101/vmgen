@@ -5,7 +5,7 @@ VMGen Worker - Setup Instructions
    python -m venv .venv
 
 2. ACTIVATE (Windows PowerShell)
-   .\.venv\Scripts\Activate.ps1
+   .\.venv\Scripts\Activate.ps1 (python -c "import sys; print(sys.prefix)")
 
    If blocked, first run:
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -13,17 +13,43 @@ VMGen Worker - Setup Instructions
 3. INSTALL DEPENDENCIES
    pip install -r requirements.txt
 
-4. CONFIGURE ENVIRONMENT
+4. GENERATE SSH KEY FOR PROXMOX HOST ACCESS
+   The worker needs SSH access to the Proxmox host to run qm exportovf (OVA export).
+   This is separate from the Proxmox API token — it's direct shell access.
+
+   Generate the key pair (press Enter twice for empty passphrase — worker runs unattended):
+   ssh-keygen -t ed25519 -C "vmgen-worker" -f "$HOME\.ssh\vmgen_worker"
+
+   Copy the public key to the Proxmox host (enter root password once):
+   type $HOME\.ssh\vmgen_worker.pub | ssh root@<PROXMOX_HOST> "cat >> ~/.ssh/authorized_keys"
+
+   Test the connection (should open a shell without asking for a password):
+   ssh -i $HOME\.ssh\vmgen_worker root@<PROXMOX_HOST>
+
+   Files created:
+   - C:\Users\<you>\.ssh\vmgen_worker      (private key — stays on this machine)
+   - C:\Users\<you>\.ssh\vmgen_worker.pub  (public key — copied to Proxmox)
+
+5. CONFIGURE ENVIRONMENT
    - Copy .env.example to .env
    - Fill in your credentials:
      * DATABASE_PASSWORD
      * PROXMOX_HOST, PROXMOX_TOKEN_ID, PROXMOX_TOKEN_SECRET
-     * PLATFORM_SECRET
+     * PROXMOX_ISOLATED_BRIDGE (default: vmbr1)
+     * PROXMOX_SSH_KEY_PATH (e.g. C:\Users\whoami\.ssh\vmgen_worker)
+     * PROXMOX_SSH_USER (default: root)
+     * BACKEND_API_KEY
+     * PLATFORM_SECRET (min 32 chars)
+     * EXPORT_PATH — filesystem path where OVAs are written, must be accessible
+       from both the Proxmox host (qm exportovf writes here) and this worker
+       machine (to compute SHA-256). Use an NFS mount. (e.g. /mnt/vmgen-exports)
+     * VM_SSH_PASSWORD — only needed if any template uses sshAuthMethod=password_reset
+     * VM_STATIC_KEY_PATH — only needed if any template uses sshAuthMethod=static_key
 
-5. CONNECT TO DATABASE
+6. CONNECT TO DATABASE
    docker exec -it vmgen-postgres psql -U vmgen -d vmgen
 
-6. RUN WORKER
+7. RUN WORKER
    python -m worker.main
 
 ---

@@ -1,7 +1,9 @@
-import { apiRequest } from './client'
+import { apiRequest, API_BASE } from './client'
+import { useAuthStore } from '@/stores/auth'
 import type {
   Build,
   BuildSpec,
+  ProvenanceResponse,
   TemplateResponse,
   TemplateListResponse,
   RegisterTemplateRequest,
@@ -32,6 +34,36 @@ export const api = {
 
   getUserBuilds: async (page = 0, size = 20): Promise<PagedResponse<Build>> => {
     return apiRequest<PagedResponse<Build>>(`/api/builds?page=${page}&size=${size}`)
+  },
+
+  downloadBuild: async (id: string, filename: string): Promise<void> => {
+    const authStore = useAuthStore()
+    const response = await fetch(`${API_BASE}/api/builds/${id}/download`, {
+      headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {},
+    })
+    if (!response.ok) throw new Error(`Download failed: ${response.statusText}`)
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+
+  getProvenance: async (id: string): Promise<ProvenanceResponse> => {
+    return apiRequest<ProvenanceResponse>(`/api/builds/${id}/provenance`)
+  },
+
+  downloadProvenance: async (id: string): Promise<void> => {
+    const data = await api.getProvenance(id)
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `provenance-${id}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   },
 
   // Flags

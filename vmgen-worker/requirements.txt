@@ -1,9 +1,8 @@
 # VMGen Worker - Production Dependencies
-# Pinned versions for reproducible builds
 
 paramiko==3.4.0           # SSH client for guest provisioning
 proxmoxer==2.0.1          # Proxmox API client
-psycopg[binary]==3.2.4    # PostgreSQL database driver (Python 3.13 compatible)
+psycopg[binary]>=3.2      # PostgreSQL database driver (Python 3.13 compatible)
 cryptography==41.0.7      # HMAC-SHA256, ephemeral keys
 requests==2.31.0          # HTTP client for Backend API
 pyyaml==6.0.1             # Configuration parsing

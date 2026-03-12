@@ -1,15 +1,22 @@
 package io.vmgen.api.controller;
 
+import io.vmgen.api.dto.build.BuildDownloadInfo;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.CreateBuildRequest;
+import io.vmgen.api.dto.build.ProvenanceResponse;
 import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.models.user.User;
 import io.vmgen.api.service.UserService;
 import io.vmgen.api.service.VmRequestService;
 import jakarta.validation.Valid;
+import java.nio.file.Paths;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -59,5 +66,34 @@ public class BuildController {
     ) {
         User user = userService.requireUser(authentication);
         return ResponseEntity.ok(vmRequestService.getBuild(id, user));
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<Resource> downloadOva(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        User user = userService.requireUser(authentication);
+        BuildDownloadInfo info = vmRequestService.getBuildDownloadInfo(id, user);
+
+        Resource file = new FileSystemResource(Paths.get(info.storagePath()));
+        String filename = info.filename() != null ? info.filename() : id + ".ova";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(info.sizeBytes())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .header("X-Checksum-SHA256", info.sha256() != null ? info.sha256() : "")
+                .body(file);
+    }
+
+    @GetMapping("/{id}/provenance")
+    public ResponseEntity<ProvenanceResponse> getProvenance(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        User user = userService.requireUser(authentication);
+        return ResponseEntity.ok(vmRequestService.getBuildProvenance(id, user));
     }
 }

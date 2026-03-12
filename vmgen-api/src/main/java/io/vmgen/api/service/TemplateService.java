@@ -7,6 +7,7 @@ import io.vmgen.api.dto.proxmox.ProxmoxVmSummary;
 import io.vmgen.api.dto.script.ScriptListDto;
 import io.vmgen.api.dto.template.RegisterTemplateRequest;
 import io.vmgen.api.dto.template.TemplateListResponse;
+import io.vmgen.api.dto.template.PublicTemplateResponse;
 import io.vmgen.api.dto.template.TemplateResponse;
 import io.vmgen.api.dto.template.UpdateTemplateMetadataRequest;
 import io.vmgen.api.exceptions.ConflictException;
@@ -186,7 +187,7 @@ public class TemplateService {
     }
 
     /**
-     * Retrieves a single template by its UUID.
+     * Retrieves a single template by its UUID — full representation for admin use.
      * Throws {@link TemplateNotFoundException} if no match exists.
      */
     @Transactional(readOnly = true)
@@ -194,6 +195,18 @@ public class TemplateService {
         Template template = templateRepository.findById(id)
                 .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + id));
         return toResponse(template);
+    }
+
+    /**
+     * Retrieves a single template by its UUID — public representation for regular users.
+     * Infra-sensitive fields (Proxmox config, SSH details, validation logs) are excluded.
+     * Throws {@link TemplateNotFoundException} if no match exists.
+     */
+    @Transactional(readOnly = true)
+    public PublicTemplateResponse getPublicTemplate(UUID id) {
+        Template template = templateRepository.findById(id)
+                .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + id));
+        return toPublicResponse(template);
     }
 
 
@@ -448,6 +461,33 @@ public class TemplateService {
                 .build();
     }
 
+
+    private PublicTemplateResponse toPublicResponse(Template template) {
+        List<String> capabilities = capabilityRepository.findAllByTemplateId(template.getId()).stream()
+                .map(TemplateCapability::getCapability)
+                .collect(Collectors.toList());
+
+        return PublicTemplateResponse.builder()
+                .id(template.getId())
+                .identifier(template.getIdentifier())
+                .version(template.getVersion())
+                .osFamily(template.getOsFamily())
+                .osVersion(template.getOsVersion())
+                .architecture(template.getArchitecture())
+                .description(template.getDescription())
+                .sha256Hash(template.getSha256Hash())
+                .diskSizeGb(template.getDiskSizeGb())
+                .minRamMb(template.getMinRamMb())
+                .minCpuCores(template.getMinCpuCores())
+                .status(template.getStatus())
+                .validatedAt(template.getValidatedAt())
+                .lastValidatedAt(template.getLastValidatedAt())
+                .createdAt(template.getCreatedAt())
+                .deprecatedAt(template.getDeprecatedAt())
+                .updatedAt(template.getUpdatedAt())
+                .capabilities(capabilities)
+                .build();
+    }
 
     /**
      * Maps a {@link Template} entity to a lightweight {@link TemplateListResponse} DTO.

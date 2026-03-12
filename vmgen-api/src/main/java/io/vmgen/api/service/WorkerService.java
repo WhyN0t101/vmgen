@@ -6,11 +6,22 @@ import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ConflictException;
+import io.vmgen.api.models.flag.Flag;
+import io.vmgen.api.models.provenance.ProvenanceRecord;
 import io.vmgen.api.models.template.Template;
 import io.vmgen.api.models.vm.VmRequest;
+import io.vmgen.api.models.vm.VmRequestScript;
+import io.vmgen.api.models.vm.VmRequestScriptParameter;
 import io.vmgen.api.models.vm.VmRequestState;
+import io.vmgen.api.repository.flag.FlagRepository;
+import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
+import io.vmgen.api.repository.script.ScriptRepository;
 import io.vmgen.api.repository.vm.VmRequestRepository;
+import io.vmgen.api.repository.vm.VmRequestScriptParameterRepository;
+import io.vmgen.api.repository.vm.VmRequestScriptRepository;
 import java.nio.file.Paths;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,8 +31,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +42,11 @@ import java.util.UUID;
 public class WorkerService {
 
     private final VmRequestRepository vmRequestRepository;
+    private final VmRequestScriptRepository vmRequestScriptRepository;
+    private final VmRequestScriptParameterRepository vmRequestScriptParameterRepository;
+    private final ProvenanceRecordRepository provenanceRecordRepository;
+    private final FlagRepository flagRepository;
+    private final ScriptRepository scriptRepository;
 
     /**
      * Atomically claims the next queued job for the given worker.
@@ -131,10 +149,50 @@ public class WorkerService {
         request.setLastProgressAt(Instant.now());
         
         vmRequestRepository.save(request);
-        
-        // TODO: Create provenance record
-        // TODO: Register flags with flag_value_hash
-        
+
+        // Create provenance record
+        if (completion.getProvenance() != null) {
+            JobCompleteRequest.Provenance p = completion.getProvenance();
+            ProvenanceRecord provenance = new ProvenanceRecord();
+            provenance.setVmRequest(request);
+            provenance.setTemplateIdentifier(p.getTemplateIdentifier());
+            provenance.setTemplateVersion(p.getTemplateVersion());
+            provenance.setTemplateSha256(p.getTemplateSha256() != null ? p.getTemplateSha256() : "");
+            provenance.setBuildSeed(request.getBuildSeed());
+            provenance.setOvaSha256(completion.getOvaChecksum());
+            provenance.setDifficultyLevel(request.getDifficultyOverride());
+            provenance.setTelemetryEnabled(Boolean.TRUE.equals(request.getTelemetryEnabled()));
+            if (p.getFlagDerivationTimestamp() != null) {
+                provenance.setFlagDerivationTimestamp(
+                    Instant.parse(p.getFlagDerivationTimestamp()));
+            } else {
+                provenance.setFlagDerivationTimestamp(Instant.now());
+            }
+            provenanceRecordRepository.save(provenance);
+        }
+
+        // Register flag hashes
+        if (completion.getFlags() != null && !completion.getFlags().isEmpty()) {
+            Instant flagTs = (completion.getProvenance() != null
+                    && completion.getProvenance().getFlagDerivationTimestamp() != null)
+                    ? Instant.parse(completion.getProvenance().getFlagDerivationTimestamp())
+                    : Instant.now();
+
+            List<Flag> flags = new ArrayList<>();
+            for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
+                UUID scriptId = UUID.fromString(fi.getScriptId());
+                scriptRepository.findById(scriptId).ifPresent(script -> {
+                    Flag flag = new Flag();
+                    flag.setVmRequest(request);
+                    flag.setScript(script);
+                    flag.setFlagValueHash(fi.getFlagValueHash());
+                    flag.setFlagDerivationTimestamp(flagTs);
+                    flags.add(flag);
+                });
+            }
+            flagRepository.saveAll(flags);
+        }
+
         log.info("Job {} completed successfully by worker {}", requestId, completion.getWorkerId());
     }
 
@@ -173,22 +231,51 @@ public class WorkerService {
      * Builds the full job specification response returned to the worker upon claiming a job.
      */
     private ClaimJobResponse buildClaimResponse(VmRequest request) {
-
         Template template = request.getTemplate();
-        // TODO: Fetch scripts from vm_request_scripts table
-        
+
+        // Load all parameter values for this request keyed by script ID
+        List<VmRequestScriptParameter> allParams =
+                vmRequestScriptParameterRepository.findByVmRequest_Id(request.getId());
+        Map<UUID, Map<String, String>> paramsByScriptId = allParams.stream()
+                .collect(Collectors.groupingBy(
+                        p -> p.getScript().getId(),
+                        Collectors.toMap(
+                                VmRequestScriptParameter::getParameterName,
+                                VmRequestScriptParameter::getParameterValue)));
+
+        // Load scripts in execution order with their Script entities eager-fetched
+        List<VmRequestScript> orderedScripts =
+                vmRequestScriptRepository.findWithScriptByVmRequestId(request.getId());
+
+        List<ClaimJobResponse.ScriptInfo> scriptInfos = orderedScripts.stream()
+                .map(vrs -> ClaimJobResponse.ScriptInfo.builder()
+                        .scriptId(vrs.getScript().getId())
+                        .identifier(vrs.getScript().getIdentifier())
+                        .version(vrs.getScript().getVersion())
+                        .sha256(vrs.getScript().getSha256Hash())
+                        .flagLocation(vrs.getScript().getFlagLocation())
+                        .executionOrder(vrs.getExecutionOrder())
+                        .scriptContent(vrs.getScript().getScriptContent())
+                        .parameterValues(paramsByScriptId.getOrDefault(vrs.getScript().getId(), Map.of()))
+                        .build())
+                .toList();
+
         return ClaimJobResponse.builder()
-            .requestId(request.getId())
-            .templateIdentifier(template.getIdentifier())
-            .templateVersion(template.getVersion())
-            .templateSha256(template.getSha256Hash())
-            .proxmoxVmid(template.getProxmoxVmid())
-            .proxmoxNode(template.getProxmoxNode())
-            .buildSeed(request.getBuildSeed())
-            .difficultyLevel(request.getDifficultyOverride())
-            .telemetryEnabled(request.getTelemetryEnabled())
-            // .scripts(scriptInfoList)  // TODO: populate from vm_request_scripts
-            .build();
+                .requestId(request.getId())
+                .templateIdentifier(template.getIdentifier())
+                .templateVersion(template.getVersion())
+                .templateSha256(template.getSha256Hash())
+                .proxmoxVmid(template.getProxmoxVmid())
+                .proxmoxNode(template.getProxmoxNode())
+                .sshAuthMethod(template.getSshAuthMethod())
+                .expectedSshUser(template.getExpectedSshUser())
+                .expectedSshPort(template.getExpectedSshPort())
+                .diskStorage(template.getDiskStorage())
+                .buildSeed(request.getBuildSeed())
+                .difficultyLevel(request.getDifficultyOverride())
+                .telemetryEnabled(request.getTelemetryEnabled())
+                .scripts(scriptInfos)
+                .build();
     }
 
     /**

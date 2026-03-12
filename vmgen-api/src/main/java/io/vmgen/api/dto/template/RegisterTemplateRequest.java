@@ -27,7 +27,7 @@ public class RegisterTemplateRequest {
     
     @NotBlank(message = "OS family is required")
     @Size(max = 100, message = "OS family must not exceed 100 characters")
-    @Pattern(regexp = "^(linux|windows)$", flags = Pattern.Flag.CASE_INSENSITIVE, message = "OS family must be 'linux' or 'windows'")
+    @Pattern(regexp = "^(linux|windows|ubuntu|debian|kali-linux|fedora|centos|rhel|alpine)$", flags = Pattern.Flag.CASE_INSENSITIVE, message = "Invalid OS family")
     private String osFamily;
     
     @NotBlank(message = "OS version is required")

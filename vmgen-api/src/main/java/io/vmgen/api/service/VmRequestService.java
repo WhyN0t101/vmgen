@@ -1,8 +1,12 @@
 package io.vmgen.api.service;
 
+import io.vmgen.api.dto.build.BuildDownloadInfo;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.BuildScriptDto;
 import io.vmgen.api.dto.build.CreateBuildRequest;
+import io.vmgen.api.dto.build.ProvenanceResponse;
+import io.vmgen.api.models.provenance.ProvenanceRecord;
+import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
 import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.dto.script.ScriptParameterDto;
 import io.vmgen.api.dto.script.ScriptSelectionResult;
@@ -51,6 +55,7 @@ public class VmRequestService {
     private final ScriptCompatibilityRepository compatibilityRepository;
     private final ScriptCompatibilityService scriptCompatibilityService;
     private final ScriptParameterService scriptParameterService;
+    private final ProvenanceRecordRepository provenanceRecordRepository;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -240,6 +245,61 @@ public class VmRequestService {
         return toResponse(request, scripts, order);
     }
 
+
+    /**
+     * Returns the OVA file metadata needed for a download response.
+     * Throws 404 if not found, not owned by the user, not READY, or file deleted.
+     */
+    @Transactional(readOnly = true)
+    public BuildDownloadInfo getBuildDownloadInfo(UUID requestId, User user) {
+        VmRequest request = vmRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + requestId));
+        if (!request.getUser().getId().equals(user.getId())) {
+            throw new ResourceNotFoundException("Build not found: " + requestId);
+        }
+        if (request.getState() != io.vmgen.api.models.vm.VmRequestState.READY) {
+            throw new ConflictException("Build is not ready for download (state: " + request.getState() + ")");
+        }
+        if (request.getStorageDeletedAt() != null) {
+            throw new ResourceNotFoundException("OVA file has been deleted");
+        }
+        if (request.getStoragePath() == null) {
+            throw new ResourceNotFoundException("OVA storage path not available");
+        }
+        return new BuildDownloadInfo(
+                request.getStoragePath(),
+                request.getOvaFilename(),
+                request.getOvaSizeBytes() != null ? request.getOvaSizeBytes() : 0L,
+                request.getOvaSha256()
+        );
+    }
+
+    /**
+     * Returns the provenance record for a completed build.
+     * Throws 404 if not found, not owned by the user, or provenance not yet created.
+     */
+    @Transactional(readOnly = true)
+    public ProvenanceResponse getBuildProvenance(UUID requestId, User user) {
+        VmRequest request = vmRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + requestId));
+        if (!request.getUser().getId().equals(user.getId())) {
+            throw new ResourceNotFoundException("Build not found: " + requestId);
+        }
+        ProvenanceRecord provenance = provenanceRecordRepository.findByVmRequest_Id(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provenance not available for this build"));
+        return ProvenanceResponse.builder()
+                .buildId(requestId)
+                .templateIdentifier(provenance.getTemplateIdentifier())
+                .templateVersion(provenance.getTemplateVersion())
+                .templateSha256(provenance.getTemplateSha256())
+                .buildSeed(provenance.getBuildSeed())
+                .difficultyLevel(provenance.getDifficultyLevel())
+                .telemetryEnabled(Boolean.TRUE.equals(provenance.getTelemetryEnabled()))
+                .ovaSha256(provenance.getOvaSha256())
+                .flagDerivationTimestamp(provenance.getFlagDerivationTimestamp())
+                .finalisedAt(provenance.getFinalisedAt())
+                .build();
+    }
 
     private Map<String, Boolean> buildRandomiseFlagsForScript(UUID scriptId, Map<String, String> userValues) {
         // Load parameters for this script and mark USER_INPUT_OR_RANDOM params without user values.

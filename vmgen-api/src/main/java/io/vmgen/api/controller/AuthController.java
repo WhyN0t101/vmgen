@@ -36,7 +36,9 @@ public class AuthController {
         this.rateLimitService = rateLimitService;
     }
     @PostMapping("/register")
-    public ResponseEntity<StatusResponse> register(@Valid @RequestBody RegisterRequest req) {
+    public ResponseEntity<StatusResponse> register(@Valid @RequestBody RegisterRequest req,
+                                                    HttpServletRequest http) {
+        rateLimitService.checkRegisterRateLimit(getClientIp(http));
         authService.register(req);
         return ResponseEntity.ok(new StatusResponse("ok"));
     }
