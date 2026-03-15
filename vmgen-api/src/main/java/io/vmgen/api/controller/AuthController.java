@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import static io.vmgen.api.utils.HttpUtils.auditContext;
 import static io.vmgen.api.utils.HttpUtils.getClientIp;
@@ -51,7 +52,7 @@ public class AuthController {
         AuditContext ctx = auditContext(http, Map.of());
         return ResponseEntity.ok(authService.login(req, ctx));
     }
-
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/logout")
     public ResponseEntity<StatusResponse> logout(Authentication authentication, HttpServletRequest http) {
         if (authentication == null || authentication.getPrincipal() == null) {

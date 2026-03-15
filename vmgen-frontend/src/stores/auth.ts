@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { User, ApiError } from '@/types'
-
-// Resolved once at module load — mirrors the same logic in api/client.ts.
-// Cannot import API_BASE from client.ts because client.ts imports this store (circular).
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+import type { User } from '@/types'
+import { rawRequest } from '@/api/client'
+// rawRequest is imported instead of re-declaring API_BASE locally.
+// The resulting circular dependency (client.ts ↔ auth.ts) is safe because
+// neither module consumes the other's exports at module-initialisation time —
+// only inside function bodies that run after both modules are fully loaded.
 
 const AUTH_CHANNEL = 'vmgen_auth'
 
@@ -21,20 +22,11 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => (user.value?.role || role.value)?.toLowerCase() === 'admin')
 
   async function login(identifier: string, password: string) {
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, password }),
-    })
+    const data = await rawRequest<{ token: string; role: string; expiresAt: string }>(
+      '/api/auth/login',
+      { method: 'POST', body: JSON.stringify({ identifier, password }) },
+    )
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      const error = new Error(errorData.message || 'Login failed') as ApiError
-      error.response = { status: response.status, data: errorData }
-      throw error
-    }
-
-    const data = await response.json()
     const normalizedRole = (data.role || '').toLowerCase()
     const roleValue = normalizedRole === 'admin' ? 'admin' : normalizedRole === 'user' ? 'user' : null
     token.value = data.token
@@ -57,9 +49,9 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     // Best-effort server logout; session revocation is enforced server-side.
     const t = token.value
-    fetch(`${API_BASE}/api/auth/logout`, {
+    rawRequest<void>('/api/auth/logout', {
       method: 'POST',
-      headers: t ? { Authorization: `Bearer ${t}` } : undefined,
+      headers: t ? { Authorization: `Bearer ${t}` } : {},
     }).catch(() => {})
 
     // Clear in-memory state

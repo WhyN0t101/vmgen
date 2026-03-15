@@ -8,10 +8,14 @@ import io.vmgen.api.dto.template.TemplateListResponse;
 import io.vmgen.api.dto.template.TemplateResponse;
 import io.vmgen.api.dto.template.UpdateTemplateMetadataRequest;
 import io.vmgen.api.service.TemplateService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+
+import static io.vmgen.api.utils.HttpUtils.auditContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -42,10 +46,11 @@ public class AdminTemplateController {
     @PostMapping
     public ResponseEntity<TemplateResponse> registerTemplate(
             @Valid @RequestBody RegisterTemplateRequest request,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest http
     ) {
         UUID adminId = getAdminId(authentication);
-        TemplateResponse response = templateService.registerTemplate(request, adminId);
+        TemplateResponse response = templateService.registerTemplate(request, adminId, auditContext(http, Map.of()));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     
@@ -65,29 +70,34 @@ public class AdminTemplateController {
     @PostMapping("/{id}/validate")
     public ResponseEntity<TemplateResponse> validateTemplate(
             @PathVariable UUID id,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest http
     ) {
         UUID adminId = getAdminId(authentication);
-        TemplateResponse response = templateService.validateTemplate(id, adminId);
+        TemplateResponse response = templateService.validateTemplate(id, adminId, auditContext(http, Map.of()));
         return ResponseEntity.ok(response);
     }
-    
+
     @PatchMapping("/{id}/deprecate")
     public ResponseEntity<Void> deprecateTemplate(
             @PathVariable UUID id,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest http
     ) {
         UUID adminId = getAdminId(authentication);
-        templateService.deprecateTemplate(id, adminId);
+        templateService.deprecateTemplate(id, adminId, auditContext(http, Map.of()));
         return ResponseEntity.noContent().build();
     }
-    
+
     @PatchMapping("/{id}/metadata")
     public ResponseEntity<TemplateResponse> updateMetadata(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateTemplateMetadataRequest request
+            @Valid @RequestBody UpdateTemplateMetadataRequest request,
+            Authentication authentication,
+            HttpServletRequest http
     ) {
-        TemplateResponse response = templateService.updateMetadata(id, request);
+        UUID adminId = getAdminId(authentication);
+        TemplateResponse response = templateService.updateMetadata(id, request, adminId, auditContext(http, Map.of()));
         return ResponseEntity.ok(response);
     }
 

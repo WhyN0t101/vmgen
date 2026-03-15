@@ -1,6 +1,7 @@
-import { apiRequest, API_BASE } from './client'
+import { apiRequest, rawRequest, API_BASE } from './client'
 import { useAuthStore } from '@/stores/auth'
 import type {
+  AuthResponse,
   Build,
   BuildSpec,
   ProvenanceResponse,
@@ -20,6 +21,25 @@ import type {
 } from '@/types'
 
 export const api = {
+  // Auth (public endpoints — no JWT required)
+  auth: {
+    login: (identifier: string, password: string): Promise<AuthResponse> =>
+      rawRequest<AuthResponse>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ identifier, password }),
+      }),
+
+    register: (username: string, email: string, password: string): Promise<void> =>
+      rawRequest<void>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ username, email, password }),
+      }),
+
+    // logout sends the token explicitly; apiRequest injects it via the auth store
+    logout: (): Promise<void> =>
+      apiRequest<void>('/api/auth/logout', { method: 'POST' }),
+  },
+
   // Builds
   createBuild: async (spec: BuildSpec): Promise<Build> => {
     return apiRequest<Build>('/api/builds', {

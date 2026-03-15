@@ -1,4 +1,6 @@
 from proxmoxer import ProxmoxAPI
+import hashlib
+import paramiko
 import time
 import logging
 
@@ -178,14 +180,13 @@ class ProxmoxClient:
         Network must already be removed (stage 12) before calling this.
         """
         import os
-        import paramiko
 
         proxmox_tmp = f"/tmp/vmgen-export-{vmid}"
         proxmox_ova = f"{proxmox_tmp}/vm.ova"
 
         log.info(f"Exporting VM {vmid} on Proxmox host to {proxmox_ova}...")
 
-        client = paramiko.SSHClient()
+        client = paramiko.SSHClient()  # paramiko imported at module level
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
             client.connect(
@@ -209,18 +210,37 @@ class ProxmoxClient:
                 sftp.get(proxmox_ova, dest_path)
             log.info("OVA transfer complete")
 
+        finally:
             # Step 3: Clean up temp dir on Proxmox
             self._ssh_run(client, f"rm -rf {proxmox_tmp}")
-
-        finally:
             client.close()
 
         return dest_path
 
-    def _ssh_run(self, client, cmd: str, timeout: int = 300) -> None:
-        """Run a command over an open SSH client, raise on non-zero exit."""
+    def _ssh_run(self, client, cmd: str, timeout: int = 300) -> str:
+        """Run a command over an open SSH client, raise on non-zero exit. Returns stdout."""
         _, stdout, stderr = client.exec_command(cmd, timeout=timeout)
+        output = stdout.read().decode()   # blocks until EOF; must be read before exit status
         exit_code = stdout.channel.recv_exit_status()
         if exit_code != 0:
             error = stderr.read().decode().strip()
             raise RuntimeError(f"SSH command failed (exit {exit_code}): {cmd!r} — {error}")
+        return output
+
+    def get_template_config_hash(self, vmid: int, node: str | None = None) -> str:
+        """
+        Compute SHA-256 of the template VM config via SSH.
+        Uses 'qm config' output as a stable fingerprint of the template state.
+        """
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(
+                self._config.host,
+                username=self._config.ssh_user,
+                key_filename=self._config.ssh_key_path,
+            )
+            config_output = self._ssh_run(client, f"sudo qm config {vmid}")
+            return hashlib.sha256(config_output.encode('utf-8')).hexdigest()
+        finally:
+            client.close()

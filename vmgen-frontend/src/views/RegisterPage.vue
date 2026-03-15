@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import { api } from '@/api/endpoints'
+import type { ApiError } from '@/types'
 
 const router = useRouter()
 
@@ -27,30 +29,16 @@ async function handleSubmit() {
 
   isSubmitting.value = true
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: username.value,
-        email: email.value,
-        password: password.value,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      errorMessage.value = errorData.message || 'Registration failed'
-      errorDetails.value = Array.isArray(errorData.details) ? errorData.details : []
-      return
-    }
-
+    await api.auth.register(username.value, email.value, password.value)
     successMessage.value = 'Account created. You can now sign in.'
     setTimeout(() => {
       router.push({ name: 'login' })
     }, 800)
   } catch (e) {
-    errorMessage.value = 'Registration failed'
-    errorDetails.value = []
+    const err = e as ApiError
+    errorMessage.value = err.message || 'Registration failed'
+    const details = err.response?.data?.details
+    errorDetails.value = Array.isArray(details) ? (details as string[]) : []
   } finally {
     isSubmitting.value = false
   }

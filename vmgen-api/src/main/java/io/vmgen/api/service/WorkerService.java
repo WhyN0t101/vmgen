@@ -1,11 +1,14 @@
 package io.vmgen.api.service;
 
+import io.vmgen.api.dto.worker.AppendBuildLogRequest;
 import io.vmgen.api.dto.worker.ClaimJobResponse;
 import io.vmgen.api.dto.worker.ProgressUpdateRequest;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
+import io.vmgen.api.service.AuditService;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ConflictException;
+import io.vmgen.api.models.build.BuildLog;
 import io.vmgen.api.models.flag.Flag;
 import io.vmgen.api.models.provenance.ProvenanceRecord;
 import io.vmgen.api.models.template.Template;
@@ -13,23 +16,35 @@ import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestScript;
 import io.vmgen.api.models.vm.VmRequestScriptParameter;
 import io.vmgen.api.models.vm.VmRequestState;
+import io.vmgen.api.repository.BuildLogRepository;
 import io.vmgen.api.repository.flag.FlagRepository;
 import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
 import io.vmgen.api.repository.script.ScriptRepository;
+import io.vmgen.api.repository.template.TemplateRepository;
 import io.vmgen.api.repository.vm.VmRequestRepository;
 import io.vmgen.api.repository.vm.VmRequestScriptParameterRepository;
 import io.vmgen.api.repository.vm.VmRequestScriptRepository;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Objects;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.binary.Base32;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +62,12 @@ public class WorkerService {
     private final ProvenanceRecordRepository provenanceRecordRepository;
     private final FlagRepository flagRepository;
     private final ScriptRepository scriptRepository;
+    private final TemplateRepository templateRepository;
+    private final BuildLogRepository buildLogRepository;
+    private final AuditService auditService;
+
+    @Value("${vmgen.platform.secret}")
+    private String platformSecret;
 
     /**
      * Atomically claims the next queued job for the given worker.
@@ -169,14 +190,47 @@ public class WorkerService {
                 provenance.setFlagDerivationTimestamp(Instant.now());
             }
             provenanceRecordRepository.save(provenance);
+
+            // Update the template's sha256Hash if it was pending and the worker computed a real one
+            String workerTemplateSha256 = p.getTemplateSha256();
+            if (workerTemplateSha256 != null && !workerTemplateSha256.isBlank()
+                    && !workerTemplateSha256.equals("PENDING")) {
+                templateRepository.findById(request.getTemplate().getId()).ifPresent(template -> {
+                    if ("PENDING".equals(template.getSha256Hash())) {
+                        template.setSha256Hash(workerTemplateSha256);
+                        templateRepository.save(template);
+                        log.info("Updated template {} sha256Hash from PENDING to computed value",
+                                template.getId());
+                    }
+                });
+            }
         }
 
-        // Register flag hashes
+        // Register flag hashes — re-derive each hash independently to verify worker output
         if (completion.getFlags() != null && !completion.getFlags().isEmpty()) {
-            Instant flagTs = (completion.getProvenance() != null
-                    && completion.getProvenance().getFlagDerivationTimestamp() != null)
-                    ? Instant.parse(completion.getProvenance().getFlagDerivationTimestamp())
+            String flagDerivationTimestamp = (completion.getProvenance() != null)
+                    ? completion.getProvenance().getFlagDerivationTimestamp()
+                    : null;
+            Instant flagTs = (flagDerivationTimestamp != null)
+                    ? Instant.parse(flagDerivationTimestamp)
                     : Instant.now();
+
+            for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
+                String expectedHash = deriveFlagHash(
+                        request.getBuildSeed(),
+                        requestId.toString(),
+                        fi.getScriptId(),
+                        flagDerivationTimestamp != null ? flagDerivationTimestamp : flagTs.toString()
+                );
+                if (!MessageDigest.isEqual(
+                        expectedHash.getBytes(StandardCharsets.UTF_8),
+                        fi.getFlagValueHash().getBytes(StandardCharsets.UTF_8))) {
+                    log.warn("Flag hash mismatch for job {} script {} — worker output rejected",
+                            requestId, fi.getScriptId());
+                    throw new ConflictException(
+                            "Flag hash verification failed for script " + fi.getScriptId());
+                }
+            }
 
             List<Flag> flags = new ArrayList<>();
             for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
@@ -193,6 +247,7 @@ public class WorkerService {
             flagRepository.saveAll(flags);
         }
 
+        auditService.logWorkerJobCompleted(completion.getWorkerId(), requestId);
         log.info("Job {} completed successfully by worker {}", requestId, completion.getWorkerId());
     }
 
@@ -224,6 +279,10 @@ public class WorkerService {
         request.setLastProgressAt(Instant.now());
         
         vmRequestRepository.save(request);
+        auditService.logWorkerJobFailed(
+                failure.getWorkerId() != null ? failure.getWorkerId() : "unknown",
+                requestId,
+                failure.getErrorType() != null ? failure.getErrorType() : "unknown");
         log.error("Job {} failed: {} - {}", requestId, failure.getErrorType(), failure.getMessage());
     }
 
@@ -281,6 +340,41 @@ public class WorkerService {
     }
 
     /**
+     * Appends a single log entry to the build log for the given job.
+     * Accepts log writes for jobs in any state (including FAILED) so that error entries
+     * emitted just before a fail_job call are never rejected.
+     * Throws {@link ConflictException} if the calling worker does not own the job.
+     */
+    @Transactional
+    public void appendBuildLog(UUID requestId, AppendBuildLogRequest request) {
+        VmRequest vmRequest = vmRequestRepository.findById(requestId)
+            .orElseThrow(() -> new ResourceNotFoundException("VmRequest not found: " + requestId));
+
+        if (!request.getWorkerId().equals(vmRequest.getClaimedByWorkerId())) {
+            throw new ConflictException(
+                "Worker " + request.getWorkerId() + " does not own job " + requestId);
+        }
+
+        BuildLog entry = new BuildLog();
+        entry.setVmRequest(vmRequest);
+        entry.setLogLevel(request.getLogLevel());
+        entry.setStage(request.getStage());
+        entry.setMessage(request.getMessage());
+
+        if (request.getLoggedAt() != null) {
+            try {
+                entry.setLoggedAt(Instant.parse(request.getLoggedAt()));
+            } catch (DateTimeParseException e) {
+                // Unparseable worker timestamp — @PrePersist will set loggedAt = Instant.now()
+                log.debug("Unparseable loggedAt '{}' for job {} — using server time",
+                    request.getLoggedAt(), requestId);
+            }
+        }
+
+        buildLogRepository.save(entry);
+    }
+
+    /**
      * Marks all BUILDING and EXPORTING jobs as FAILED if no progress update has been
      * received within the given timeout duration.
      * Intended to be called periodically by a scheduled task.
@@ -300,6 +394,64 @@ public class WorkerService {
         
         if (!staleJobs.isEmpty()) {
             log.info("Marked {} stale jobs as failed", staleJobs.size());
+        }
+    }
+
+    /**
+     * Marks all BUILDING and EXPORTING jobs as FAILED if their wall-clock age exceeds
+     * the given duration (absolute timeout — independent of heartbeat activity).
+     * Intended to be called periodically by a scheduled task.
+     */
+    @Transactional
+    public void markLongRunningJobsAsFailed(Duration maxDuration) {
+        Instant threshold = Instant.now().minus(maxDuration);
+        List<VmRequest> longRunningJobs = vmRequestRepository.findLongRunningJobs(
+                List.of(VmRequestState.BUILDING, VmRequestState.EXPORTING), threshold);
+
+        longRunningJobs.forEach(job -> {
+            job.setState(VmRequestState.FAILED);
+            job.setFailedAt(Instant.now());
+            job.setFailureReason("TIMEOUT: Build exceeded maximum duration of " + maxDuration.toHours() + " hours");
+        });
+        vmRequestRepository.saveAll(longRunningJobs);
+
+        if (!longRunningJobs.isEmpty()) {
+            log.warn("Marked {} long-running jobs as failed (exceeded {}h)", longRunningJobs.size(), maxDuration.toHours());
+        }
+    }
+
+    /**
+     * Re-derives the flag hash using the same algorithm as the worker (build/flags.py):
+     *   HMAC-SHA256(key=platformSecret, msg=seedHex||requestId||scriptId||timestamp)
+     *   → first 17 bytes, zero last 6 bits of byte[16] (& 0xC0)
+     *   → Base32 (no padding) → "FLAG{<26 chars>}"
+     *   → SHA-256 hex of that string
+     */
+    private String deriveFlagHash(String seedHex, String requestId, String scriptId, String timestamp) {
+        try {
+            byte[] key = platformSecret.getBytes(StandardCharsets.UTF_8);
+            byte[] message = (seedHex + requestId + scriptId + timestamp).getBytes(StandardCharsets.UTF_8);
+
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(key, "HmacSHA256"));
+            byte[] digest = mac.doFinal(message);
+
+            // Take first 17 bytes, zero last 6 bits of byte[16] — yields 130 bits
+            byte[] raw = new byte[17];
+            System.arraycopy(digest, 0, raw, 0, 17);
+            raw[16] = (byte) (raw[16] & 0xC0);
+
+            // Base32-encode (RFC 4648) and strip padding
+            String encoded = new Base32().encodeToString(raw).replace("=", "");
+            String flagString = "FLAG{" + encoded + "}";
+
+            // SHA-256 of the flag string — this is what the worker sends
+            byte[] hashBytes = MessageDigest.getInstance("SHA-256")
+                    .digest(flagString.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hashBytes);
+
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new IllegalStateException("Flag derivation failed — crypto provider error", e);
         }
     }
 }

@@ -1,4 +1,6 @@
 import logging
+from datetime import datetime, timezone
+
 import requests
 
 log = logging.getLogger(__name__)
@@ -71,6 +73,34 @@ class BackendClient:
         )
         resp.raise_for_status()
         log.info(f"[{job_id}] Backend acknowledged completion")
+
+    def append_log(
+        self,
+        job_id: str,
+        level: str,
+        message: str,
+        stage: str | None = None,
+    ) -> None:
+        """
+        Fire-and-forget build log entry. A failure here must never abort the build —
+        the caller should not propagate exceptions from this method.
+        """
+        try:
+            resp = requests.post(
+                f"{self.url}/api/worker/jobs/{job_id}/logs",
+                json={
+                    "workerId": self.worker_id,
+                    "logLevel": level,
+                    "stage": stage,
+                    "message": message,
+                    "loggedAt": datetime.now(timezone.utc).isoformat(),
+                },
+                headers=self._headers,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except Exception as e:
+            log.warning("[%s] Failed to write build log to backend (non-fatal): %s", job_id, e)
 
     def fail_job(self, job_id: str, error_type: str, message: str, logs: str = ""):
         # error_type: "script_failed" | "timeout" | "proxmox_error"

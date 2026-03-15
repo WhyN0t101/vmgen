@@ -1,5 +1,6 @@
 package io.vmgen.api.controller;
 
+import io.vmgen.api.dto.worker.AppendBuildLogRequest;
 import io.vmgen.api.dto.worker.ClaimJobRequest;
 import io.vmgen.api.dto.worker.ClaimJobResponse;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
@@ -71,8 +72,21 @@ public class WorkerController {
     public ResponseEntity<WorkerAckResponse> failJob(
             @PathVariable("id") UUID requestId,
             @Valid @RequestBody JobFailRequest request) {
-        
+
         workerService.failJob(requestId, request);
+        return ResponseEntity.ok(new WorkerAckResponse(true));
+    }
+
+    /**
+     * Appends a build log entry for an in-flight (or recently failed) job.
+     * Fire-and-forget from the worker perspective — failures here must not abort builds.
+     */
+    @PostMapping("/jobs/{id}/logs")
+    public ResponseEntity<WorkerAckResponse> appendBuildLog(
+            @PathVariable("id") UUID requestId,
+            @Valid @RequestBody AppendBuildLogRequest request) {
+
+        workerService.appendBuildLog(requestId, request);
         return ResponseEntity.ok(new WorkerAckResponse(true));
     }
 }

@@ -1,13 +1,16 @@
 package io.vmgen.api.service.script;
 
+import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.script.CreateScriptRequest;
 import io.vmgen.api.dto.script.ScriptDetailDto;
 import io.vmgen.api.dto.script.ScriptListDto;
 import io.vmgen.api.dto.script.UpdateScriptRequest;
+import io.vmgen.api.service.AuditService;
 import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ScriptConflictException;
 import io.vmgen.api.models.script.Script;
+import io.vmgen.api.models.user.User;
 import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
 import io.vmgen.api.repository.script.ScriptRepository;
 import io.vmgen.api.repository.UserRepository;
@@ -41,6 +44,7 @@ public class ScriptService {
     private final UserRepository userRepository;
     private final ScriptCompatibilityService compatibilityService;
     private final ScriptParameterService parameterService;
+    private final AuditService auditService;
 
     /**
      * Lists scripts with optional filters.
@@ -79,7 +83,7 @@ public class ScriptService {
      * Creates a new script.
      */
     @Transactional
-    public ScriptDetailDto create(CreateScriptRequest request, String adminUsername) {
+    public ScriptDetailDto create(CreateScriptRequest request, String adminUsername, AuditContext ctx) {
         if (scriptRepository.existsByIdentifierAndVersion(request.getIdentifier(), request.getVersion())) {
             throw new ConflictException("Script " + request.getIdentifier() + "@" + request.getVersion() + " already exists");
         }
@@ -100,6 +104,7 @@ public class ScriptService {
         // Optional: create compatibility and parameter definitions atomically with the script.
         createCompatibilityAndParametersIfPresent(saved.getId(), request, admin.getId());
 
+        auditService.logScriptCreated(admin, saved.getId(), saved.getIdentifier(), ctx);
         log.info("Created script {}@{}", saved.getIdentifier(), saved.getVersion());
         return toDetailDto(saved);
     }
@@ -161,7 +166,7 @@ public class ScriptService {
      * Updates an existing script. Identifier and version are immutable.
      */
     @Transactional
-    public ScriptDetailDto update(UUID id, UpdateScriptRequest request) {
+    public ScriptDetailDto update(UUID id, UpdateScriptRequest request, User admin, AuditContext ctx) {
         Script script = scriptRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Script not found: " + id));
 
@@ -171,6 +176,7 @@ public class ScriptService {
         buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions());
 
         Script saved = scriptRepository.save(script);
+        auditService.logScriptUpdated(admin, saved.getId(), ctx);
         log.info("Updated script {}@{}", saved.getIdentifier(), saved.getVersion());
         return toDetailDto(saved);
     }
@@ -179,7 +185,7 @@ public class ScriptService {
      * Soft-deprecates a script.
      */
     @Transactional
-    public void deprecate(UUID id) {
+    public void deprecate(UUID id, User admin, AuditContext ctx) {
         Script script = scriptRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Script not found: " + id));
         if (!Boolean.TRUE.equals(script.getIsActive())) {
@@ -188,6 +194,7 @@ public class ScriptService {
         script.setIsActive(false);
         script.setDeprecatedAt(Instant.now());
         scriptRepository.save(script);
+        auditService.logScriptDeprecated(admin, script.getId(), ctx);
         log.info("Deprecated script {}@{}", script.getIdentifier(), script.getVersion());
     }
 

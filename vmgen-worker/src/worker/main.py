@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import logging
 import signal
 import sys
@@ -79,31 +80,50 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_shutdown)
     signal.signal(signal.SIGINT, _handle_shutdown)
 
+    executor = ThreadPoolExecutor(max_workers=config.worker.max_concurrent_builds)
+    active: dict = {}  # future → job
+
     try:
-        with ThreadPoolExecutor(max_workers=config.worker.max_concurrent_builds) as executor:
-            active = set()
-            while not shutdown_requested:
-                # Drop completed futures from the tracking set
-                active = {f for f in active if not f.done()}
+        while not shutdown_requested:
+            # Drop completed futures from the tracking dict
+            for f in [f for f in active if f.done()]:
+                del active[f]
 
-                if len(active) < config.worker.max_concurrent_builds:
-                    job = backend.claim_job()
-                    if job:
-                        logger.info(f"Claimed job {job['requestId']}")
-                        pipeline = BuildPipeline(config, proxmox, backend)
-                        active.add(executor.submit(pipeline.run, job))
-                    else:
-                        time.sleep(config.worker.poll_interval_seconds)
+            if len(active) < config.worker.max_concurrent_builds:
+                job = backend.claim_job()
+                if job:
+                    logger.info(f"Claimed job {job['requestId']}")
+                    pipeline = BuildPipeline(config, proxmox, backend)
+                    active[executor.submit(pipeline.run, job)] = job
                 else:
-                    # At capacity — check again in 5s without hitting the backend
-                    time.sleep(5)
+                    time.sleep(config.worker.poll_interval_seconds)
+            else:
+                # At capacity — check again in 5s without hitting the backend
+                time.sleep(5)
 
-        # ThreadPoolExecutor.__exit__ waits for all active futures to complete
-        logger.info("Worker shut down gracefully")
-        return 0
     except Exception as e:
         logger.error(f"Worker error: {e}", exc_info=True)
-        return 1
+
+    finally:
+        executor.shutdown(wait=False, cancel_futures=False)
+
+        GRACE_SECONDS = 8  # stay within Docker's 10s SIGKILL window
+        if active:
+            logger.info(f"Shutdown: waiting up to {GRACE_SECONDS}s for {len(active)} active build(s)...")
+            _, still_running = concurrent.futures.wait(list(active.keys()), timeout=GRACE_SECONDS)
+            for future in still_running:
+                job = active[future]
+                job_id = str(job["requestId"])
+                logger.warning(f"Build {job_id} exceeded grace period — reporting as failed")
+                try:
+                    backend.fail_job(job_id, "worker_shutdown",
+                                     "Worker shutdown: build did not finish within grace period")
+                except Exception as report_err:
+                    logger.error(f"Could not report {job_id} as failed: {report_err}")
+
+        logger.info("Worker shut down gracefully")
+
+    return 0
 
 
 if __name__ == "__main__":

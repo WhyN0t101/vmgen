@@ -1,5 +1,6 @@
 package io.vmgen.api.service;
 
+import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.build.BuildDownloadInfo;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.BuildScriptDto;
@@ -56,6 +57,7 @@ public class VmRequestService {
     private final ScriptCompatibilityService scriptCompatibilityService;
     private final ScriptParameterService scriptParameterService;
     private final ProvenanceRecordRepository provenanceRecordRepository;
+    private final AuditService auditService;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -64,7 +66,7 @@ public class VmRequestService {
      * script entries and parameter values. Returns the full BuildResponse.
      */
     @Transactional
-    public BuildResponse createBuild(User user, CreateBuildRequest request) {
+    public BuildResponse createBuild(User user, CreateBuildRequest request, AuditContext ctx) {
         // 0. Reject duplicate script IDs up front — the count check below would otherwise
         //    report them as "not found or inactive", which is a misleading error.
         List<UUID> requestedIds = request.getVulnerabilityIds();
@@ -211,6 +213,7 @@ public class VmRequestService {
         }
 
         log.info("Build {} created by user {} for template {}", saved.getId(), user.getId(), template.getIdentifier());
+        auditService.logBuildCreated(user, saved.getId(), template.getId(), ctx);
         return toResponse(saved, scripts, orderedScriptIds);
     }
 
@@ -251,7 +254,7 @@ public class VmRequestService {
      * Throws 404 if not found, not owned by the user, not READY, or file deleted.
      */
     @Transactional(readOnly = true)
-    public BuildDownloadInfo getBuildDownloadInfo(UUID requestId, User user) {
+    public BuildDownloadInfo getBuildDownloadInfo(UUID requestId, User user, AuditContext ctx) {
         VmRequest request = vmRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + requestId));
         if (!request.getUser().getId().equals(user.getId())) {
@@ -266,6 +269,7 @@ public class VmRequestService {
         if (request.getStoragePath() == null) {
             throw new ResourceNotFoundException("OVA storage path not available");
         }
+        auditService.logBuildDownloaded(user, requestId, ctx);
         return new BuildDownloadInfo(
                 request.getStoragePath(),
                 request.getOvaFilename(),
@@ -279,7 +283,7 @@ public class VmRequestService {
      * Throws 404 if not found, not owned by the user, or provenance not yet created.
      */
     @Transactional(readOnly = true)
-    public ProvenanceResponse getBuildProvenance(UUID requestId, User user) {
+    public ProvenanceResponse getBuildProvenance(UUID requestId, User user, AuditContext ctx) {
         VmRequest request = vmRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + requestId));
         if (!request.getUser().getId().equals(user.getId())) {
@@ -287,6 +291,7 @@ public class VmRequestService {
         }
         ProvenanceRecord provenance = provenanceRecordRepository.findByVmRequest_Id(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provenance not available for this build"));
+        auditService.logProvenanceRetrieved(user, requestId, ctx);
         return ProvenanceResponse.builder()
                 .buildId(requestId)
                 .templateIdentifier(provenance.getTemplateIdentifier())

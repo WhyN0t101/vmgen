@@ -401,5 +401,11 @@ export interface RoleUpdateRequest {
   role: 'user' | 'admin'
 }
 
+export interface AuthResponse {
+  token: string
+  role: string
+  expiresAt: string
+}
+
 
 

@@ -74,6 +74,12 @@ public interface VmRequestRepository extends JpaRepository<VmRequest, UUID> {
     List<VmRequest> findStaleJobs(@Param("states") List<VmRequestState> states, @Param("threshold") Instant threshold);
 
     /**
+     * Find jobs that have been running longer than the given wall-clock duration (absolute timeout).
+     */
+    @Query("SELECT vr FROM VmRequest vr WHERE vr.state IN :states AND vr.submittedAt < :threshold")
+    List<VmRequest> findLongRunningJobs(@Param("states") List<VmRequestState> states, @Param("threshold") Instant threshold);
+
+    /**
      * Find jobs by user (paginated).
      */
     Page<VmRequest> findByUser_IdOrderBySubmittedAtDesc(UUID userId, Pageable pageable);

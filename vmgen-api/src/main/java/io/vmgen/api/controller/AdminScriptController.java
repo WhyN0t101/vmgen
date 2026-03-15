@@ -16,7 +16,11 @@ import io.vmgen.api.service.script.ScriptCompatibilityService;
 import io.vmgen.api.service.script.ScriptParameterService;
 import io.vmgen.api.service.script.ScriptService;
 import io.vmgen.api.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Map;
+
+import static io.vmgen.api.utils.HttpUtils.auditContext;
 
 import java.util.List;
 import java.util.UUID;
@@ -84,24 +88,33 @@ public class AdminScriptController {
     @PostMapping
     public ResponseEntity<ScriptDetailDto> createScript(
             @Valid @RequestBody CreateScriptRequest request,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest http
     ) {
         String adminUsername = userService.requireAdminUser(authentication).getUsername();
-        ScriptDetailDto created = scriptService.create(request, adminUsername);
+        ScriptDetailDto created = scriptService.create(request, adminUsername, auditContext(http, Map.of()));
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ScriptDetailDto> updateScript(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateScriptRequest request
+            @Valid @RequestBody UpdateScriptRequest request,
+            Authentication authentication,
+            HttpServletRequest http
     ) {
-        return ResponseEntity.ok(scriptService.update(id, request));
+        var admin = userService.requireAdminUser(authentication);
+        return ResponseEntity.ok(scriptService.update(id, request, admin, auditContext(http, Map.of())));
     }
 
     @PostMapping("/{id}/deprecate")
-    public ResponseEntity<StatusResponse> deprecateScript(@PathVariable UUID id) {
-        scriptService.deprecate(id);
+    public ResponseEntity<StatusResponse> deprecateScript(
+            @PathVariable UUID id,
+            Authentication authentication,
+            HttpServletRequest http
+    ) {
+        var admin = userService.requireAdminUser(authentication);
+        scriptService.deprecate(id, admin, auditContext(http, Map.of()));
         return ResponseEntity.ok(new StatusResponse("ok"));
     }
 

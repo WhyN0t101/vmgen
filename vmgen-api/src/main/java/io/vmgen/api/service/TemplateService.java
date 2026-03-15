@@ -2,6 +2,7 @@ package io.vmgen.api.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vmgen.api.config.ProxmoxApiConfig;
+import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.config.TemplateDefaults;
 import io.vmgen.api.dto.proxmox.ProxmoxVmSummary;
 import io.vmgen.api.dto.script.ScriptListDto;
@@ -57,13 +58,14 @@ public class TemplateService {
     private final ProxmoxService proxmoxService;
     private final ObjectMapper objectMapper;
     private final ProxmoxApiConfig proxmoxConfig;
+    private final AuditService auditService;
 
     /**
      * Registers a new template from an existing Proxmox VM.
      * Validates uniqueness and VM existence before persisting.
      */
     @Transactional
-    public TemplateResponse registerTemplate(RegisterTemplateRequest request, UUID adminId) {
+    public TemplateResponse registerTemplate(RegisterTemplateRequest request, UUID adminId, AuditContext ctx) {
         // Validate everything before database interaction
         validateRegistrationRequest(request);
 
@@ -80,7 +82,7 @@ public class TemplateService {
         log.info("Template registered: {} {} (ID: {}, VMID: {}, Node: {})",
                 request.getIdentifier(), request.getVersion(), template.getId(),
                 template.getProxmoxVmid(), template.getProxmoxNode());
-
+        auditService.logTemplateRegistered(creator, template.getId(), template.getIdentifier(), ctx);
         return toResponse(template);
     }
 
@@ -266,7 +268,7 @@ public class TemplateService {
      * Throws {@link TemplateValidationException} if the template is not in DRAFT status.
      */
     @Transactional
-    public TemplateResponse validateTemplate(UUID templateId, UUID adminId) {
+    public TemplateResponse validateTemplate(UUID templateId, UUID adminId, AuditContext ctx) {
         Template template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + templateId));
 
@@ -295,7 +297,7 @@ public class TemplateService {
         log.info("Template validated: {} {} (ID: {}, VMID: {}, Node: {})",
                 template.getIdentifier(), template.getVersion(), template.getId(),
                 template.getProxmoxVmid(), template.getProxmoxNode());
-
+        auditService.logTemplateValidated(admin, template.getId(), ctx);
         return toResponse(template);
     }
 
@@ -361,7 +363,7 @@ public class TemplateService {
      * Throws {@link TemplateValidationException} if the template is already deprecated.
      */
     @Transactional
-    public void deprecateTemplate(UUID templateId, UUID adminId) {
+    public void deprecateTemplate(UUID templateId, UUID adminId, AuditContext ctx) {
         Template template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + templateId));
 
@@ -377,6 +379,7 @@ public class TemplateService {
         template.setDeprecatedBy(admin);
         templateRepository.save(template);
 
+        auditService.logTemplateDeprecated(admin, template.getId(), ctx);
         log.info("Template deprecated: {} v{} by admin {} (ID: {})",
                 template.getIdentifier(), template.getVersion(), adminId, template.getId());
     }
@@ -387,7 +390,7 @@ public class TemplateService {
      * identifier, version, and Proxmox configuration are not affected.
      */
     @Transactional
-    public TemplateResponse updateMetadata(UUID id, UpdateTemplateMetadataRequest request) {
+    public TemplateResponse updateMetadata(UUID id, UpdateTemplateMetadataRequest request, UUID adminId, AuditContext ctx) {
         Template template = templateRepository.findById(id)
                 .orElseThrow(() -> new TemplateNotFoundException("Template not found: " + id));
 
@@ -412,8 +415,9 @@ public class TemplateService {
 
         template = templateRepository.save(template);
 
+        User admin = userRepository.findById(adminId).orElse(null);
+        auditService.logTemplateMetadataUpdated(admin, template.getId(), ctx);
         log.info("Template metadata updated: {} v{} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
-
         return toResponse(template);
     }
 

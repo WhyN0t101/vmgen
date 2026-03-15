@@ -8,8 +8,10 @@ import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.models.user.User;
 import io.vmgen.api.service.UserService;
 import io.vmgen.api.service.VmRequestService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
@@ -28,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import static io.vmgen.api.utils.HttpUtils.auditContext;
+
 @RestController
 @RequestMapping("/api/builds")
 @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
@@ -41,10 +45,11 @@ public class BuildController {
     @PostMapping
     public ResponseEntity<BuildResponse> createBuild(
             @Valid @RequestBody CreateBuildRequest request,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest http
     ) {
         User user = userService.requireUser(authentication);
-        BuildResponse response = vmRequestService.createBuild(user, request);
+        BuildResponse response = vmRequestService.createBuild(user, request, auditContext(http, Map.of()));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -71,10 +76,11 @@ public class BuildController {
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> downloadOva(
             @PathVariable UUID id,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest http
     ) {
         User user = userService.requireUser(authentication);
-        BuildDownloadInfo info = vmRequestService.getBuildDownloadInfo(id, user);
+        BuildDownloadInfo info = vmRequestService.getBuildDownloadInfo(id, user, auditContext(http, Map.of()));
 
         Resource file = new FileSystemResource(Paths.get(info.storagePath()));
         String filename = info.filename() != null ? info.filename() : id + ".ova";
@@ -91,9 +97,10 @@ public class BuildController {
     @GetMapping("/{id}/provenance")
     public ResponseEntity<ProvenanceResponse> getProvenance(
             @PathVariable UUID id,
-            Authentication authentication
+            Authentication authentication,
+            HttpServletRequest http
     ) {
         User user = userService.requireUser(authentication);
-        return ResponseEntity.ok(vmRequestService.getBuildProvenance(id, user));
+        return ResponseEntity.ok(vmRequestService.getBuildProvenance(id, user, auditContext(http, Map.of())));
     }
 }
