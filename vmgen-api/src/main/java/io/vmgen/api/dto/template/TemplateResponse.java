@@ -59,7 +59,9 @@ public class TemplateResponse {
     private Integer expectedSshPort;
     private String networkBridge;
     private String sshAuthMethod;
-    
+    private String sshPassword;
+    private String sshPrivateKey;
+
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Instant updatedAt;
     

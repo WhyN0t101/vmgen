@@ -73,6 +73,13 @@ public class RegisterTemplateRequest {
             message = "sshAuthMethod must be one of: cloudinit, password_reset, static_key"
     )
     private String sshAuthMethod = "cloudinit";
+
+    /** Required when sshAuthMethod = 'password_reset'. The password the worker uses to SSH into the VM. */
+    @Size(max = 255, message = "SSH password must not exceed 255 characters")
+    private String sshPassword;
+
+    /** Required when sshAuthMethod = 'static_key'. Full PEM private key content (not a file path). */
+    private String sshPrivateKey;
     
     // Resources
     @NotNull(message = "Disk size is required")

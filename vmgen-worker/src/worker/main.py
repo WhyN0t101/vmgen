@@ -1,5 +1,6 @@
 import argparse
 import logging
+import signal
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -68,10 +69,20 @@ def main() -> int:
     logger.info(f"Poll interval: {config.worker.poll_interval_seconds}s")
     logger.info(f"Max concurrent builds: {config.worker.max_concurrent_builds}")
 
+    shutdown_requested = False
+
+    def _handle_shutdown(sig, *_):
+        nonlocal shutdown_requested
+        logger.info(f"Shutdown signal received ({signal.Signals(sig).name}), finishing active builds...")
+        shutdown_requested = True
+
+    signal.signal(signal.SIGTERM, _handle_shutdown)
+    signal.signal(signal.SIGINT, _handle_shutdown)
+
     try:
         with ThreadPoolExecutor(max_workers=config.worker.max_concurrent_builds) as executor:
             active = set()
-            while True:
+            while not shutdown_requested:
                 # Drop completed futures from the tracking set
                 active = {f for f in active if not f.done()}
 
@@ -87,8 +98,8 @@ def main() -> int:
                     # At capacity — check again in 5s without hitting the backend
                     time.sleep(5)
 
-    except KeyboardInterrupt:
-        logger.info("Worker stopped by user")
+        # ThreadPoolExecutor.__exit__ waits for all active futures to complete
+        logger.info("Worker shut down gracefully")
         return 0
     except Exception as e:
         logger.error(f"Worker error: {e}", exc_info=True)

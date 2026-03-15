@@ -164,6 +164,8 @@ public class TemplateService {
             sshAuthMethod = "cloudinit";
         }
         template.setSshAuthMethod(sshAuthMethod);
+        template.setSshPassword(request.getSshPassword());
+        template.setSshPrivateKey(request.getSshPrivateKey());
         template.setStatus(TemplateStatus.DRAFT);
         template.setCreatedBy(creator);
         return template;
@@ -456,6 +458,8 @@ public class TemplateService {
                 .expectedSshPort(template.getExpectedSshPort())
                 .networkBridge(template.getNetworkBridge())
                 .sshAuthMethod(template.getSshAuthMethod())
+                .sshPassword(template.getSshPassword())
+                .sshPrivateKey(template.getSshPrivateKey())
                 .updatedAt(template.getUpdatedAt())
                 .capabilities(capabilities)
                 .build();

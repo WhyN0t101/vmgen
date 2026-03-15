@@ -121,6 +121,14 @@ public class Template {
     @Column(name = "ssh_auth_method", nullable = false, length = 20)
     private String sshAuthMethod = "password_reset";
 
+    /** Used when sshAuthMethod = 'password_reset'. Null for other methods. */
+    @Column(name = "ssh_password", length = 255)
+    private String sshPassword;
+
+    /** Full PEM private key content used when sshAuthMethod = 'static_key'. Null for other methods. */
+    @Column(name = "ssh_private_key", columnDefinition = "TEXT")
+    private String sshPrivateKey;
+
     @Column(name = "last_validation_attempt")
     private Instant lastValidationAttempt;
 

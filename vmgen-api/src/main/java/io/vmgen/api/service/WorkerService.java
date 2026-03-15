@@ -270,6 +270,8 @@ public class WorkerService {
                 .sshAuthMethod(template.getSshAuthMethod())
                 .expectedSshUser(template.getExpectedSshUser())
                 .expectedSshPort(template.getExpectedSshPort())
+                .sshPassword(template.getSshPassword())
+                .sshPrivateKey(template.getSshPrivateKey())
                 .diskStorage(template.getDiskStorage())
                 .buildSeed(request.getBuildSeed())
                 .difficultyLevel(request.getDifficultyOverride())

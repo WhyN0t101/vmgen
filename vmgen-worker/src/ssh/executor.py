@@ -4,6 +4,7 @@ import paramiko
 
 log = logging.getLogger(__name__)
 
+
 class SSHExecutor:
     def __init__(
         self,
@@ -60,14 +61,25 @@ class SSHExecutor:
         exit_code = stdout.channel.recv_exit_status()
         return exit_code, stdout.read().decode(), stderr.read().decode()
     
-    def upload_file(self, local_path: str, remote_path: str):
-        sftp = self._client.open_sftp()
-        try:
-            sftp.put(local_path, remote_path)
-        finally:
-            sftp.close()
+    def write_remote_file(self, content: str, remote_path: str, mode: str = "644") -> None:
+        """Write content to a remote file by piping via stdin — value never appears in the command string."""
+        log.debug(f"Writing {len(content)} bytes to {self.host}:{remote_path}")
+        stdin, stdout, stderr = self._client.exec_command(
+            f"cat > {remote_path} && chmod {mode} {remote_path}"
+        )
+        stdin.write(content.encode())
+        stdin.channel.shutdown_write()
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code != 0:
+            error = stderr.read().decode().strip()
+            raise RuntimeError(f"Failed to write {remote_path}: {error}")
 
-    def execute_script(self, local_path: str, remote_path: str = "/tmp/vmgen_script.sh") -> tuple[int, str, str]:
-        self.upload_file(local_path, remote_path)
-        self.execute(f"chmod +x {remote_path}")
-        return self.execute(remote_path)
+    def execute_content(self, script_content: str) -> tuple[int, str, str]:
+        """Execute script content by piping it to bash stdin — no local file or SFTP needed."""
+        log.debug(f"Executing script content on {self.host} via bash stdin ({len(script_content)} bytes)")
+        stdin, stdout, stderr = self._client.exec_command("bash -s")
+        stdin.write(script_content.encode())
+        stdin.channel.shutdown_write()
+        exit_code = stdout.channel.recv_exit_status()
+        log.debug(f"Script exited with code {exit_code} on {self.host}")
+        return exit_code, stdout.read().decode(), stderr.read().decode()

@@ -3,13 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv
 
-@dataclass
-class DatabaseConfig:
-    host: str
-    port: int
-    name: str
-    user: str
-    password: str
 
 @dataclass
 class ProxmoxConfig:
@@ -35,14 +28,11 @@ class WorkerConfig:
 
 @dataclass
 class Config:
-    database: DatabaseConfig
     proxmox: ProxmoxConfig
     worker: WorkerConfig
     backend: BackendConfig
     platform_secret: str
     export_path: str           # filesystem path where OVAs are written (must be NFS-accessible from worker)
-    vm_ssh_password: str = ""  # used when template sshAuthMethod = "password_reset"
-    vm_static_key_path: str = ""  # used when template sshAuthMethod = "static_key"
     log_level: str = "INFO"
 
     @classmethod
@@ -51,13 +41,6 @@ class Config:
         load_dotenv(env_path)
         
         # Read values from environment
-        database = DatabaseConfig(
-            host=os.getenv("DATABASE_HOST", "localhost"),
-            port=int(os.getenv("DATABASE_PORT", "5432")),
-            name=os.getenv("DATABASE_NAME", "vmgen"),
-            user=os.getenv("DATABASE_USER", "vmgen"),
-            password=os.getenv("DATABASE_PASSWORD", ""),
-        )
         proxmox = ProxmoxConfig(
             host=os.getenv("PROXMOX_HOST", ""),
             token_id=os.getenv("PROXMOX_TOKEN_ID", ""),
@@ -71,33 +54,26 @@ class Config:
 
         worker = WorkerConfig(
             id=os.getenv("WORKER_ID", "worker-01"),
-            poll_interval_seconds=30,
-            max_concurrent_builds=3,
+            poll_interval_seconds=int(os.getenv("WORKER_POLL_INTERVAL_SECONDS", "30")),
+            max_concurrent_builds=int(os.getenv("WORKER_MAX_CONCURRENT_BUILDS", "3")),
         )
         backend = BackendConfig(
             url=os.getenv("BACKEND_URL", "http://localhost:3000"),
             api_key=os.getenv("BACKEND_API_KEY", ""),
         )
         return cls(
-            database=database,
             proxmox=proxmox,
             worker=worker,
             backend=backend,
             platform_secret=os.getenv("PLATFORM_SECRET", ""),
             export_path=os.getenv("EXPORT_PATH", "/var/lib/vmgen/exports"),
-            vm_ssh_password=os.getenv("VM_SSH_PASSWORD", ""),
-            vm_static_key_path=os.getenv("VM_STATIC_KEY_PATH", ""),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
         )
         
     def validate(self) -> list[str]:
         """Return list of validation errors (empty if valid)."""
         errors = []
-        
-        # Database
-        if not self.database.password:
-            errors.append("DATABASE_PASSWORD is required")
-        
+
         # Proxmox
         if not self.proxmox.host:
             errors.append("PROXMOX_HOST is required")

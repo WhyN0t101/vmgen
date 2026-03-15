@@ -27,10 +27,12 @@ public class ClaimJobResponse {
     private List<ScriptInfo> scripts;
     
     // SSH configuration (needed by worker to connect to the VM guest)
-    private String sshAuthMethod;    // "cloudinit" | "password_reset" | "static_key"
+    private String sshAuthMethod;     // "cloudinit" | "password_reset" | "static_key"
     private String expectedSshUser;
     private Integer expectedSshPort;
-    private String diskStorage;      // Proxmox storage name — used for OVA export
+    private String sshPassword;       // non-null when sshAuthMethod = "password_reset"
+    private String sshPrivateKey;     // non-null when sshAuthMethod = "static_key" (full PEM content)
+    private String diskStorage;       // Proxmox storage name — used for OVA export
 
     // Build parameters
     private String buildSeed;

@@ -6,7 +6,7 @@ log = logging.getLogger(__name__)
 
 class ProxmoxClient:
     def __init__(self, config):
-        self._config = config          # ← 8 spaces indent
+        self._config = config         
         user, token_name = config.token_id.split('!')
         self._px = ProxmoxAPI(
             config.host,
@@ -48,15 +48,18 @@ class ProxmoxClient:
         
     def clone_vm(self, vmid: int, new_vmid: int, name: str, node: str | None = None):
         """Full clone (not linked) — independent copy so we can modify without touching template."""
+        log.info(f"Cloning VM {vmid} → {new_vmid} (name: {name})...")
         task = self._node_api(node).qemu(vmid).clone.post(
             newid=new_vmid,
             name=name,
             full=1,     # full=1 means full clone, full=0 would be linked (shares disk)
         )
         self._wait_for_task(task, node, timeout=600)  # cloning a full disk takes time
+        log.info(f"VM {new_vmid} cloned successfully")
 
     def configure_network(self, vmid: int, node: str | None = None):
         """Attach VM to the isolated build bridge (from config)."""
+        log.info(f"Attaching VM {vmid} to isolated bridge {self._config.isolated_bridge}")
         self._node_api(node).qemu(vmid).config.put(
             net0=f"virtio,bridge={self._config.isolated_bridge}"
         )
@@ -85,6 +88,7 @@ class ProxmoxClient:
             return False
 
     def inject_cloudinit_key(self, vmid: int, ssh_user: str, public_key: str, node: str | None = None):
+        log.info(f"Injecting ephemeral cloud-init SSH key for user '{ssh_user}' on VM {vmid}")
         """
         Inject an ephemeral SSH public key via the Proxmox cloud-init API.
         Must be called BEFORE start_vm — cloud-init only runs on first boot.
@@ -120,12 +124,16 @@ class ProxmoxClient:
         return self._node_api(node).qemu(vmid).config.get()
 
     def start_vm(self, vmid: int, node: str | None = None):
+        log.info(f"Starting VM {vmid}...")
         task = self._node_api(node).qemu(vmid).status.start.post()
         self._wait_for_task(task, node)
+        log.info(f"VM {vmid} started")
 
     def stop_vm(self, vmid: int, node: str | None = None):
+        log.info(f"Stopping VM {vmid}...")
         task = self._node_api(node).qemu(vmid).status.stop.post()
         self._wait_for_task(task, node, timeout=120)
+        log.info(f"VM {vmid} stopped")
 
     def remove_network(self, vmid: int, node: str | None = None):
         """
@@ -154,9 +162,11 @@ class ProxmoxClient:
         log.info(f"Removed {net_devices} from VM {vmid}")
 
     def delete_vm(self, vmid: int, node: str | None = None):
-        """Delete VM — used in stage 17 (cleanup) and on failure."""
+        """Delete VM — used in stage 16 (cleanup) and on failure."""
+        log.info(f"Deleting VM {vmid}...")
         task = self._node_api(node).qemu(vmid).delete()
         self._wait_for_task(task, node)
+        log.info(f"VM {vmid} deleted")
 
     def export_ova(self, vmid: int, dest_path: str, storage: str) -> str:
         """
@@ -188,7 +198,7 @@ class ProxmoxClient:
             self._ssh_run(client, f"mkdir -p {proxmox_tmp}")
             self._ssh_run(
                 client,
-                f"qm exportovf {vmid} {proxmox_ova} --storage {storage}",
+                f"sudo qm exportovf {vmid} {proxmox_ova} --storage {storage}",
                 timeout=1800,  # large disks can take a while
             )
 

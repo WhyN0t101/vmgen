@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Plus, X } from 'lucide-vue-next'
 import { useQuery } from '@tanstack/vue-query'
@@ -124,6 +124,12 @@ const form = ref<RegisterTemplateRequest>({
   networkBridge: 'vmbr0',
   sshAuthMethod: 'cloudinit',
   capabilities: [],
+})
+
+// Clear stale credential when auth method changes
+watch(() => form.value.sshAuthMethod, () => {
+  form.value.sshPassword = undefined
+  form.value.sshPrivateKey = undefined
 })
 
 const customCapability = ref('')
@@ -470,6 +476,42 @@ async function handleSubmit() {
           <p class="mt-1 text-xs text-slate-400">
             Use <span class="font-semibold text-slate-200">cloud-init</span> for modern templates with
             ephemeral SSH keys. Other options exist for legacy or special-case images.
+          </p>
+        </div>
+
+        <!-- Credential fields — shown conditionally based on auth method -->
+        <div v-if="form.sshAuthMethod === 'password_reset'" class="mb-4">
+          <label class="block text-sm font-medium text-slate-300 mb-2">
+            SSH Password <span class="text-red-400">*</span>
+          </label>
+          <input
+            v-model="form.sshPassword"
+            type="password"
+            required
+            autocomplete="new-password"
+            class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="Password the worker will use to SSH into the VM"
+          />
+          <p class="mt-1 text-xs text-slate-400">
+            The worker will SSH into the VM using this password after Proxmox resets the local account.
+          </p>
+        </div>
+
+        <div v-if="form.sshAuthMethod === 'static_key'" class="mb-4">
+          <label class="block text-sm font-medium text-slate-300 mb-2">
+            Private Key (PEM) <span class="text-red-400">*</span>
+          </label>
+          <textarea
+            v-model="form.sshPrivateKey"
+            required
+            rows="8"
+            spellcheck="false"
+            class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
+          />
+          <p class="mt-1 text-xs text-slate-400">
+            Full PEM private key content. The corresponding public key must already be present in the
+            template's <code class="text-slate-300">authorized_keys</code>.
           </p>
         </div>
 

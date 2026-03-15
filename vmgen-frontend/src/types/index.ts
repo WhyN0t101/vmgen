@@ -69,6 +69,8 @@ export interface RegisterTemplateRequest {
   expectedSshPort?: number
   networkBridge?: string
   sshAuthMethod: 'cloudinit' | 'password_reset' | 'static_key'
+  sshPassword?: string
+  sshPrivateKey?: string
   capabilities: string[]
 }
 
