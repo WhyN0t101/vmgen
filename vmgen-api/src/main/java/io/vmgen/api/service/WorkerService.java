@@ -11,6 +11,7 @@ import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.models.build.BuildLog;
 import io.vmgen.api.models.flag.Flag;
 import io.vmgen.api.models.provenance.ProvenanceRecord;
+import io.vmgen.api.models.provenance.ProvenanceScript;
 import io.vmgen.api.models.template.Template;
 import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestScript;
@@ -183,12 +184,44 @@ public class WorkerService {
             provenance.setOvaSha256(completion.getOvaChecksum());
             provenance.setDifficultyLevel(request.getDifficultyOverride());
             provenance.setTelemetryEnabled(Boolean.TRUE.equals(request.getTelemetryEnabled()));
+            provenance.setWorkerId(p.getWorkerId());
+            if (p.getBuildStartedAt() != null) {
+                try { provenance.setBuildStartedAt(Instant.parse(p.getBuildStartedAt())); }
+                catch (DateTimeParseException ignored) {}
+            }
+            if (p.getBuildFinishedAt() != null) {
+                try { provenance.setBuildFinishedAt(Instant.parse(p.getBuildFinishedAt())); }
+                catch (DateTimeParseException ignored) {}
+            }
             if (p.getFlagDerivationTimestamp() != null) {
                 provenance.setFlagDerivationTimestamp(
                     Instant.parse(p.getFlagDerivationTimestamp()));
             } else {
                 provenance.setFlagDerivationTimestamp(Instant.now());
             }
+
+            // Persist script execution records
+            if (p.getScripts() != null) {
+                List<ProvenanceScript> scriptRecords = new ArrayList<>();
+                for (int i = 0; i < p.getScripts().size(); i++) {
+                    JobCompleteRequest.ScriptRecord sr = p.getScripts().get(i);
+                    ProvenanceScript ps = new ProvenanceScript();
+                    ps.setProvenanceRecord(provenance);
+                    ps.setScriptIdentifier(sr.getIdentifier() != null ? sr.getIdentifier() : "");
+                    ps.setScriptVersion(sr.getVersion() != null ? sr.getVersion() : "");
+                    ps.setScriptSha256(sr.getSha256() != null ? sr.getSha256() : "");
+                    ps.setExecutionOrder(sr.getExecutionOrder() != null ? sr.getExecutionOrder() : i);
+                    if (sr.getScriptId() != null) {
+                        try { ps.setScriptId(UUID.fromString(sr.getScriptId())); }
+                        catch (IllegalArgumentException ignored) {}
+                    }
+                    ps.setExitCode(sr.getExitCode());
+                    ps.setDurationSeconds(sr.getDurationSeconds());
+                    scriptRecords.add(ps);
+                }
+                provenance.setScripts(scriptRecords);
+            }
+
             provenanceRecordRepository.save(provenance);
 
             // Update the template's sha256Hash if it was pending and the worker computed a real one
@@ -216,12 +249,16 @@ public class WorkerService {
                     : Instant.now();
 
             for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
+                String tsUsed = flagDerivationTimestamp != null ? flagDerivationTimestamp : flagTs.toString();
                 String expectedHash = deriveFlagHash(
                         request.getBuildSeed(),
                         requestId.toString(),
                         fi.getScriptId(),
-                        flagDerivationTimestamp != null ? flagDerivationTimestamp : flagTs.toString()
+                        tsUsed
                 );
+                log.info("[DEBUG flag] seed={} reqId={} scriptId={} ts={} expected={} got={}",
+                        request.getBuildSeed(), requestId, fi.getScriptId(),
+                        tsUsed, expectedHash, fi.getFlagValueHash());
                 if (!MessageDigest.isEqual(
                         expectedHash.getBytes(StandardCharsets.UTF_8),
                         fi.getFlagValueHash().getBytes(StandardCharsets.UTF_8))) {

@@ -292,6 +292,18 @@ public class VmRequestService {
         ProvenanceRecord provenance = provenanceRecordRepository.findByVmRequest_Id(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Provenance not available for this build"));
         auditService.logProvenanceRetrieved(user, requestId, ctx);
+        List<ProvenanceResponse.ScriptInfo> scriptInfos = provenance.getScripts().stream()
+                .map(s -> ProvenanceResponse.ScriptInfo.builder()
+                        .scriptId(s.getScriptId() != null ? s.getScriptId().toString() : null)
+                        .identifier(s.getScriptIdentifier())
+                        .version(s.getScriptVersion())
+                        .sha256(s.getScriptSha256())
+                        .executionOrder(s.getExecutionOrder())
+                        .exitCode(s.getExitCode())
+                        .durationSeconds(s.getDurationSeconds())
+                        .build())
+                .collect(Collectors.toList());
+
         return ProvenanceResponse.builder()
                 .buildId(requestId)
                 .templateIdentifier(provenance.getTemplateIdentifier())
@@ -303,6 +315,10 @@ public class VmRequestService {
                 .ovaSha256(provenance.getOvaSha256())
                 .flagDerivationTimestamp(provenance.getFlagDerivationTimestamp())
                 .finalisedAt(provenance.getFinalisedAt())
+                .workerId(provenance.getWorkerId())
+                .buildStartedAt(provenance.getBuildStartedAt())
+                .buildFinishedAt(provenance.getBuildFinishedAt())
+                .scripts(scriptInfos)
                 .build();
     }
 

@@ -23,27 +23,31 @@ public class JobCompleteRequest {
     private Provenance provenance;
     @Valid
     private List<FlagInfo> flags;
-    
+
     @Data
     public static class Provenance {
+        private String workerId;
         private String templateIdentifier;
         private String templateVersion;
         private String templateSha256;
+        private String buildStartedAt;
+        private String buildFinishedAt;
+        private String flagDerivationTimestamp;
         @Valid
         private List<ScriptRecord> scripts;
-        private String buildSeed;
-        private String flagDerivationTimestamp;
-        private String ovaSha256;
     }
-    
+
     @Data
     public static class ScriptRecord {
+        private String scriptId;
         private String identifier;
         private String version;
         private String sha256;
         private Integer executionOrder;
+        private Integer exitCode;
+        private Integer durationSeconds;
     }
-    
+
     @Data
     public static class FlagInfo {
         private String scriptId;

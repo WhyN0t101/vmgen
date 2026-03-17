@@ -165,6 +165,14 @@ class ProxmoxClient:
 
     def delete_vm(self, vmid: int, node: str | None = None):
         """Delete VM — used in stage 16 (cleanup) and on failure."""
+        try:
+            status = self._node_api(node).qemu(vmid).status.current.get()
+            if status.get('status') == 'running':
+                log.info(f"VM {vmid} is running, stopping before delete...")
+                task = self._node_api(node).qemu(vmid).status.stop.post()
+                self._wait_for_task(task, node)
+        except Exception as e:
+            log.warning(f"Could not check/stop VM {vmid} before delete: {e}")
         log.info(f"Deleting VM {vmid}...")
         task = self._node_api(node).qemu(vmid).delete()
         self._wait_for_task(task, node)
@@ -172,21 +180,28 @@ class ProxmoxClient:
 
     def export_ova(self, vmid: int, dest_path: str, storage: str) -> str:
         """
-        SSH into the Proxmox host, run qm exportovf to a temp dir there,
-        then SFTP the resulting OVA to dest_path on the worker machine.
-        Finally removes the temp file from Proxmox.
+        SSH into the Proxmox host, manually build an OVA:
+          1. Parse qm config to find disk volume + hardware specs
+          2. Get disk path via pvesm
+          3. Convert disk to stream-optimised VMDK with qemu-img
+          4. Generate a minimal OVF 1.0 descriptor
+          5. Package OVF + VMDK into a tar OVA
+          6. SFTP the OVA to the worker machine
+          7. Clean up temp dir on Proxmox
 
-        dest_path is a LOCAL path on the worker (e.g. /var/lib/vmgen/exports/<job>/<name>.ova).
-        Network must already be removed (stage 12) before calling this.
+        dest_path is a LOCAL path on the worker.
+        Network must already be removed (stage 11) before calling this.
         """
         import os
 
         proxmox_tmp = f"/tmp/vmgen-export-{vmid}"
+        vmdk_path   = f"{proxmox_tmp}/disk.vmdk"
+        ovf_path    = f"{proxmox_tmp}/vm.ovf"
         proxmox_ova = f"{proxmox_tmp}/vm.ova"
 
         log.info(f"Exporting VM {vmid} on Proxmox host to {proxmox_ova}...")
 
-        client = paramiko.SSHClient()  # paramiko imported at module level
+        client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
             client.connect(
@@ -195,15 +210,42 @@ class ProxmoxClient:
                 key_filename=self._config.ssh_key_path,
             )
 
-            # Step 1: Create temp dir on Proxmox and run export
             self._ssh_run(client, f"mkdir -p {proxmox_tmp}")
+
+            # Step 1: Parse VM config
+            config_raw = self._ssh_run(client, f"sudo qm config {vmid}")
+            vm_cfg = self._parse_vm_config(config_raw)
+            log.info(f"VM config: {vm_cfg}")
+
+            # Step 2: Resolve disk path
+            disk_path = self._ssh_run(client, f"sudo pvesm path {vm_cfg['disk_volid']}").strip()
+            log.info(f"Disk path: {disk_path}")
+
+            # Step 3: Convert to stream-optimised VMDK
+            log.info("Converting disk to VMDK (stream-optimised)...")
             self._ssh_run(
                 client,
-                f"sudo qm exportovf {vmid} {proxmox_ova} --storage {storage}",
-                timeout=1800,  # large disks can take a while
+                f"sudo qemu-img convert --salvage -O vmdk -o subformat=streamOptimized {disk_path} {vmdk_path}",
+                timeout=1800,
             )
 
-            # Step 2: SFTP the OVA from Proxmox to the worker's local dest_path
+            # Step 4: Get actual VMDK file size for OVF
+            vmdk_size = int(self._ssh_run(client, f"stat -c %s {vmdk_path}").strip())
+
+            # Step 5: Write OVF descriptor
+            ovf = self._generate_ovf(
+                vm_name=vm_cfg.get('name', f'vmgen-{vmid}'),
+                cpu_count=vm_cfg.get('cores', 1),
+                memory_mb=vm_cfg.get('memory', 512),
+                disk_capacity_bytes=vm_cfg.get('disk_size_bytes', 0),
+                vmdk_size_bytes=vmdk_size,
+            )
+            self._ssh_write(client, ovf, ovf_path)
+
+            # Step 6: Package as OVA (tar, OVF first per spec)
+            self._ssh_run(client, f"tar -C {proxmox_tmp} -cf {proxmox_ova} vm.ovf disk.vmdk")
+
+            # Step 7: SFTP to worker
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             log.info(f"Transferring OVA from Proxmox to {dest_path}...")
             with client.open_sftp() as sftp:
@@ -211,11 +253,109 @@ class ProxmoxClient:
             log.info("OVA transfer complete")
 
         finally:
-            # Step 3: Clean up temp dir on Proxmox
-            self._ssh_run(client, f"rm -rf {proxmox_tmp}")
+            try:
+                self._ssh_run(client, f"rm -rf {proxmox_tmp}")
+            except Exception:
+                pass
             client.close()
 
         return dest_path
+
+    def _parse_vm_config(self, config_output: str) -> dict:
+        """Parse 'qm config' output into a dict with disk_volid, cores, memory, name, disk_size_bytes."""
+        result: dict = {}
+        for line in config_output.splitlines():
+            if ':' not in line:
+                continue
+            key, _, value = line.partition(':')
+            key = key.strip()
+            value = value.strip()
+            if key == 'name':
+                result['name'] = value
+            elif key == 'cores':
+                result['cores'] = int(value)
+            elif key == 'memory':
+                result['memory'] = int(value)
+            elif key in ('scsi0', 'virtio0', 'ide0', 'sata0'):
+                # Skip cdrom and cloud-init drives
+                if 'media=cdrom' in value or 'cloudinit' in value:
+                    continue
+                parts = value.split(',')
+                result['disk_volid'] = parts[0]
+                for part in parts:
+                    if part.startswith('size='):
+                        result['disk_size_bytes'] = self._parse_disk_size(part[5:])
+        return result
+
+    def _parse_disk_size(self, size_str: str) -> int:
+        """Convert '20G', '512M', etc. to bytes."""
+        units = {'K': 1024, 'M': 1024 ** 2, 'G': 1024 ** 3, 'T': 1024 ** 4}
+        suffix = size_str[-1].upper()
+        if suffix in units:
+            return int(size_str[:-1]) * units[suffix]
+        return int(size_str)
+
+    def _generate_ovf(self, vm_name: str, cpu_count: int, memory_mb: int,
+                      disk_capacity_bytes: int, vmdk_size_bytes: int) -> str:
+        """Generate a minimal OVF 1.0 descriptor compatible with VirtualBox and VMware."""
+        return f'''<?xml version="1.0" encoding="UTF-8"?>
+<Envelope xmlns="http://schemas.dmtf.org/ovf/envelope/1"
+          xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1"
+          xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData"
+          xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData">
+  <References>
+    <File ovf:id="disk1" ovf:href="disk.vmdk" ovf:size="{vmdk_size_bytes}"/>
+  </References>
+  <DiskSection>
+    <Info>Virtual disk information</Info>
+    <Disk ovf:diskId="disk1" ovf:fileRef="disk1"
+          ovf:capacity="{disk_capacity_bytes}"
+          ovf:format="http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized"/>
+  </DiskSection>
+  <VirtualSystem ovf:id="{vm_name}">
+    <Info>VMGen generated vulnerable VM</Info>
+    <VirtualHardwareSection>
+      <Info>Virtual hardware requirements</Info>
+      <System>
+        <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>
+        <vssd:InstanceID>0</vssd:InstanceID>
+        <vssd:VirtualSystemType>vmx-13</vssd:VirtualSystemType>
+      </System>
+      <Item>
+        <rasd:Description>Number of virtual CPUs</rasd:Description>
+        <rasd:ElementName>{cpu_count} virtual CPU(s)</rasd:ElementName>
+        <rasd:InstanceID>1</rasd:InstanceID>
+        <rasd:ResourceType>3</rasd:ResourceType>
+        <rasd:VirtualQuantity>{cpu_count}</rasd:VirtualQuantity>
+      </Item>
+      <Item>
+        <rasd:AllocationUnits>MegaBytes</rasd:AllocationUnits>
+        <rasd:Description>Memory Size</rasd:Description>
+        <rasd:ElementName>{memory_mb} MB of memory</rasd:ElementName>
+        <rasd:InstanceID>2</rasd:InstanceID>
+        <rasd:ResourceType>4</rasd:ResourceType>
+        <rasd:VirtualQuantity>{memory_mb}</rasd:VirtualQuantity>
+      </Item>
+      <Item>
+        <rasd:AddressOnParent>0</rasd:AddressOnParent>
+        <rasd:ElementName>Hard Disk</rasd:ElementName>
+        <rasd:HostResource>ovf:/disk/disk1</rasd:HostResource>
+        <rasd:InstanceID>3</rasd:InstanceID>
+        <rasd:Parent>4</rasd:Parent>
+        <rasd:ResourceType>17</rasd:ResourceType>
+      </Item>
+    </VirtualHardwareSection>
+  </VirtualSystem>
+</Envelope>'''
+
+    def _ssh_write(self, client, content: str, remote_path: str) -> None:
+        """Write a string to a remote file via stdin."""
+        stdin, stdout, stderr = client.exec_command(f"cat > {remote_path}")
+        stdin.write(content.encode())
+        stdin.channel.shutdown_write()
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to write {remote_path}: {stderr.read().decode().strip()}")
 
     def _ssh_run(self, client, cmd: str, timeout: int = 300) -> str:
         """Run a command over an open SSH client, raise on non-zero exit. Returns stdout."""
