@@ -1,10 +1,8 @@
 package io.vmgen.api.service.script;
 
 import io.vmgen.api.dto.audit.AuditContext;
-import io.vmgen.api.dto.script.CreateScriptRequest;
-import io.vmgen.api.dto.script.ScriptDetailDto;
-import io.vmgen.api.dto.script.ScriptListDto;
-import io.vmgen.api.dto.script.UpdateScriptRequest;
+import io.vmgen.api.dto.script.*;
+import io.vmgen.api.mapper.ScriptListDtoMapper;
 import io.vmgen.api.service.AuditService;
 import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
@@ -31,7 +29,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import static io.vmgen.api.service.TemplateService.getScriptListDto;
 
 
 @Service
@@ -95,7 +92,7 @@ public class ScriptService {
         script.setIdentifier(request.getIdentifier());
         script.setVersion(request.getVersion());
         buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions());
-        var admin = userRepository.findByUsernameIgnoreCase(adminUsername)
+        User admin = userRepository.findByUsernameIgnoreCase(adminUsername)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + adminUsername));
         script.setCreatedBy(admin);
 
@@ -140,7 +137,7 @@ public class ScriptService {
         }
 
         if (request.getParameters() != null) {
-            for (var param : request.getParameters()) {
+            for (CreateScriptParameterRequest param : request.getParameters()) {
                 if (param == null) continue;
                 parameterService.createParameter(scriptId, param);
             }
@@ -199,11 +196,10 @@ public class ScriptService {
     }
 
     /**
-     * Maps a {@link Script} entity to a full detail DTO.
-     * Placeholder empty lists are used for requirements pending entity introduction.
+     * Maps a {@link Script} entity to a lightweight list DTO.
      */
     private ScriptListDto toListDto(Script script) {
-        return getScriptListDto(script);
+        return ScriptListDtoMapper.toBase(script);
     }
 
     /**

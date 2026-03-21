@@ -55,5 +55,6 @@ public final class ScriptListDtoMapper {
                 .owaspMapping(category != null ? category.getOwaspMapping() : null)
                 .createdAt(script.getCreatedAt());
     }
+
 }
 

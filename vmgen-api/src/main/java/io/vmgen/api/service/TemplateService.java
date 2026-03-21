@@ -185,7 +185,7 @@ public class TemplateService {
 
         List<TemplateCapability> caps = capabilities.stream()
                 .map(cap -> new TemplateCapability(template.getId(), cap, template))
-                .collect(Collectors.toList());
+                .toList();
 
         capabilityRepository.saveAll(caps);
     }
@@ -232,9 +232,8 @@ public class TemplateService {
                 PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
         List<TemplateListResponse> content = paged.getContent().stream()
                 .map(this::toListResponse)
-                .collect(Collectors.toList());
-        return new PagedResponse<>(content, paged.getNumber(), paged.getSize(),
-                paged.getTotalElements(), paged.getTotalPages(), paged.isLast());
+                .toList();
+        return PagedResponse.from(paged, content);
     }
 
 
@@ -247,7 +246,7 @@ public class TemplateService {
         if (status == null || status.isBlank()) {
             return templateRepository.findAllByOrderByCreatedAtDesc().stream()
                     .map(this::toListResponse)
-                    .collect(Collectors.toList());
+                    .toList();
         }
 
         TemplateStatus statusEnum;
@@ -259,7 +258,7 @@ public class TemplateService {
 
         return templateRepository.findAllByStatusOrderByCreatedAtDesc(statusEnum).stream()
                 .map(this::toListResponse)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**
@@ -415,7 +414,8 @@ public class TemplateService {
 
         template = templateRepository.save(template);
 
-        User admin = userRepository.findById(adminId).orElse(null);
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new IllegalArgumentException("Admin user not found: " + adminId));
         auditService.logTemplateMetadataUpdated(admin, template.getId(), ctx);
         log.info("Template metadata updated: {} v{} (ID: {})", template.getIdentifier(), template.getVersion(), template.getId());
         return toResponse(template);
@@ -431,7 +431,7 @@ public class TemplateService {
     private TemplateResponse toResponse(Template template) {
         List<String> capabilities = capabilityRepository.findAllByTemplateId(template.getId()).stream()
                 .map(TemplateCapability::getCapability)
-                .collect(Collectors.toList());
+                .toList();
 
         return TemplateResponse.builder()
                 .id(template.getId())
@@ -473,7 +473,7 @@ public class TemplateService {
     private PublicTemplateResponse toPublicResponse(Template template) {
         List<String> capabilities = capabilityRepository.findAllByTemplateId(template.getId()).stream()
                 .map(TemplateCapability::getCapability)
-                .collect(Collectors.toList());
+                .toList();
 
         return PublicTemplateResponse.builder()
                 .id(template.getId())
@@ -534,7 +534,7 @@ public class TemplateService {
         } else {
             List<UUID> scriptIds = entries.stream()
                     .map(ScriptCompatibility::getScriptId)
-                    .collect(Collectors.toList());
+                    .toList();
             scripts = scriptRepository.findActiveByIdsWithCategory(scriptIds);
         }
 
@@ -579,22 +579,14 @@ public class TemplateService {
         log.info("Script {} unlinked from template {}", scriptId, templateId);
     }
 
-    /**
-     * Maps a {@link Script} entity to a {@link ScriptListDto} without conflict/dependency metadata.
-     */
-    public static ScriptListDto getScriptListDto(Script script) {
-        return ScriptListDtoMapper.toBase(script);
-    }
 
     // Validation result holder
-        private record ValidationResult(boolean valid, String errorMessage) {
-
+    private record ValidationResult(boolean valid, String errorMessage) {
         static ValidationResult success() {
-                return new ValidationResult(true, null);
-            }
-
-            static ValidationResult failed(String message) {
-                return new ValidationResult(false, message);
-            }
+            return new ValidationResult(true, null);
         }
+        static ValidationResult failed(String message) {
+            return new ValidationResult(false, message);
+        }
+    }
 }

@@ -51,7 +51,7 @@ public class ScriptCompatibilityService {
      * dependencies. Returns a {@link ScriptSelectionResult} containing
      * the ordered execution list and any auto-added scripts.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public ScriptSelectionResult resolveScriptSelection(List<UUID> selectedScriptIds) {
         if (selectedScriptIds == null || selectedScriptIds.isEmpty()) {
             throw new ScriptConflictException("At least one script must be selected");
@@ -126,15 +126,11 @@ public class ScriptCompatibilityService {
         }
 
         return scripts.stream()
-                .map(s -> toEnrichedDto(s, conflictMap, requiresMap))
+                .map(s -> ScriptListDtoMapper.toEnriched(s, conflictMap, requiresMap))
                 .toList();
     }
 
-    private ScriptListDto toEnrichedDto(Script script,
-                                        Map<UUID, List<UUID>> conflictMap,
-                                        Map<UUID, List<UUID>> requiresMap) {
-        return ScriptListDtoMapper.toEnriched(script, conflictMap, requiresMap);
-    }
+
 
     /**
      * Returns raw compatibility information for a given script.

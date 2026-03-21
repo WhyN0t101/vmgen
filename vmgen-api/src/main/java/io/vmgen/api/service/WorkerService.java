@@ -5,7 +5,6 @@ import io.vmgen.api.dto.worker.ClaimJobResponse;
 import io.vmgen.api.dto.worker.ProgressUpdateRequest;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
-import io.vmgen.api.service.AuditService;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.models.build.BuildLog;
@@ -30,7 +29,6 @@ import java.nio.file.Paths;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Objects;
 import javax.crypto.Mac;
@@ -148,8 +146,7 @@ public class WorkerService {
             .orElseThrow(() -> new ResourceNotFoundException("VmRequest not found: " + requestId));
         
         // Verify worker owns this job
-        if (!completion.getWorkerId().equals(request.getClaimedByWorkerId())) {
-            throw new ConflictException("Worker " + completion.getWorkerId() + " does not own this job");
+        if (!Objects.equals(completion.getWorkerId(), request.getClaimedByWorkerId())) {            throw new ConflictException("Worker " + completion.getWorkerId() + " does not own this job");
         }
         
         // Validate state transition using state machine
@@ -161,7 +158,7 @@ public class WorkerService {
             );
         }
         
-        // Update with artifact info
+        // Update with artefact info
         request.setState(VmRequestState.READY);
         request.setCompletedAt(Instant.now());
         request.setStoragePath(completion.getOvaPath());
@@ -174,116 +171,129 @@ public class WorkerService {
 
         // Create provenance record
         if (completion.getProvenance() != null) {
-            JobCompleteRequest.Provenance p = completion.getProvenance();
-            ProvenanceRecord provenance = new ProvenanceRecord();
-            provenance.setVmRequest(request);
-            provenance.setTemplateIdentifier(p.getTemplateIdentifier());
-            provenance.setTemplateVersion(p.getTemplateVersion());
-            provenance.setTemplateSha256(p.getTemplateSha256() != null ? p.getTemplateSha256() : "");
-            provenance.setBuildSeed(request.getBuildSeed());
-            provenance.setOvaSha256(completion.getOvaChecksum());
-            provenance.setDifficultyLevel(request.getDifficultyOverride());
-            provenance.setTelemetryEnabled(Boolean.TRUE.equals(request.getTelemetryEnabled()));
-            provenance.setWorkerId(p.getWorkerId());
-            provenance.setVmLoginPassword(completion.getVmLoginPassword());
-            if (p.getBuildStartedAt() != null) {
-                try { provenance.setBuildStartedAt(Instant.parse(p.getBuildStartedAt())); }
-                catch (DateTimeParseException ignored) {}
-            }
-            if (p.getBuildFinishedAt() != null) {
-                try { provenance.setBuildFinishedAt(Instant.parse(p.getBuildFinishedAt())); }
-                catch (DateTimeParseException ignored) {}
-            }
-            if (p.getFlagDerivationTimestamp() != null) {
-                provenance.setFlagDerivationTimestamp(
-                    Instant.parse(p.getFlagDerivationTimestamp()));
-            } else {
-                provenance.setFlagDerivationTimestamp(Instant.now());
-            }
-
-            // Persist script execution records
-            if (p.getScripts() != null) {
-                List<ProvenanceScript> scriptRecords = new ArrayList<>();
-                for (int i = 0; i < p.getScripts().size(); i++) {
-                    JobCompleteRequest.ScriptRecord sr = p.getScripts().get(i);
-                    ProvenanceScript ps = new ProvenanceScript();
-                    ps.setProvenanceRecord(provenance);
-                    ps.setScriptIdentifier(sr.getIdentifier() != null ? sr.getIdentifier() : "");
-                    ps.setScriptVersion(sr.getVersion() != null ? sr.getVersion() : "");
-                    ps.setScriptSha256(sr.getSha256() != null ? sr.getSha256() : "");
-                    ps.setExecutionOrder(sr.getExecutionOrder() != null ? sr.getExecutionOrder() : i);
-                    if (sr.getScriptId() != null) {
-                        try { ps.setScriptId(UUID.fromString(sr.getScriptId())); }
-                        catch (IllegalArgumentException ignored) {}
-                    }
-                    ps.setExitCode(sr.getExitCode());
-                    ps.setDurationSeconds(sr.getDurationSeconds());
-                    scriptRecords.add(ps);
-                }
-                provenance.setScripts(scriptRecords);
-            }
-
-            provenanceRecordRepository.save(provenance);
-
-            // Update the template's sha256Hash if it was pending and the worker computed a real one
-            String workerTemplateSha256 = p.getTemplateSha256();
-            if (workerTemplateSha256 != null && !workerTemplateSha256.isBlank()
-                    && !workerTemplateSha256.equals("PENDING")) {
-                templateRepository.findById(request.getTemplate().getId()).ifPresent(template -> {
-                    if ("PENDING".equals(template.getSha256Hash())) {
-                        template.setSha256Hash(workerTemplateSha256);
-                        templateRepository.save(template);
-                        log.info("Updated template {} sha256Hash from PENDING to computed value",
-                                template.getId());
-                    }
-                });
-            }
+            persistProvenance(completion, request);
         }
 
         // Register flag hashes — re-derive each hash independently to verify worker output
         if (completion.getFlags() != null && !completion.getFlags().isEmpty()) {
-            String flagDerivationTimestamp = (completion.getProvenance() != null)
-                    ? completion.getProvenance().getFlagDerivationTimestamp()
-                    : null;
-            Instant flagTs = (flagDerivationTimestamp != null)
-                    ? Instant.parse(flagDerivationTimestamp)
-                    : Instant.now();
-
-            for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
-                String tsUsed = flagDerivationTimestamp != null ? flagDerivationTimestamp : flagTs.toString();
-                String expectedHash = deriveFlagHash(
-                        request.getBuildSeed(),
-                        requestId.toString(),
-                        fi.getScriptId(),
-                        tsUsed
-                );
-                if (!MessageDigest.isEqual(
-                        expectedHash.getBytes(StandardCharsets.UTF_8),
-                        fi.getFlagValueHash().getBytes(StandardCharsets.UTF_8))) {
-                    log.warn("Flag hash mismatch for job {} script {} — worker output rejected",
-                            requestId, fi.getScriptId());
-                    throw new ConflictException(
-                            "Flag hash verification failed for script " + fi.getScriptId());
-                }
-            }
-
-            List<Flag> flags = new ArrayList<>();
-            for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
-                UUID scriptId = UUID.fromString(fi.getScriptId());
-                scriptRepository.findById(scriptId).ifPresent(script -> {
-                    Flag flag = new Flag();
-                    flag.setVmRequest(request);
-                    flag.setScript(script);
-                    flag.setFlagValueHash(fi.getFlagValueHash());
-                    flag.setFlagDerivationTimestamp(flagTs);
-                    flags.add(flag);
-                });
-            }
-            flagRepository.saveAll(flags);
+            verifyAndPersistFlags(requestId, completion, request);
         }
 
         auditService.logWorkerJobCompleted(completion.getWorkerId(), requestId);
         log.info("Job {} completed successfully by worker {}", requestId, completion.getWorkerId());
+    }
+
+    private void verifyAndPersistFlags(UUID requestId, JobCompleteRequest completion, VmRequest request) {
+        String flagDerivationTimestamp = (completion.getProvenance() != null)
+                ? completion.getProvenance().getFlagDerivationTimestamp()
+                : null;
+        Instant flagTs = (flagDerivationTimestamp != null)
+                ? Instant.parse(flagDerivationTimestamp)
+                : Instant.now();
+
+        for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
+            String tsUsed = flagDerivationTimestamp != null ? flagDerivationTimestamp : flagTs.toString();
+            String expectedHash = deriveFlagHash(
+                    request.getBuildSeed(),
+                    requestId.toString(),
+                    fi.getScriptId(),
+                    tsUsed
+            );
+
+            if (!MessageDigest.isEqual(
+                    expectedHash.getBytes(StandardCharsets.UTF_8),
+                    fi.getFlagValueHash().getBytes(StandardCharsets.UTF_8))) {
+                log.warn("Flag hash mismatch for job {} script {} — worker output rejected",
+                        requestId, fi.getScriptId());
+                throw new ConflictException(
+                        "Flag hash verification failed for script " + fi.getScriptId());
+            }
+        }
+
+        List<Flag> flags = new ArrayList<>();
+        for (JobCompleteRequest.FlagInfo fi : completion.getFlags()) {
+            UUID scriptId = UUID.fromString(fi.getScriptId());
+            scriptRepository.findById(scriptId).ifPresent(script -> {
+                Flag flag = new Flag();
+                flag.setVmRequest(request);
+                flag.setScript(script);
+                flag.setFlagValueHash(fi.getFlagValueHash());
+                flag.setFlagDerivationTimestamp(flagTs);
+                flags.add(flag);
+            });
+        }
+        flagRepository.saveAll(flags);
+    }
+
+    private void persistProvenance(JobCompleteRequest completion, VmRequest request) {
+        JobCompleteRequest.Provenance p = completion.getProvenance();
+        ProvenanceRecord provenance = new ProvenanceRecord();
+        provenance.setVmRequest(request);
+        provenance.setTemplateIdentifier(p.getTemplateIdentifier());
+        provenance.setTemplateVersion(p.getTemplateVersion());
+        provenance.setTemplateSha256(p.getTemplateSha256() != null ? p.getTemplateSha256() : "");
+        provenance.setBuildSeed(request.getBuildSeed());
+        provenance.setOvaSha256(completion.getOvaChecksum());
+        provenance.setDifficultyLevel(request.getDifficultyOverride());
+        provenance.setTelemetryEnabled(Boolean.TRUE.equals(request.getTelemetryEnabled()));
+        provenance.setWorkerId(p.getWorkerId());
+        provenance.setVmLoginPassword(completion.getVmLoginPassword());
+        if (p.getBuildStartedAt() != null) {
+            try { provenance.setBuildStartedAt(Instant.parse(p.getBuildStartedAt())); }
+            catch (DateTimeParseException e) {
+                log.warn("Unparseable provenance timestamp, field skipped: {}", e.getMessage());
+            }
+        }
+        if (p.getBuildFinishedAt() != null) {
+            try { provenance.setBuildFinishedAt(Instant.parse(p.getBuildFinishedAt())); }
+            catch (DateTimeParseException e) {
+                log.warn("Unparseable provenance timestamp, field skipped: {}", e.getMessage());
+            }
+        }
+        if (p.getFlagDerivationTimestamp() != null) {
+            provenance.setFlagDerivationTimestamp(
+                Instant.parse(p.getFlagDerivationTimestamp()));
+        } else {
+            provenance.setFlagDerivationTimestamp(Instant.now());
+        }
+
+        // Persist script execution records
+        if (p.getScripts() != null) {
+            List<ProvenanceScript> scriptRecords = new ArrayList<>();
+            for (int i = 0; i < p.getScripts().size(); i++) {
+                JobCompleteRequest.ScriptRecord sr = p.getScripts().get(i);
+                ProvenanceScript ps = new ProvenanceScript();
+                ps.setProvenanceRecord(provenance);
+                ps.setScriptIdentifier(sr.getIdentifier() != null ? sr.getIdentifier() : "");
+                ps.setScriptVersion(sr.getVersion() != null ? sr.getVersion() : "");
+                ps.setScriptSha256(sr.getSha256() != null ? sr.getSha256() : "");
+                ps.setExecutionOrder(sr.getExecutionOrder() != null ? sr.getExecutionOrder() : i);
+                if (sr.getScriptId() != null) {
+                    try { ps.setScriptId(UUID.fromString(sr.getScriptId())); }
+                    catch (IllegalArgumentException ignored) {}
+                }
+                ps.setExitCode(sr.getExitCode());
+                ps.setDurationSeconds(sr.getDurationSeconds());
+                scriptRecords.add(ps);
+            }
+            provenance.setScripts(scriptRecords);
+        }
+
+        provenanceRecordRepository.save(provenance);
+
+        // Update the template's sha256Hash if it was pending and the worker computed a real one
+        String workerTemplateSha256 = p.getTemplateSha256();
+        if (workerTemplateSha256 != null && !workerTemplateSha256.isBlank()
+                && !workerTemplateSha256.equals("PENDING")) {
+            templateRepository.findById(request.getTemplate().getId()).ifPresent(template -> {
+                if ("PENDING".equals(template.getSha256Hash())) {
+                    template.setSha256Hash(workerTemplateSha256);
+                    templateRepository.save(template);
+                    log.info("Updated template {} sha256Hash from PENDING to computed value",
+                            template.getId());
+                }
+            });
+        }
     }
 
     /**
@@ -415,7 +425,7 @@ public class WorkerService {
      * Intended to be called periodically by a scheduled task.
      */
     @Transactional
-    public void markStaleJobsAsFailed(Duration timeout){
+    public void markStaleJobsAsFailed(Duration timeout) {
         Instant threshold = Instant.now().minus(timeout);
         List<VmRequest> staleJobs = vmRequestRepository.findStaleJobs(
                 List.of(VmRequestState.BUILDING, VmRequestState.EXPORTING), threshold);

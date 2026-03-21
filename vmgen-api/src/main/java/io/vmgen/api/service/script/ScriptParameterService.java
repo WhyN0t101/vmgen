@@ -20,6 +20,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -161,8 +164,8 @@ public class ScriptParameterService {
         parameter.setDefaultValue(defaultValue);
         parameter.setIsRequired(isRequired != null ? isRequired : Boolean.TRUE);
         if (validationRules != null && validationRules.getPattern() != null) {
-            try { java.util.regex.Pattern.compile(validationRules.getPattern()); }
-            catch (java.util.regex.PatternSyntaxException e) {
+            try {Pattern.compile(validationRules.getPattern()); }
+            catch (PatternSyntaxException e) {
                 throw new ValidationException("Validation failed", List.of("Invalid regex pattern: " + e.getMessage()));
             }
         }

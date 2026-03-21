@@ -14,6 +14,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class UserService {
     static final int MAX_FLAG_FAILURES_PER_BUILD = 5;
     static final int EXHAUSTED_BUILDS_THRESHOLD = 3;
@@ -33,13 +36,7 @@ public class UserService {
     private final AuditService auditService;
     private final VmRequestRepository vmRequestRepository;
 
-    public UserService(UserRepository userRepository, SessionService sessionService,
-                       AuditService auditService, VmRequestRepository vmRequestRepository) {
-        this.userRepository = userRepository;
-        this.sessionService = sessionService;
-        this.auditService = auditService;
-        this.vmRequestRepository = vmRequestRepository;
-    }
+
 
     /**
      * Updates the role of a target user.

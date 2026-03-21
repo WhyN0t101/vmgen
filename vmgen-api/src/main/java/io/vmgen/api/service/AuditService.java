@@ -204,7 +204,7 @@ public class AuditService {
             Map<String, Object> extraMetadata
     ) {
         try {
-            AuditLog auditLog = new AuditLog();  // Changed from 'log' to 'auditLog'
+            AuditLog auditLog = new AuditLog();
             auditLog.setUser(user);
             auditLog.setAction(action);
             auditLog.setResourceType(resourceType);

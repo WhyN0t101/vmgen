@@ -9,6 +9,7 @@ import io.vmgen.api.dto.build.BuildScriptDto;
 import io.vmgen.api.dto.build.CreateBuildRequest;
 import io.vmgen.api.dto.build.ProvenanceResponse;
 import io.vmgen.api.models.provenance.ProvenanceRecord;
+import io.vmgen.api.models.vm.VmRequestState;
 import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
 import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.dto.script.ScriptParameterDto;
@@ -31,6 +32,7 @@ import io.vmgen.api.repository.template.TemplateRepository;
 import io.vmgen.api.service.script.ScriptCompatibilityService;
 import io.vmgen.api.service.script.ScriptParameterService;
 import io.vmgen.api.service.script.ScriptParameterService.ParameterProcessingResult;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 
@@ -230,8 +232,7 @@ public class VmRequestService {
         List<BuildResponse> content = paged.getContent().stream()
                 .map(r -> toResponse(r, loadScripts(r), getScriptOrderFromRequest(r)))
                 .toList();
-        return new PagedResponse<>(content, paged.getNumber(), paged.getSize(),
-                paged.getTotalElements(), paged.getTotalPages(), paged.isLast());
+        return PagedResponse.from(paged, content);
     }
 
     /**
@@ -262,7 +263,7 @@ public class VmRequestService {
         if (!request.getUser().getId().equals(user.getId())) {
             throw new ResourceNotFoundException("Build not found: " + requestId);
         }
-        if (request.getState() != io.vmgen.api.models.vm.VmRequestState.READY) {
+        if (request.getState() != VmRequestState.READY) {
             throw new ConflictException("Build is not ready for download (state: " + request.getState() + ")");
         }
         if (request.getStorageDeletedAt() != null) {
@@ -304,7 +305,7 @@ public class VmRequestService {
                         .exitCode(s.getExitCode())
                         .durationSeconds(s.getDurationSeconds())
                         .build())
-                .collect(Collectors.toList());
+                .toList();
 
         return ProvenanceResponse.builder()
                 .buildId(requestId)
@@ -330,7 +331,7 @@ public class VmRequestService {
     @Transactional(readOnly = true)
     public PagedResponse<AdminBuildSummaryDto> getAllBuilds(int page, int size) {
         Page<VmRequest> builds = vmRequestRepository.findAll(PageRequest.of(page, size,
-                org.springframework.data.domain.Sort.by("submittedAt").descending()));
+                Sort.by("submittedAt").descending()));
         List<AdminBuildSummaryDto> items = builds.getContent().stream()
                 .map(r -> AdminBuildSummaryDto.builder()
                         .id(r.getId())
@@ -349,9 +350,8 @@ public class VmRequestService {
                         .completedAt(r.getCompletedAt())
                         .failedAt(r.getFailedAt())
                         .build())
-                .collect(Collectors.toList());
-        return new PagedResponse<>(items, builds.getNumber(), builds.getSize(),
-                builds.getTotalElements(), builds.getTotalPages(), builds.isLast());
+                .toList();
+        return PagedResponse.from(builds, items);
     }
 
     /**
@@ -444,4 +444,5 @@ public class VmRequestService {
         SECURE_RANDOM.nextBytes(bytes);
         return HexFormat.of().formatHex(bytes);
     }
+
 }

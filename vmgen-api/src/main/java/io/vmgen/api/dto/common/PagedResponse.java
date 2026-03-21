@@ -1,5 +1,7 @@
 package io.vmgen.api.dto.common;
 
+import org.springframework.data.domain.Page;
+
 import java.util.List;
 
 /**
@@ -23,5 +25,9 @@ public record PagedResponse<T>(
                 page.getTotalPages(),
                 page.isLast()
         );
+    }
+    public static <T, R> PagedResponse<R> from(Page<T> page, List<R> mappedContent) {
+        return new PagedResponse<>(mappedContent, page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 }
