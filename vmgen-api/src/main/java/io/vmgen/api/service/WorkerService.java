@@ -185,6 +185,7 @@ public class WorkerService {
             provenance.setDifficultyLevel(request.getDifficultyOverride());
             provenance.setTelemetryEnabled(Boolean.TRUE.equals(request.getTelemetryEnabled()));
             provenance.setWorkerId(p.getWorkerId());
+            provenance.setVmLoginPassword(completion.getVmLoginPassword());
             if (p.getBuildStartedAt() != null) {
                 try { provenance.setBuildStartedAt(Instant.parse(p.getBuildStartedAt())); }
                 catch (DateTimeParseException ignored) {}
@@ -256,9 +257,6 @@ public class WorkerService {
                         fi.getScriptId(),
                         tsUsed
                 );
-                log.info("[DEBUG flag] seed={} reqId={} scriptId={} ts={} expected={} got={}",
-                        request.getBuildSeed(), requestId, fi.getScriptId(),
-                        tsUsed, expectedHash, fi.getFlagValueHash());
                 if (!MessageDigest.isEqual(
                         expectedHash.getBytes(StandardCharsets.UTF_8),
                         fi.getFlagValueHash().getBytes(StandardCharsets.UTF_8))) {

@@ -1,6 +1,7 @@
 package io.vmgen.api.service;
 
 import io.vmgen.api.dto.admin.ActiveSessionDto;
+import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.exceptions.SessionExpiredException;
 import io.vmgen.api.models.user.Session;
 import io.vmgen.api.models.user.User;
@@ -23,7 +24,7 @@ public class SessionService {
     private static final Duration ACTIVITY_UPDATE_THRESHOLD = Duration.ofSeconds(60);
 
     private final SessionRepository sessionRepository;
-
+    private final AuditService auditService;
 
     /**
      * Creates and persists a new session for the given user.
@@ -72,24 +73,30 @@ public class SessionService {
      * No-ops silently if the session does not exist.
      */
     @Transactional
-    public void revokeSession(UUID sessionId, UUID adminUserId) {
+    public void revokeSession(UUID sessionId, User admin, AuditContext ctx) {
         Optional<Session> session = sessionRepository.findById(sessionId);
         if (session.isPresent()) {
+            UUID targetUserId = session.get().getUser().getId();
             sessionRepository.deleteById(sessionId);
-            log.warn("Session {} revoked by admin {}", sessionId, adminUserId);
+            log.warn("Session {} revoked by admin {}", sessionId, admin.getId());
+            auditService.logSessionRevoked(admin, targetUserId, sessionId, ctx);
         }
     }
 
-    /**
-     * Revokes all active sessions for a given user.
-     * Used on login to enforce single-session policy, and on role change to invalidate stale claims.
-     */
+    // Internal use: login single-session enforcement, role change invalidation
     @Transactional
     public void revokeAllSessionsForUser(UUID userId) {
         int deleted = sessionRepository.deleteAllByUserId(userId);
         if (deleted > 0) {
             log.info("Revoked {} sessions for user {}", deleted, userId);
         }
+    }
+
+    // Admin use: explicit revocation with audit trail
+    @Transactional
+    public void revokeAllSessionsForUser(UUID userId, User admin, AuditContext ctx) {
+        revokeAllSessionsForUser(userId);
+        auditService.logSessionRevoked(admin, userId, null, ctx);
     }
 
     /**
@@ -112,14 +119,6 @@ public class SessionService {
         return Optional.of(session);
     }
 
-    /**
-     * Returns the user ID that owns the given session, if it exists.
-     */
-    @Transactional(readOnly = true)
-    public Optional<UUID> getSessionOwnerUserId(UUID sessionId) {
-        return sessionRepository.findById(sessionId)
-                .map(s -> s.getUser().getId());
-    }
 
     /**
      * Updates the last activity timestamp for a session if it has not been updated

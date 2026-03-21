@@ -1,6 +1,8 @@
 import { apiRequest, rawRequest, API_BASE } from './client'
 import { useAuthStore } from '@/stores/auth'
 import type {
+  AdminBuildCredentials,
+  AdminBuildSummary,
   AuthResponse,
   Build,
   BuildSpec,
@@ -289,6 +291,15 @@ export const api = {
           method: 'DELETE',
         },
       )
+    },
+
+    // Builds (admin)
+    getAllBuilds: async (page = 0, size = 20): Promise<PagedResponse<AdminBuildSummary>> => {
+      return apiRequest<PagedResponse<AdminBuildSummary>>(`/api/admin/builds?page=${page}&size=${size}`)
+    },
+
+    getBuildCredentials: async (id: string): Promise<AdminBuildCredentials> => {
+      return apiRequest<AdminBuildCredentials>(`/api/admin/builds/${id}/credentials`)
     },
 
     // Vulnerability categories

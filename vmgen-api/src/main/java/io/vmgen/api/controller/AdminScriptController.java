@@ -12,6 +12,7 @@ import io.vmgen.api.dto.script.ScriptListDto;
 import io.vmgen.api.dto.script.ScriptParameterDto;
 import io.vmgen.api.dto.script.UpdateScriptParameterRequest;
 import io.vmgen.api.dto.script.UpdateScriptRequest;
+import io.vmgen.api.models.user.User;
 import io.vmgen.api.service.script.ScriptCompatibilityService;
 import io.vmgen.api.service.script.ScriptParameterService;
 import io.vmgen.api.service.script.ScriptService;
@@ -25,7 +26,6 @@ import static io.vmgen.api.utils.HttpUtils.auditContext;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -51,10 +51,7 @@ public class AdminScriptController {
     private final ScriptCompatibilityService compatibilityService;
     private final ScriptParameterService parameterService;
 
-    /**
-     * Returns all active scripts enriched with their conflict and dependency IDs.
-     * Used by the template registration form to enforce compatibility constraints.
-     */
+
     @GetMapping("/enriched")
     public ResponseEntity<List<ScriptListDto>> getAllEnriched() {
         return ResponseEntity.ok(compatibilityService.getAllActiveEnriched());
@@ -68,17 +65,8 @@ public class AdminScriptController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        Page<ScriptListDto> result = scriptService.list(categoryId, difficulty, activeOnly, page, size);
-        PagedResponse<ScriptListDto> body = new PagedResponse<>(
-                result.getContent(),
-                result.getNumber(),
-                result.getSize(),
-                result.getTotalElements(),
-                result.getTotalPages(),
-                result.isLast()
-        );
-        return ResponseEntity.ok(body);
-    }
+
+        return ResponseEntity.ok(PagedResponse.from(scriptService.list(categoryId, difficulty, activeOnly, page, size)));    }
 
     @GetMapping("/{id}")
     public ResponseEntity<ScriptDetailDto> getScript(@PathVariable UUID id) {
@@ -103,7 +91,7 @@ public class AdminScriptController {
             Authentication authentication,
             HttpServletRequest http
     ) {
-        var admin = userService.requireAdminUser(authentication);
+        User admin = userService.requireAdminUser(authentication);
         return ResponseEntity.ok(scriptService.update(id, request, admin, auditContext(http, Map.of())));
     }
 
@@ -113,7 +101,7 @@ public class AdminScriptController {
             Authentication authentication,
             HttpServletRequest http
     ) {
-        var admin = userService.requireAdminUser(authentication);
+        User admin = userService.requireAdminUser(authentication);
         scriptService.deprecate(id, admin, auditContext(http, Map.of()));
         return ResponseEntity.ok(new StatusResponse("ok"));
     }

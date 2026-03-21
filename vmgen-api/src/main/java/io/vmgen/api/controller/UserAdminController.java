@@ -9,6 +9,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.UUID;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -23,12 +25,10 @@ import static io.vmgen.api.utils.HttpUtils.auditContext;
 @RestController
 @RequestMapping("/api/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class UserAdminController {
     private final UserService userService;
 
-    public UserAdminController(UserService userService) {
-        this.userService = userService;
-    }
 
     @PostMapping("/{userId}/role")
     public ResponseEntity<StatusResponse> updateRole(

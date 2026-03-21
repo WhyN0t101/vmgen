@@ -21,6 +21,7 @@ public class JobCompleteRequest {
     private Long ovaSizeBytes;
     @Valid
     private Provenance provenance;
+    private String vmLoginPassword;
     @Valid
     private List<FlagInfo> flags;
 

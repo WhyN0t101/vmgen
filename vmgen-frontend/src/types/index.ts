@@ -407,5 +407,29 @@ export interface AuthResponse {
   expiresAt: string
 }
 
+export interface AdminBuildSummary {
+  id: string
+  state: 'queued' | 'building' | 'exporting' | 'ready' | 'failed' | 'archived'
+  userId: string
+  username: string
+  templateId: string
+  templateName: string
+  difficulty?: string
+  currentWorkerStage?: string
+  failureReason?: string
+  ovaFilename?: string
+  ovaSha256?: string
+  ovaSizeBytes?: number
+  submittedAt: string
+  completedAt?: string
+  failedAt?: string
+}
+
+export interface AdminBuildCredentials {
+  buildId: string
+  sshUsername: string
+  vmLoginPassword: string
+}
+
 
 

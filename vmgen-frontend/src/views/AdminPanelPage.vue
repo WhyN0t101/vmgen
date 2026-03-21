@@ -5,8 +5,9 @@ import UserManagement from '@/components/admin/UserManagement.vue'
 import CategoryListPage from '@/views/admin/categories/CategoryListPage.vue'
 import ScriptListPage from '@/views/admin/scripts/ScriptListPage.vue'
 import TemplateList from '@/views/admin/templates/TemplateList.vue'
+import AdminBuildPanel from '@/views/admin/builds/AdminBuildPanel.vue'
 
-type AdminTab = 'sessions' | 'users' | 'categories' | 'scripts' | 'templates'
+type AdminTab = 'sessions' | 'users' | 'categories' | 'scripts' | 'templates' | 'builds'
 
 const activeTab = ref<AdminTab>('sessions')
 </script>
@@ -85,6 +86,17 @@ const activeTab = ref<AdminTab>('sessions')
         >
           Vulnerability Scripts
         </button>
+        <button
+          @click="activeTab = 'builds'"
+          :class="[
+            'px-4 py-2 text-xs md:text-sm font-medium rounded-full transition-all duration-150',
+            activeTab === 'builds'
+              ? 'bg-sky-500/15 text-sky-300 border border-sky-500/50 shadow-[0_0_0_1px_rgba(8,145,178,0.35)]'
+              : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 border border-transparent'
+          ]"
+        >
+          Builds
+        </button>
       </nav>
 
       <!-- Tab Content -->
@@ -93,6 +105,7 @@ const activeTab = ref<AdminTab>('sessions')
         <UserManagement v-else-if="activeTab === 'users'" />
         <CategoryListPage v-else-if="activeTab === 'categories'" />
         <TemplateList v-else-if="activeTab === 'templates'" />
+        <AdminBuildPanel v-else-if="activeTab === 'builds'" />
         <ScriptListPage v-else />
       </section>
     </div>

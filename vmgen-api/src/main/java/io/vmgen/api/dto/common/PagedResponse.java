@@ -14,5 +14,14 @@ public record PagedResponse<T>(
         int totalPages,
         boolean last
 ) {
+    public static <T> PagedResponse<T> from(org.springframework.data.domain.Page<T> page) {
+        return new PagedResponse<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
+    }
 }
-

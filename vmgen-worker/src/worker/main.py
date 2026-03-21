@@ -12,6 +12,7 @@ from proxmox.client import ProxmoxClient
 from worker.backend.client import BackendClient
 from build.pipeline import BuildPipeline
 import urllib3
+# Proxmox VE uses a self-signed certificate in the reference deployment — suppress noise
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def setup_logging(level: str, worker_id: str) -> logging.Logger:

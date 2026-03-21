@@ -1,6 +1,8 @@
 package io.vmgen.api.service;
 
 import io.vmgen.api.dto.audit.AuditContext;
+import io.vmgen.api.dto.build.AdminBuildCredentialsResponse;
+import io.vmgen.api.dto.build.AdminBuildSummaryDto;
 import io.vmgen.api.dto.build.BuildDownloadInfo;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.BuildScriptDto;
@@ -319,6 +321,57 @@ public class VmRequestService {
                 .buildStartedAt(provenance.getBuildStartedAt())
                 .buildFinishedAt(provenance.getBuildFinishedAt())
                 .scripts(scriptInfos)
+                .build();
+    }
+
+    /**
+     * Returns a paginated list of all builds across all users — admin only.
+     */
+    @Transactional(readOnly = true)
+    public PagedResponse<AdminBuildSummaryDto> getAllBuilds(int page, int size) {
+        Page<VmRequest> builds = vmRequestRepository.findAll(PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by("submittedAt").descending()));
+        List<AdminBuildSummaryDto> items = builds.getContent().stream()
+                .map(r -> AdminBuildSummaryDto.builder()
+                        .id(r.getId())
+                        .state(r.getState().name().toLowerCase())
+                        .userId(r.getUser().getId())
+                        .username(r.getUser().getUsername())
+                        .templateId(r.getTemplate().getId())
+                        .templateName(r.getTemplate().getIdentifier())
+                        .difficulty(r.getDifficultyOverride())
+                        .currentWorkerStage(r.getCurrentWorkerStage())
+                        .failureReason(r.getFailureReason())
+                        .ovaFilename(r.getOvaFilename())
+                        .ovaSha256(r.getOvaSha256())
+                        .ovaSizeBytes(r.getOvaSizeBytes())
+                        .submittedAt(r.getSubmittedAt())
+                        .completedAt(r.getCompletedAt())
+                        .failedAt(r.getFailedAt())
+                        .build())
+                .collect(Collectors.toList());
+        return new PagedResponse<>(items, builds.getNumber(), builds.getSize(),
+                builds.getTotalElements(), builds.getTotalPages(), builds.isLast());
+    }
+
+    /**
+     * Returns the VM login credentials for a completed build — admin only.
+     * Throws 404 if the build has no provenance (not yet complete) or no password stored
+     * (built before this feature was introduced).
+     */
+    @Transactional(readOnly = true)
+    public AdminBuildCredentialsResponse getAdminBuildCredentials(UUID requestId) {
+        VmRequest request = vmRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + requestId));
+        ProvenanceRecord provenance = provenanceRecordRepository.findByVmRequest_Id(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Provenance not available for this build"));
+        if (provenance.getVmLoginPassword() == null) {
+            throw new ResourceNotFoundException("VM login credentials not available for this build");
+        }
+        return AdminBuildCredentialsResponse.builder()
+                .buildId(requestId)
+                .sshUsername(request.getTemplate().getExpectedSshUser())
+                .vmLoginPassword(provenance.getVmLoginPassword())
                 .build();
     }
 

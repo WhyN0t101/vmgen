@@ -7,7 +7,6 @@ import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
 import io.vmgen.api.dto.worker.ProgressUpdateRequest;
 import io.vmgen.api.dto.worker.WorkerAckResponse;
-import io.vmgen.api.dto.worker.WorkerRegisteredResponse;
 import io.vmgen.api.service.WorkerService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -22,11 +21,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 
-/**
- * Worker-facing API endpoints.
- * Authentication is handled upstream by WorkerApiKeyFilter via API key validation.
- * Spring Security role-based access is intentionally not applied here.
- */
 @RestController
 @RequestMapping("/api/worker")
 @RequiredArgsConstructor
@@ -35,10 +29,7 @@ public class WorkerController {
 
     private final WorkerService workerService;
 
-    /**
-     * Claim the next available job (atomic dequeue).
-     * Returns 204 No Content if no jobs available.
-     */
+
     @PostMapping("/jobs/claim")
     public ResponseEntity<ClaimJobResponse> claimJob(@Valid @RequestBody ClaimJobRequest request) {
         log.info("Worker {} requesting job claim", request.getWorkerId());
@@ -60,13 +51,12 @@ public class WorkerController {
 
 
     @PostMapping("/jobs/{id}/complete")
-    public ResponseEntity<WorkerRegisteredResponse> completeJob(
+    public ResponseEntity<WorkerAckResponse> completeJob(
             @PathVariable("id") UUID requestId,
             @Valid @RequestBody JobCompleteRequest request) {
         
         workerService.completeJob(requestId, request);
-        return ResponseEntity.ok(new WorkerRegisteredResponse(true));
-    }
+        return ResponseEntity.ok(new WorkerAckResponse(true));    }
 
     @PostMapping("/jobs/{id}/fail")
     public ResponseEntity<WorkerAckResponse> failJob(
@@ -77,10 +67,7 @@ public class WorkerController {
         return ResponseEntity.ok(new WorkerAckResponse(true));
     }
 
-    /**
-     * Appends a build log entry for an in-flight (or recently failed) job.
-     * Fire-and-forget from the worker perspective — failures here must not abort builds.
-     */
+
     @PostMapping("/jobs/{id}/logs")
     public ResponseEntity<WorkerAckResponse> appendBuildLog(
             @PathVariable("id") UUID requestId,

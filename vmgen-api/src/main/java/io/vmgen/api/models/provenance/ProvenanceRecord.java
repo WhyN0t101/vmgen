@@ -70,6 +70,9 @@ public class ProvenanceRecord {
     @Column(name = "build_finished_at")
     private Instant buildFinishedAt;
 
+    @Column(name = "vm_login_password", length = 64)
+    private String vmLoginPassword;
+
     @OneToMany(mappedBy = "provenanceRecord", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("executionOrder ASC")
     private List<ProvenanceScript> scripts = new ArrayList<>();

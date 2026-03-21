@@ -53,6 +53,7 @@ class BackendClient:
         ova_checksum: str,
         ova_size_bytes: int,
         provenance: dict,
+        vm_login_password: str,
         flags: list[dict],
     ):
         # flags = [{"scriptId": ..., "flagValueHash": ..., "placementLocation": ...}]
@@ -66,6 +67,7 @@ class BackendClient:
                 "ovaChecksum": ova_checksum,
                 "ovaSizeBytes": ova_size_bytes,
                 "provenance": provenance,
+                "vmLoginPassword": vm_login_password,
                 "flags": flags,
             },
             headers=self._headers,

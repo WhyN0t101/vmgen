@@ -16,6 +16,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 import static io.vmgen.api.utils.HttpUtils.auditContext;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -33,16 +35,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/templates")
 @PreAuthorize("hasRole('ADMIN')")
+@RequiredArgsConstructor
 public class AdminTemplateController {
     
     private final TemplateService templateService;
     
-    public AdminTemplateController(
-            TemplateService templateService
-    ) {
-        this.templateService = templateService;
-    }
-    
+
     @PostMapping
     public ResponseEntity<TemplateResponse> registerTemplate(
             @Valid @RequestBody RegisterTemplateRequest request,

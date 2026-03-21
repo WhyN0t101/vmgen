@@ -16,10 +16,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -89,7 +86,7 @@ public class BuildController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .contentLength(info.sizeBytes())
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + filename + "\"")
+                        ContentDisposition.attachment().filename(filename).build().toString())
                 .header("X-Checksum-SHA256", info.sha256() != null ? info.sha256() : "")
                 .body(file);
     }
