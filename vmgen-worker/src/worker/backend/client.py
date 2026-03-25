@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -59,22 +60,31 @@ class BackendClient:
         # flags = [{"scriptId": ..., "flagValueHash": ..., "placementLocation": ...}]
         # flagValueHash = SHA-256(raw_flag) — raw flag is NEVER sent here
         log.info(f"[{job_id}] Registering completion (ova_size: {ova_size_bytes // (1024 * 1024)}MB, flags: {len(flags)})")
-        resp = requests.post(
-            f"{self.url}/api/worker/jobs/{job_id}/complete",
-            json={
-                "workerId": self.worker_id,
-                "ovaPath": ova_path,
-                "ovaChecksum": ova_checksum,
-                "ovaSizeBytes": ova_size_bytes,
-                "provenance": provenance,
-                "vmLoginPassword": vm_login_password,
-                "flags": flags,
-            },
-            headers=self._headers,
-            timeout=_DEFAULT_TIMEOUT,
-        )
-        resp.raise_for_status()
-        log.info(f"[{job_id}] Backend acknowledged completion")
+        payload = {
+            "workerId": self.worker_id,
+            "ovaPath": ova_path,
+            "ovaChecksum": ova_checksum,
+            "ovaSizeBytes": ova_size_bytes,
+            "provenance": provenance,
+            "vmLoginPassword": vm_login_password,
+            "flags": flags,
+        }
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    f"{self.url}/api/worker/jobs/{job_id}/complete",
+                    json=payload,
+                    headers=self._headers,
+                    timeout=_DEFAULT_TIMEOUT,
+                )
+                resp.raise_for_status()
+                log.info(f"[{job_id}] Backend acknowledged completion")
+                return
+            except Exception as e:
+                if attempt == 2:
+                    raise
+                log.warning(f"[{job_id}] complete_job attempt {attempt + 1} failed, retrying in 5s: {e}")
+                time.sleep(5)
 
     def append_log(
         self,
@@ -103,6 +113,22 @@ class BackendClient:
             resp.raise_for_status()
         except Exception as e:
             log.warning("[%s] Failed to write build log to backend (non-fatal): %s", job_id, e)
+
+    def heartbeat(self, active_job_ids: list[str]) -> None:
+        """
+        Report worker liveness to the backend every 60 seconds.
+        Non-fatal — a failure here must never crash the poll loop.
+        """
+        try:
+            resp = requests.post(
+                f"{self.url}/api/worker/heartbeat",
+                json={"workerId": self.worker_id, "activeJobIds": active_job_ids},
+                headers=self._headers,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except Exception as e:
+            log.warning("Heartbeat failed (non-fatal): %s", e)
 
     def fail_job(self, job_id: str, error_type: str, message: str, logs: str = ""):
         # error_type: "script_failed" | "timeout" | "proxmox_error"

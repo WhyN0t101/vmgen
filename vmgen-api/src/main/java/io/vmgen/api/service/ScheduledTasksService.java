@@ -1,6 +1,7 @@
 package io.vmgen.api.service;
 
 import java.time.Duration;
+import java.util.List;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +54,18 @@ public class ScheduledTasksService {
             workerService.markLongRunningJobsAsFailed(Duration.ofHours(3));
         } catch (Exception e) {
             log.error("Scheduled detectLongRunningBuilds failed", e);
+        }
+    }
+
+    @Scheduled(fixedDelay = 180_000) // Every 3 minutes (3 × 60s heartbeat interval)
+    public void detectStaleWorkers() {
+        try {
+            List<String> stale = workerService.getStaleWorkers(Duration.ofSeconds(180));
+            if (!stale.isEmpty()) {
+                log.warn("Workers have not sent a heartbeat in 180s: {}", stale);
+            }
+        } catch (Exception e) {
+            log.error("Scheduled detectStaleWorkers failed", e);
         }
     }
 }

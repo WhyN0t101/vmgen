@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -67,6 +68,31 @@ public class WorkerService {
 
     @Value("${vmgen.platform.secret}")
     private String platformSecret;
+
+    // In-memory worker liveness tracking — keyed by workerId, value is last heartbeat timestamp.
+    // Not persisted: resets on backend restart, which is acceptable for a lab deployment.
+    private final Map<String, Instant> workerHeartbeats = new ConcurrentHashMap<>();
+
+    /**
+     * Records a liveness heartbeat from a worker.
+     * Called every 60 seconds by each worker regardless of build activity.
+     */
+    public void recordHeartbeat(String workerId, List<String> activeJobIds) {
+        workerHeartbeats.put(workerId, Instant.now());
+        log.debug("Heartbeat from worker {} (active jobs: {})", workerId, activeJobIds);
+    }
+
+    /**
+     * Returns worker IDs that have not sent a heartbeat within the given threshold.
+     * Used by the scheduled task to log warnings about potentially dead workers.
+     */
+    public List<String> getStaleWorkers(Duration threshold) {
+        Instant cutoff = Instant.now().minus(threshold);
+        return workerHeartbeats.entrySet().stream()
+                .filter(e -> e.getValue().isBefore(cutoff))
+                .map(Map.Entry::getKey)
+                .toList();
+    }
 
     /**
      * Atomically claims the next queued job for the given worker.

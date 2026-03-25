@@ -83,12 +83,20 @@ def main() -> int:
 
     executor = ThreadPoolExecutor(max_workers=config.worker.max_concurrent_builds)
     active: dict = {}  # future → job
+    HEARTBEAT_INTERVAL = 60  # seconds
+    last_heartbeat = 0.0
 
     try:
         while not shutdown_requested:
             # Drop completed futures from the tracking dict
             for f in [f for f in active if f.done()]:
                 del active[f]
+
+            # Heartbeat every 60 seconds regardless of build activity
+            if time.time() - last_heartbeat >= HEARTBEAT_INTERVAL:
+                active_ids = [str(j["requestId"]) for j in active.values()]
+                backend.heartbeat(active_ids)
+                last_heartbeat = time.time()
 
             if len(active) < config.worker.max_concurrent_builds:
                 job = backend.claim_job()

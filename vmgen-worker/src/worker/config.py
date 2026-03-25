@@ -83,6 +83,12 @@ class Config:
             errors.append("PROXMOX_TOKEN_SECRET is required")
         if not self.proxmox.ssh_key_path:
             errors.append("PROXMOX_SSH_KEY_PATH is required")
+        else:
+            ssh_key = Path(self.proxmox.ssh_key_path)
+            if not ssh_key.exists():
+                errors.append(f"SSH key file not found: {self.proxmox.ssh_key_path}")
+            elif ssh_key.stat().st_mode & 0o077:
+                errors.append(f"SSH key has insecure permissions (expected 0600): {self.proxmox.ssh_key_path}")
 
         # Backend
         if not self.backend.url:

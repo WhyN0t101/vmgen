@@ -3,6 +3,7 @@ package io.vmgen.api.controller;
 import io.vmgen.api.dto.worker.AppendBuildLogRequest;
 import io.vmgen.api.dto.worker.ClaimJobRequest;
 import io.vmgen.api.dto.worker.ClaimJobResponse;
+import io.vmgen.api.dto.worker.HeartbeatRequest;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
 import io.vmgen.api.dto.worker.ProgressUpdateRequest;
@@ -29,6 +30,12 @@ public class WorkerController {
 
     private final WorkerService workerService;
 
+
+    @PostMapping("/heartbeat")
+    public ResponseEntity<WorkerAckResponse> heartbeat(@Valid @RequestBody HeartbeatRequest request) {
+        workerService.recordHeartbeat(request.getWorkerId(), request.getActiveJobIds());
+        return ResponseEntity.ok(new WorkerAckResponse(true));
+    }
 
     @PostMapping("/jobs/claim")
     public ResponseEntity<ClaimJobResponse> claimJob(@Valid @RequestBody ClaimJobRequest request) {

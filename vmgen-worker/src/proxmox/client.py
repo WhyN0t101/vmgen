@@ -21,7 +21,7 @@ class ProxmoxClient:
         )
         self._node = config.node
 
-    def _node_api(self, node: str | None = None):
+    def _node_api(self, node: str | None = None) -> object:
         """Shortcut so we don't repeat proxmox.nodes(node) everywhere."""
         return self._px.nodes(node or self._node)
 
@@ -196,7 +196,7 @@ class ProxmoxClient:
           1. Parse qm config to find disk volume + hardware specs
           2. Get disk path via pvesm
           3. Convert disk to stream-optimised VMDK with qemu-img
-          4. Generate a minimal OVF 1.0 descriptor
+          4. Generate a OVF 1.0 descriptor
           5. Package OVF + VMDK into a tar OVA
           6. SFTP the OVA to the worker machine
           7. Clean up temp dir on Proxmox
@@ -293,12 +293,18 @@ class ProxmoxClient:
         return result
 
     def _parse_disk_size(self, size_str: str) -> int:
-        """Convert '20G', '512M', etc. to bytes."""
+        """Convert '20G', '512M', etc. to bytes. Returns 0 on malformed input."""
+        if not size_str:
+            return 0
         units = {'K': 1024, 'M': 1024 ** 2, 'G': 1024 ** 3, 'T': 1024 ** 4}
-        suffix = size_str[-1].upper()
-        if suffix in units:
-            return int(size_str[:-1]) * units[suffix]
-        return int(size_str)
+        try:
+            suffix = size_str[-1].upper()
+            if suffix in units:
+                return int(size_str[:-1]) * units[suffix]
+            return int(size_str)
+        except (ValueError, IndexError):
+            log.warning(f"Could not parse disk size: {size_str!r}, defaulting to 0")
+            return 0
 
     def _ssh_write(self, client, content: str, remote_path: str) -> None:
         """Write a string to a remote file via stdin."""
