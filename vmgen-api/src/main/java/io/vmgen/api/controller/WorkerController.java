@@ -3,6 +3,8 @@ package io.vmgen.api.controller;
 import io.vmgen.api.dto.worker.AppendBuildLogRequest;
 import io.vmgen.api.dto.worker.ClaimJobRequest;
 import io.vmgen.api.dto.worker.ClaimJobResponse;
+import io.vmgen.api.dto.worker.DeriveFlagsRequest;
+import io.vmgen.api.dto.worker.DeriveFlagsResponse;
 import io.vmgen.api.dto.worker.HeartbeatRequest;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
@@ -86,5 +88,14 @@ public class WorkerController {
 
         workerService.appendBuildLog(requestId, request);
         return ResponseEntity.ok(new WorkerAckResponse(true));
+    }
+
+    @PostMapping("/jobs/{id}/derive-flags")
+    public ResponseEntity<DeriveFlagsResponse> deriveFlags(
+            @PathVariable("id") UUID requestId,
+            @Valid @RequestBody DeriveFlagsRequest request) {
+
+        DeriveFlagsResponse response = workerService.deriveBuildSecrets(requestId, request);
+        return ResponseEntity.ok(response);
     }
 }

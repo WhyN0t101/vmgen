@@ -2,6 +2,8 @@ package io.vmgen.api.service;
 
 import io.vmgen.api.dto.worker.AppendBuildLogRequest;
 import io.vmgen.api.dto.worker.ClaimJobResponse;
+import io.vmgen.api.dto.worker.DeriveFlagsRequest;
+import io.vmgen.api.dto.worker.DeriveFlagsResponse;
 import io.vmgen.api.dto.worker.ProgressUpdateRequest;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
@@ -515,13 +517,12 @@ public class WorkerService {
     }
 
     /**
-     * Re-derives the flag hash using the same algorithm as the worker (build/flags.py):
-     *   HMAC-SHA256(key=platformSecret, msg=seedHex||requestId||scriptId||timestamp)
-     *   → first 17 bytes, zero last 6 bits of byte[16] (& 0xC0)
-     *   → Base32 (no padding) → "FLAG{<26 chars>}"
-     *   → SHA-256 hex of that string
+     * Derives the raw flag string: "FLAG{<26-char-base32>}".
+     * HMAC-SHA256(key=platformSecret, msg=seedHex||requestId||scriptId||timestamp)
+     *   -> first 17 bytes, zero last 6 bits of byte[16] (& 0xC0)
+     *   -> Base32 (no padding) -> "FLAG{<26 chars>}"
      */
-    private String deriveFlagHash(String seedHex, String requestId, String scriptId, String timestamp) {
+    private String deriveRawFlag(String seedHex, String requestId, String scriptId, String timestamp) {
         try {
             byte[] key = platformSecret.getBytes(StandardCharsets.UTF_8);
             byte[] message = (seedHex + requestId + scriptId + timestamp).getBytes(StandardCharsets.UTF_8);
@@ -530,22 +531,79 @@ public class WorkerService {
             mac.init(new SecretKeySpec(key, "HmacSHA256"));
             byte[] digest = mac.doFinal(message);
 
-            // Take first 17 bytes, zero last 6 bits of byte[16] — yields 130 bits
             byte[] raw = new byte[17];
             System.arraycopy(digest, 0, raw, 0, 17);
             raw[16] = (byte) (raw[16] & 0xC0);
 
-            // Base32-encode (RFC 4648) and strip padding
             String encoded = new Base32().encodeToString(raw).replace("=", "");
-            String flagString = "FLAG{" + encoded + "}";
-
-            // SHA-256 of the flag string — this is what the worker sends
-            byte[] hashBytes = MessageDigest.getInstance("SHA-256")
-                    .digest(flagString.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hashBytes);
+            return "FLAG{" + encoded + "}";
 
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("Flag derivation failed — crypto provider error", e);
         }
+    }
+
+    /**
+     * SHA-256 hex of a raw flag string — used for verification and persistence.
+     */
+    private String hashFlag(String rawFlag) {
+        try {
+            byte[] hashBytes = MessageDigest.getInstance("SHA-256")
+                    .digest(rawFlag.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hashBytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+
+    private String deriveFlagHash(String seedHex, String requestId, String scriptId, String timestamp) {
+        return hashFlag(deriveRawFlag(seedHex, requestId, scriptId, timestamp));
+    }
+
+    /**
+     * Derives raw flags and the VM login password for a build job.
+     * Called by the worker so the platform secret never leaves the backend.
+     */
+    @Transactional(readOnly = true)
+    public DeriveFlagsResponse deriveBuildSecrets(UUID requestId, DeriveFlagsRequest req) {
+        VmRequest request = vmRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("VmRequest not found: " + requestId));
+
+        if (!Objects.equals(req.getWorkerId(), request.getClaimedByWorkerId())) {
+            throw new ConflictException("Worker " + req.getWorkerId() + " does not own this job");
+        }
+        if (request.getState() != VmRequestState.BUILDING && request.getState() != VmRequestState.EXPORTING) {
+            throw new ConflictException("Cannot derive secrets for job in state: " + request.getState());
+        }
+
+        String seedHex = request.getBuildSeed();
+        String jobId = requestId.toString();
+        String timestamp = req.getFlagDerivationTimestamp();
+
+        List<VmRequestScript> scripts =
+                vmRequestScriptRepository.findWithScriptByVmRequestId(requestId);
+
+        List<DeriveFlagsResponse.FlagEntry> flags = scripts.stream()
+                .map(vrs -> DeriveFlagsResponse.FlagEntry.builder()
+                        .scriptId(vrs.getScript().getId().toString())
+                        .rawFlag(deriveRawFlag(seedHex, jobId, vrs.getScript().getId().toString(), timestamp))
+                        .build())
+                .toList();
+
+        // VM login password: HMAC-SHA256(platformSecret, "vm-login:<seed>:<jobId>") truncated to 16 hex chars
+        String vmPassword;
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(platformSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(("vm-login:" + seedHex + ":" + jobId).getBytes(StandardCharsets.UTF_8));
+            vmPassword = HexFormat.of().formatHex(digest).substring(0, 16);
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new IllegalStateException("VM password derivation failed", e);
+        }
+
+        return DeriveFlagsResponse.builder()
+                .flags(flags)
+                .vmLoginPassword(vmPassword)
+                .build();
     }
 }

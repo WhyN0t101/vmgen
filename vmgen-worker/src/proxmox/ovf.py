@@ -62,6 +62,15 @@ def generate_ovf(vm_name: str, cpu_count: int, memory_mb: int,
         <rasd:Parent>4</rasd:Parent>
         <rasd:ResourceType>17</rasd:ResourceType>
       </Item>
+      <Item>
+        <rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>
+        <rasd:Connection>VM Network</rasd:Connection>
+        <rasd:Description>Ethernet adapter (disconnected by default)</rasd:Description>
+        <rasd:ElementName>Ethernet 0</rasd:ElementName>
+        <rasd:InstanceID>5</rasd:InstanceID>
+        <rasd:ResourceSubType>E1000</rasd:ResourceSubType>
+        <rasd:ResourceType>10</rasd:ResourceType>
+      </Item>
     </VirtualHardwareSection>
   </VirtualSystem>
 </Envelope>'''

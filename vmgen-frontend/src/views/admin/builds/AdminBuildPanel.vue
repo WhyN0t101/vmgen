@@ -8,9 +8,15 @@ import { formatTimeAgo } from '@/utils/dateFormat'
 const page = ref(0)
 const pageSize = 20
 
+const ACTIVE_STATES = new Set(['queued', 'building', 'exporting'])
+
 const { data, isLoading, isError, refetch } = useQuery({
   queryKey: computed(() => ['admin', 'builds', page.value]),
   queryFn: () => api.admin.getAllBuilds(page.value, pageSize),
+  refetchInterval: (query) => {
+    const items = query.state.data?.content ?? []
+    return items.some((b: AdminBuildSummary) => ACTIVE_STATES.has(b.state)) ? 5000 : false
+  },
 })
 
 const builds = computed(() => data.value?.content ?? [])

@@ -135,6 +135,23 @@ class BackendClient:
         except Exception as e:
             log.warning("Heartbeat failed (non-fatal): %s", e)
 
+    def derive_build_secrets(self, job_id: str, flag_derivation_timestamp: str) -> dict:
+        """
+        Ask the backend to derive raw flags and VM login password.
+        Returns {"flags": [{"scriptId": ..., "rawFlag": ...}], "vmLoginPassword": "..."}.
+        """
+        resp = requests.post(
+            f"{self.url}/api/worker/jobs/{job_id}/derive-flags",
+            json={
+                "workerId": self.worker_id,
+                "flagDerivationTimestamp": flag_derivation_timestamp,
+            },
+            headers=self._headers,
+            timeout=_DEFAULT_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     def fail_job(self, job_id: str, error_type: str, message: str, logs: str = ""):
         # error_type: "script_failed" | "timeout" | "proxmox_error"
         log.info(f"[{job_id}] Reporting failure: type={error_type}")

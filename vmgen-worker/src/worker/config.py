@@ -1,4 +1,5 @@
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv
@@ -31,7 +32,6 @@ class Config:
     proxmox: ProxmoxConfig
     worker: WorkerConfig
     backend: BackendConfig
-    platform_secret: str
     export_path: str           # filesystem path where OVAs are written (must be NFS-accessible from worker)
     log_level: str = "INFO"
 
@@ -65,7 +65,6 @@ class Config:
             proxmox=proxmox,
             worker=worker,
             backend=backend,
-            platform_secret=os.getenv("PLATFORM_SECRET", ""),
             export_path=os.getenv("EXPORT_PATH", "/var/lib/vmgen/exports"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
         )
@@ -87,7 +86,7 @@ class Config:
             ssh_key = Path(self.proxmox.ssh_key_path)
             if not ssh_key.exists():
                 errors.append(f"SSH key file not found: {self.proxmox.ssh_key_path}")
-            elif ssh_key.stat().st_mode & 0o077:
+            elif sys.platform != "win32" and ssh_key.stat().st_mode & 0o077:
                 errors.append(f"SSH key has insecure permissions (expected 0600): {self.proxmox.ssh_key_path}")
 
         # Backend
@@ -100,11 +99,4 @@ class Config:
         if not self.export_path:
             errors.append("EXPORT_PATH is required")
 
-        # Security
-        if not self.platform_secret:
-            errors.append("PLATFORM_SECRET is required")
-        elif len(self.platform_secret) < 32:
-            errors.append("PLATFORM_SECRET should be at least 32 characters")
-     
-       
         return errors
