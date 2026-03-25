@@ -69,17 +69,32 @@ public class WorkerService {
     @Value("${vmgen.platform.secret}")
     private String platformSecret;
 
-    // In-memory worker liveness tracking — keyed by workerId, value is last heartbeat timestamp.
-    // Not persisted: resets on backend restart, which is acceptable for a lab deployment.
-    private final Map<String, Instant> workerHeartbeats = new ConcurrentHashMap<>();
+    /**
+     * Snapshot of a single worker's last heartbeat payload.
+     * Stored in-memory; resets on backend restart.
+     */
+    public record WorkerHeartbeatState(
+            String workerId,
+            List<String> activeJobIds,
+            Double cpuPercent,
+            Double memoryPercent,
+            Instant lastSeenAt
+    ) {}
+
+    // In-memory worker liveness tracking — keyed by workerId.
+    // Not persisted: resets on backend restart.
+    private final Map<String, WorkerHeartbeatState> workerHeartbeats = new ConcurrentHashMap<>();
 
     /**
      * Records a liveness heartbeat from a worker.
      * Called every 60 seconds by each worker regardless of build activity.
      */
-    public void recordHeartbeat(String workerId, List<String> activeJobIds) {
-        workerHeartbeats.put(workerId, Instant.now());
-        log.debug("Heartbeat from worker {} (active jobs: {})", workerId, activeJobIds);
+    public void recordHeartbeat(String workerId, List<String> activeJobIds,
+                                Double cpuPercent, Double memoryPercent) {
+        workerHeartbeats.put(workerId,
+                new WorkerHeartbeatState(workerId, activeJobIds, cpuPercent, memoryPercent, Instant.now()));
+        log.debug("Heartbeat from worker {} (active jobs: {}, cpu: {}%, mem: {}%)",
+                workerId, activeJobIds, cpuPercent, memoryPercent);
     }
 
     /**
@@ -89,9 +104,17 @@ public class WorkerService {
     public List<String> getStaleWorkers(Duration threshold) {
         Instant cutoff = Instant.now().minus(threshold);
         return workerHeartbeats.entrySet().stream()
-                .filter(e -> e.getValue().isBefore(cutoff))
+                .filter(e -> e.getValue().lastSeenAt().isBefore(cutoff))
                 .map(Map.Entry::getKey)
                 .toList();
+    }
+
+    /**
+     * Returns a snapshot of all known worker heartbeat states.
+     * Used by AdminMetricsService to populate the metrics endpoint.
+     */
+    public Map<String, WorkerHeartbeatState> getAllWorkerHeartbeats() {
+        return java.util.Collections.unmodifiableMap(workerHeartbeats);
     }
 
     /**

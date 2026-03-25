@@ -197,7 +197,7 @@ function stateBadgeClass(state: string) {
               </div>
             </div>
             <p class="text-xs text-slate-600">
-              This password is deterministic — derived from the build seed. Not visible to students.
+              This password is deterministic — derived from the build seed.
             </p>
           </template>
 

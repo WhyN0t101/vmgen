@@ -33,7 +33,11 @@ public class WorkerController {
 
     @PostMapping("/heartbeat")
     public ResponseEntity<WorkerAckResponse> heartbeat(@Valid @RequestBody HeartbeatRequest request) {
-        workerService.recordHeartbeat(request.getWorkerId(), request.getActiveJobIds());
+        workerService.recordHeartbeat(
+                request.getWorkerId(),
+                request.getActiveJobIds(),
+                request.getCpuPercent(),
+                request.getMemoryPercent());
         return ResponseEntity.ok(new WorkerAckResponse(true));
     }
 

@@ -431,5 +431,20 @@ export interface AdminBuildCredentials {
   vmLoginPassword: string
 }
 
+export interface WorkerStatus {
+  workerId: string
+  activeJobIds: string[]
+  cpuPercent: number | null
+  memoryPercent: number | null
+  lastSeenAt: string
+}
+
+export interface AdminMetrics {
+  queueDepth: number
+  avgWaitMinutes: number
+  completionRate24h: number
+  workers: WorkerStatus[]
+}
+
 
 

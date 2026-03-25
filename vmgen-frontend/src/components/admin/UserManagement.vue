@@ -54,7 +54,7 @@ const currentUserId = computed(() => {
   
   // If there's only one admin session, it's likely the current user
   if (adminSessions.length === 1) {
-    return adminSessions[0].userId
+    return adminSessions[0]?.userId || null
   }
   
   // Try to match by username/email (username might be email or username)

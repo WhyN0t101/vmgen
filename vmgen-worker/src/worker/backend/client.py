@@ -114,7 +114,7 @@ class BackendClient:
         except Exception as e:
             log.warning("[%s] Failed to write build log to backend (non-fatal): %s", job_id, e)
 
-    def heartbeat(self, active_job_ids: list[str]) -> None:
+    def heartbeat(self, active_job_ids: list[str], cpu_percent: float, memory_percent: float) -> None:
         """
         Report worker liveness to the backend every 60 seconds.
         Non-fatal — a failure here must never crash the poll loop.
@@ -122,7 +122,12 @@ class BackendClient:
         try:
             resp = requests.post(
                 f"{self.url}/api/worker/heartbeat",
-                json={"workerId": self.worker_id, "activeJobIds": active_job_ids},
+                json={
+                    "workerId": self.worker_id,
+                    "activeJobIds": active_job_ids,
+                    "cpuPercent": cpu_percent,
+                    "memoryPercent": memory_percent,
+                },
                 headers=self._headers,
                 timeout=_DEFAULT_TIMEOUT,
             )

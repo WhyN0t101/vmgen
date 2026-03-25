@@ -7,6 +7,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import psutil
+
 from worker.config import Config
 from proxmox.client import ProxmoxClient
 from worker.backend.client import BackendClient
@@ -95,7 +97,9 @@ def main() -> int:
             # Heartbeat every 60 seconds regardless of build activity
             if time.time() - last_heartbeat >= HEARTBEAT_INTERVAL:
                 active_ids = [str(j["requestId"]) for j in active.values()]
-                backend.heartbeat(active_ids)
+                cpu = psutil.cpu_percent(interval=1)
+                mem = psutil.virtual_memory().percent
+                backend.heartbeat(active_ids, cpu, mem)
                 last_heartbeat = time.time()
 
             if len(active) < config.worker.max_concurrent_builds:

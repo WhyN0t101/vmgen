@@ -13,4 +13,8 @@ public class HeartbeatRequest {
     @NotBlank
     private String workerId;
     private List<String> activeJobIds;
+    /** Host CPU utilisation (0–100). Null if the worker does not supply it. */
+    private Double cpuPercent;
+    /** Host virtual-memory utilisation (0–100). Null if the worker does not supply it. */
+    private Double memoryPercent;
 }

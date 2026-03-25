@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import type {
   AdminBuildCredentials,
   AdminBuildSummary,
+  AdminMetrics,
   AuthResponse,
   Build,
   BuildSpec,
@@ -300,6 +301,11 @@ export const api = {
 
     getBuildCredentials: async (id: string): Promise<AdminBuildCredentials> => {
       return apiRequest<AdminBuildCredentials>(`/api/admin/builds/${id}/credentials`)
+    },
+
+    // Metrics
+    getMetrics: async (): Promise<AdminMetrics> => {
+      return apiRequest<AdminMetrics>('/api/admin/metrics')
     },
 
     // Vulnerability categories
