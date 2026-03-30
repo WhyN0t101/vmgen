@@ -346,6 +346,7 @@ public class VmRequestService {
                         .ovaFilename(r.getOvaFilename())
                         .ovaSha256(r.getOvaSha256())
                         .ovaSizeBytes(r.getOvaSizeBytes())
+                        .telemetryEnabled(Boolean.TRUE.equals(r.getTelemetryEnabled()))
                         .submittedAt(r.getSubmittedAt())
                         .completedAt(r.getCompletedAt())
                         .failedAt(r.getFailedAt())

@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { api } from '@/api/endpoints'
-import type { AdminBuildSummary, AdminBuildCredentials } from '@/types'
+import type { AdminBuildSummary, AdminBuildCredentials, TelemetryUploadResponse } from '@/types'
 import { formatTimeAgo } from '@/utils/dateFormat'
 
 const page = ref(0)
@@ -47,6 +47,51 @@ function closeCredentials() {
   selectedCredentials.value = null
   credentialsBuildId.value = null
   credentialsError.value = null
+}
+
+// Telemetry modal
+const telemetryLoading = ref<string | null>(null)
+const telemetryError = ref<string | null>(null)
+const selectedTelemetry = ref<TelemetryUploadResponse | null>(null)
+const telemetryBuildId = ref<string | null>(null)
+const telemetryRawExpanded = ref(false)
+
+const telemetryParsed = computed(() => {
+  if (!selectedTelemetry.value?.rawJson) return null
+  try {
+    return JSON.parse(selectedTelemetry.value.rawJson)
+  } catch {
+    return null
+  }
+})
+
+async function viewTelemetry(build: AdminBuildSummary) {
+  telemetryLoading.value = build.id
+  telemetryError.value = null
+  selectedTelemetry.value = null
+  telemetryBuildId.value = build.id
+  telemetryRawExpanded.value = false
+  try {
+    selectedTelemetry.value = await api.admin.getBuildTelemetry(build.id)
+  } catch (e: any) {
+    telemetryError.value = e?.message ?? 'No telemetry submitted yet'
+  } finally {
+    telemetryLoading.value = null
+  }
+}
+
+function closeTelemetry() {
+  selectedTelemetry.value = null
+  telemetryBuildId.value = null
+  telemetryError.value = null
+}
+
+function formatDuration(startMs: number, endMs: number): string {
+  const secs = Math.round((endMs - startMs) / 1000)
+  if (secs < 60) return `${secs}s`
+  const mins = Math.floor(secs / 60)
+  const rem = secs % 60
+  return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`
 }
 
 function stateBadgeClass(state: string) {
@@ -132,15 +177,25 @@ function stateBadgeClass(state: string) {
               <span v-else class="text-slate-600">—</span>
             </td>
             <td class="px-4 py-3">
-              <button
-                v-if="build.state === 'ready'"
-                @click="viewCredentials(build)"
-                :disabled="credentialsLoading === build.id"
-                class="px-3 py-1 text-xs font-medium text-sky-400 hover:text-sky-200 border border-sky-500/30 hover:border-sky-400/60 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <span v-if="credentialsLoading === build.id">Loading...</span>
-                <span v-else>Credentials</span>
-              </button>
+              <div v-if="build.state === 'ready'" class="flex items-center gap-2">
+                <button
+                  @click="viewCredentials(build)"
+                  :disabled="credentialsLoading === build.id"
+                  class="px-3 py-1 text-xs font-medium text-sky-400 hover:text-sky-200 border border-sky-500/30 hover:border-sky-400/60 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <span v-if="credentialsLoading === build.id">Loading...</span>
+                  <span v-else>Credentials</span>
+                </button>
+                <button
+                  v-if="build.telemetryEnabled"
+                  @click="viewTelemetry(build)"
+                  :disabled="telemetryLoading === build.id"
+                  class="px-3 py-1 text-xs font-medium text-violet-400 hover:text-violet-200 border border-violet-500/30 hover:border-violet-400/60 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <span v-if="telemetryLoading === build.id">Loading...</span>
+                  <span v-else>Telemetry</span>
+                </button>
+              </div>
               <span v-else-if="build.failureReason" class="text-xs text-red-400/70 max-w-[200px] truncate block" :title="build.failureReason">
                 {{ build.failureReason }}
               </span>
@@ -209,6 +264,84 @@ function stateBadgeClass(state: string) {
 
           <button
             @click="closeCredentials"
+            class="w-full py-2 text-sm font-medium text-slate-400 hover:text-slate-100 border border-slate-700 hover:border-slate-500 rounded-xl transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Telemetry Modal -->
+    <Teleport to="body">
+      <div
+        v-if="telemetryBuildId && (selectedTelemetry || telemetryError)"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        @click.self="closeTelemetry"
+      >
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-lg space-y-4 shadow-2xl max-h-[80vh] overflow-y-auto">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-100">Session Telemetry</h3>
+            <button @click="closeTelemetry" class="text-slate-500 hover:text-slate-200 transition-colors text-lg leading-none">&times;</button>
+          </div>
+
+          <div v-if="telemetryError" class="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-300">
+            {{ telemetryError }}
+          </div>
+
+          <template v-else-if="selectedTelemetry && telemetryParsed">
+            <p class="text-xs text-slate-500 font-mono truncate">Build {{ selectedTelemetry.buildId }}</p>
+
+            <!-- Summary stats -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="bg-slate-800/60 rounded-lg p-3">
+                <p class="text-xs text-slate-500 mb-1">Hostname</p>
+                <p class="font-mono text-sm text-slate-200">{{ telemetryParsed.hostname ?? '—' }}</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-3">
+                <p class="text-xs text-slate-500 mb-1">Collected at</p>
+                <p class="font-mono text-xs text-slate-300">{{ telemetryParsed.collected_at ?? '—' }}</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-3">
+                <p class="text-xs text-slate-500 mb-1">History entries</p>
+                <p class="font-mono text-sm text-slate-200">{{ telemetryParsed.history_entry_count ?? '—' }}</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-lg p-3">
+                <p class="text-xs text-slate-500 mb-1">File size</p>
+                <p class="font-mono text-sm text-slate-200">{{ selectedTelemetry.fileSizeBytes }} B</p>
+              </div>
+            </div>
+
+            <!-- Tools detected -->
+            <div v-if="telemetryParsed.tools_detected?.length">
+              <p class="text-xs text-slate-500 mb-2">Tools detected</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="tool in telemetryParsed.tools_detected"
+                  :key="tool"
+                  class="px-2 py-0.5 rounded-full text-xs font-mono bg-violet-500/15 text-violet-300 border border-violet-500/30"
+                >{{ tool }}</span>
+              </div>
+            </div>
+            <p v-else class="text-xs text-slate-600">No known tools detected.</p>
+
+            <!-- Raw JSON toggle -->
+            <div>
+              <button
+                @click="telemetryRawExpanded = !telemetryRawExpanded"
+                class="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                {{ telemetryRawExpanded ? '▲ Hide' : '▶ Show' }} raw JSON
+              </button>
+              <pre
+                v-if="telemetryRawExpanded"
+                class="mt-2 text-xs font-mono text-slate-400 bg-slate-800/60 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-all"
+              >{{ JSON.stringify(telemetryParsed, null, 2) }}</pre>
+            </div>
+          </template>
+
+          <button
+            @click="closeTelemetry"
             class="w-full py-2 text-sm font-medium text-slate-400 hover:text-slate-100 border border-slate-700 hover:border-slate-500 rounded-xl transition-colors"
           >
             Close

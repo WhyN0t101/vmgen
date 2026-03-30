@@ -134,8 +134,11 @@ public class AuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logFlagSubmitted(User user, UUID buildId, UUID scriptId, boolean valid, AuditContext ctx) {
-        write(user, valid ? ACTION_FLAG_SUBMITTED : ACTION_FLAG_REJECTED, "build", buildId, ctx,
-                Map.of("buildId", buildId.toString(), "scriptId", scriptId.toString(), "valid", valid));
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("buildId", buildId.toString());
+        if (scriptId != null) meta.put("scriptId", scriptId.toString());
+        meta.put("valid", valid);
+        write(user, valid ? ACTION_FLAG_SUBMITTED : ACTION_FLAG_REJECTED, "build", buildId, ctx, meta);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

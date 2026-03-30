@@ -3,6 +3,8 @@ package io.vmgen.api.controller;
 import io.vmgen.api.dto.build.AdminBuildCredentialsResponse;
 import io.vmgen.api.dto.build.AdminBuildSummaryDto;
 import io.vmgen.api.dto.common.PagedResponse;
+import io.vmgen.api.dto.telemetry.TelemetryUploadResponse;
+import io.vmgen.api.service.TelemetryService;
 import io.vmgen.api.service.VmRequestService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminBuildController {
 
     private final VmRequestService vmRequestService;
+    private final TelemetryService telemetryService;
 
     @GetMapping
     public ResponseEntity<PagedResponse<AdminBuildSummaryDto>> getAllBuilds(
@@ -35,5 +38,12 @@ public class AdminBuildController {
             @PathVariable UUID id
     ) {
         return ResponseEntity.ok(vmRequestService.getAdminBuildCredentials(id));
+    }
+
+    @GetMapping("/{id}/telemetry")
+    public ResponseEntity<TelemetryUploadResponse> getBuildTelemetry(
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(telemetryService.getAdminTelemetry(id));
     }
 }

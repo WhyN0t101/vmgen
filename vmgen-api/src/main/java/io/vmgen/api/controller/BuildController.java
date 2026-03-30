@@ -1,11 +1,17 @@
 package io.vmgen.api.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.vmgen.api.dto.build.BuildDownloadInfo;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.CreateBuildRequest;
 import io.vmgen.api.dto.build.ProvenanceResponse;
 import io.vmgen.api.dto.common.PagedResponse;
+import io.vmgen.api.dto.flag.FlagSubmitRequest;
+import io.vmgen.api.dto.flag.FlagSubmitResponse;
+import io.vmgen.api.dto.telemetry.TelemetryUploadResponse;
 import io.vmgen.api.models.user.User;
+import io.vmgen.api.service.FlagService;
+import io.vmgen.api.service.TelemetryService;
 import io.vmgen.api.service.UserService;
 import io.vmgen.api.service.VmRequestService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,7 +43,8 @@ public class BuildController {
 
     private final VmRequestService vmRequestService;
     private final UserService userService;
-
+    private final FlagService flagService;
+    private final TelemetryService telemetryService;
 
     @PostMapping
     public ResponseEntity<BuildResponse> createBuild(
@@ -99,5 +106,27 @@ public class BuildController {
     ) {
         User user = userService.requireUser(authentication);
         return ResponseEntity.ok(vmRequestService.getBuildProvenance(id, user, auditContext(http, Map.of())));
+    }
+
+    @PostMapping(value = "/{id}/telemetry", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<TelemetryUploadResponse> uploadTelemetry(
+            @PathVariable UUID id,
+            @RequestBody JsonNode body,
+            Authentication authentication
+    ) {
+        User user = userService.requireUser(authentication);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(telemetryService.uploadTelemetry(id, body, user));
+    }
+
+    @PostMapping("/{id}/flag")
+    public ResponseEntity<FlagSubmitResponse> submitFlag(
+            @PathVariable UUID id,
+            @Valid @RequestBody FlagSubmitRequest request,
+            Authentication authentication,
+            HttpServletRequest http
+    ) {
+        User user = userService.requireUser(authentication);
+        return ResponseEntity.ok(flagService.submitFlag(id, request, user, auditContext(http, Map.of())));
     }
 }

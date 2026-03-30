@@ -15,6 +15,34 @@ const { data: build, isLoading } = useBuildStatus(requestId)
 const downloading = ref(false)
 const downloadingProvenance = ref(false)
 
+// Telemetry upload
+const telemetryFile = ref<File | null>(null)
+const telemetryUploading = ref(false)
+const telemetrySubmitted = ref(false)
+const telemetryError = ref<string | null>(null)
+
+function onTelemetryFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  telemetryFile.value = input.files?.[0] ?? null
+  telemetryError.value = null
+}
+
+async function submitTelemetry() {
+  if (!build.value || !telemetryFile.value) return
+  telemetryUploading.value = true
+  telemetryError.value = null
+  try {
+    const text = await telemetryFile.value.text()
+    const json = JSON.parse(text)
+    await api.uploadTelemetry(build.value.id, json)
+    telemetrySubmitted.value = true
+  } catch (e: any) {
+    telemetryError.value = e?.response?.data?.message ?? e?.message ?? 'Upload failed'
+  } finally {
+    telemetryUploading.value = false
+  }
+}
+
 async function downloadOva() {
   if (!build.value) return
   downloading.value = true
@@ -148,6 +176,37 @@ function formatBytes(bytes?: number) {
               <span class="text-slate-300 font-mono text-sm">provenance-{{ build.id }}.json</span>
               <BaseButton variant="secondary" class="w-full mt-2" :disabled="downloadingProvenance" @click="downloadManifest">
                 {{ downloadingProvenance ? 'Downloading…' : 'Download Manifest' }}
+              </BaseButton>
+            </div>
+          </div>
+
+          <!-- Telemetry upload (only when telemetry was enabled at build time) -->
+          <div v-if="build.telemetryEnabled" class="mt-6 pt-6 border-t border-slate-800">
+            <p class="text-xs font-mono tracking-widest uppercase text-slate-400 mb-3">Session Telemetry</p>
+
+            <div v-if="telemetrySubmitted" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
+              Telemetry submitted — your instructor can now review your session.
+            </div>
+
+            <div v-else class="space-y-3">
+              <p class="text-xs text-slate-500">
+                Run <code class="bg-slate-800 px-1 rounded">collect-telemetry</code> inside the VM, then upload
+                <code class="bg-slate-800 px-1 rounded">/tmp/vmgen-telemetry.json</code> here.
+              </p>
+              <input
+                type="file"
+                accept=".json,application/json"
+                class="block w-full text-sm text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-600 file:text-xs file:font-medium file:text-slate-300 file:bg-slate-800 hover:file:bg-slate-700 file:cursor-pointer cursor-pointer"
+                @change="onTelemetryFileChange"
+              />
+              <div v-if="telemetryError" class="text-xs text-red-400">{{ telemetryError }}</div>
+              <BaseButton
+                variant="secondary"
+                class="w-full"
+                :disabled="!telemetryFile || telemetryUploading"
+                @click="submitTelemetry"
+              >
+                {{ telemetryUploading ? 'Uploading…' : 'Upload Telemetry' }}
               </BaseButton>
             </div>
           </div>

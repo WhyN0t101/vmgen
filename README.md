@@ -1,16 +1,16 @@
-# VVMGen - Vulnerable VM Generation Platform
+# VMGen - Vulnerable VM Generation Platform
 
-A platform for generating deterministic, reproducible virtual machines for cybersecurity education and training. Build vulnerable training environments with full provenance tracking and isolated execution.
+A platform for deterministic generation of vulnerable virtual machines for cybersecurity education and training. Build vulnerable training environments with full provenance tracking and isolated execution.
 
 ## Project Concept
 
-VVMGen enables educators and security researchers to:
+VMGen enables educators and security researchers to:
 
 - **Generate Vulnerable VMs**: Create virtual machines with specific vulnerabilities for training purposes
-- **Deterministic Builds**: Same configuration always produces the same VM (reproducible)
+- **Deterministic Builds**: Same configuration → same learning outcome (identical vulnerability, identical exploitation technique). Flags and timestamps differ per build by design — this is functional equivalence, not bit-for-bit replication
 - **Provenance Tracking**: Complete audit trail of what was included in each build
 - **Isolated Environments**: Each VM is self-contained and portable (OVA format)
-- **Flag Management**: Secure flag generation and submission tracking for CTF-style exercises
+- **Flag Management**: Secure HMAC-SHA256 flag generation and submission tracking for CTF-style exercises
 
 ### Key Features
 
@@ -34,12 +34,21 @@ VVMGen enables educators and security researchers to:
 
 ### Backend (`vmgen-api`)
 - **Framework**: Spring Boot 4.0 (Java 21)
-- **Security**: Spring Security 6 with JWT authentication
+- **Security**: Spring Security 6 with JWT authentication (HS256, tokens in-memory only)
 - **Database**: PostgreSQL 16 (via Docker)
 - **ORM**: JPA/Hibernate
 - **Migrations**: Flyway
 - **Password Hashing**: Argon2id
-- **Scheduling**: Spring Scheduling for session cleanup
+- **Scheduling**: Spring Scheduling for session cleanup and stale build detection
+
+### Worker (`vmgen-worker`)
+
+- **Language**: Python 3.11+
+- **Proxmox integration**: `proxmoxer` (API) + `paramiko` (SSH)
+- **Build pipeline**: 16-stage automated pipeline — clone, provision, scripts, flags, OVA export, provenance
+- **Flag derivation**: Requests raw flags from backend API (`POST /api/worker/jobs/{id}/derive-flags`); `PLATFORM_SECRET` never leaves the backend
+- **Concurrency**: `ThreadPoolExecutor` (configurable, default 3 parallel builds)
+- **Metrics**: `psutil` for CPU/memory reporting via heartbeat
 
 ### Database
 - **PostgreSQL 16** running in Docker
@@ -54,6 +63,31 @@ VVMGen enables educators and security researchers to:
 - **IDE** (IntelliJ IDEA, VS Code, or Eclipse recommended)
 
 ## Quick Start
+
+### 0. Configure Environment Variables
+
+The backend requires secrets via environment variables (or an `.env` file). At minimum:
+
+```properties
+# Required
+VMGEN_JWT_SECRET=<min-32-char-random-string>
+VMGEN_PLATFORM_SECRET=<256-bit-hex-secret-for-flag-derivation>
+VMGEN_WORKER_API_KEY=<random-key-shared-with-workers>
+
+# Database (defaults match the Docker Compose setup below)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=vmgen
+DB_USERNAME=vmgen
+DB_PASSWORD=vmgen
+
+# Proxmox (required for template validation and VM listing)
+# Create the API token in Proxmox VE: Datacenter → Permissions → API Tokens
+# Token format is <user>@<realm>!<tokenname> — e.g. worker@pve!automation
+PROXMOX_API_URL=https://<proxmox-host>:8006/api2/json
+PROXMOX_TOKEN_ID=<user>@<realm>!<tokenname>
+PROXMOX_TOKEN_SECRET=<token-secret-from-proxmox>
+```
 
 ### 1. Start the Database
 
@@ -124,7 +158,7 @@ The frontend will start on `http://localhost:5173` (or another port if 5173 is b
 
 1. Navigate to `/login`
 2. Use your username/email and password
-3. You'll receive a JWT token (stored in localStorage)
+3. You'll receive a JWT token (held in-memory via Pinia — never written to localStorage)
 4. Protected routes require authentication
 
 ### Promote to Admin

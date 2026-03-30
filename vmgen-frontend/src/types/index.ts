@@ -415,6 +415,7 @@ export interface AdminBuildSummary {
   templateId: string
   templateName: string
   difficulty?: string
+  telemetryEnabled: boolean
   currentWorkerStage?: string
   failureReason?: string
   ovaFilename?: string
@@ -423,6 +424,15 @@ export interface AdminBuildSummary {
   submittedAt: string
   completedAt?: string
   failedAt?: string
+}
+
+export interface TelemetryUploadResponse {
+  id: string
+  buildId: string
+  fileSha256: string
+  fileSizeBytes: number
+  uploadedAt: string
+  rawJson: string
 }
 
 export interface AdminBuildCredentials {

@@ -20,6 +20,7 @@ public class AdminBuildSummaryDto {
     private String ovaFilename;
     private String ovaSha256;
     private Long ovaSizeBytes;
+    private boolean telemetryEnabled;
     private Instant submittedAt;
     private Instant completedAt;
     private Instant failedAt;

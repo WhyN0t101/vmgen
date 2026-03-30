@@ -8,6 +8,7 @@ import type {
   Build,
   BuildSpec,
   ProvenanceResponse,
+  TelemetryUploadResponse,
   TemplateResponse,
   TemplateListResponse,
   RegisterTemplateRequest,
@@ -89,13 +90,21 @@ export const api = {
     URL.revokeObjectURL(url)
   },
 
+  // Telemetry
+  uploadTelemetry: async (id: string, jsonData: unknown): Promise<TelemetryUploadResponse> => {
+    return apiRequest<TelemetryUploadResponse>(`/api/builds/${id}/telemetry`, {
+      method: 'POST',
+      body: JSON.stringify(jsonData),
+    })
+  },
+
   // Flags
-  submitFlag: async (requestId: string, flag: string): Promise<{ valid: boolean; message: string }> => {
-    return apiRequest<{ valid: boolean; message: string }>(
+  submitFlag: async (requestId: string, flag: string): Promise<{ correct: boolean; attemptsRemaining: number }> => {
+    return apiRequest<{ correct: boolean; attemptsRemaining: number }>(
       `/api/builds/${requestId}/flag`,
       {
         method: 'POST',
-        body: JSON.stringify({ flag }),
+        body: JSON.stringify({ flagValue: flag }),
       }
     )
   },
@@ -301,6 +310,10 @@ export const api = {
 
     getBuildCredentials: async (id: string): Promise<AdminBuildCredentials> => {
       return apiRequest<AdminBuildCredentials>(`/api/admin/builds/${id}/credentials`)
+    },
+
+    getBuildTelemetry: async (id: string): Promise<TelemetryUploadResponse> => {
+      return apiRequest<TelemetryUploadResponse>(`/api/admin/builds/${id}/telemetry`)
     },
 
     // Metrics
