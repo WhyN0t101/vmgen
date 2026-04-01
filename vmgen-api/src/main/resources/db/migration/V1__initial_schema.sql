@@ -1,7 +1,5 @@
--- VMGen consolidated baseline schema (V1–V10)
--- This file represents the end state after applying the historical migrations that
--- previously lived in this folder (V1..V10). Those files are now archived under:
---   db/migration_legacy/
+-- VMGen single baseline migration (merged former V1–V6).
+-- Superseded incremental migration files are archived under db/migration_legacy/archived_active_V2_through_V6_*.sql
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -16,7 +14,8 @@ CREATE TABLE users (
     role VARCHAR(50) NOT NULL DEFAULT 'USER',
     email_verified_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    locked_until TIMESTAMP
 );
 
 CREATE TABLE sessions (
@@ -31,6 +30,8 @@ CREATE TABLE sessions (
 CREATE INDEX idx_sessions_token ON sessions(token_hash);
 CREATE INDEX idx_sessions_user ON sessions(user_id);
 CREATE INDEX idx_sessions_expiry ON sessions(expires_at);
+
+CREATE INDEX idx_users_locked_until ON users(locked_until) WHERE locked_until IS NOT NULL;
 
 -- =========================
 -- Audit Log
@@ -98,6 +99,9 @@ CREATE TABLE templates (
 
     ssh_auth_method VARCHAR(20) NOT NULL DEFAULT 'password_reset',
     CONSTRAINT chk_templates_ssh_auth_method CHECK (ssh_auth_method IN ('cloudinit', 'password_reset', 'static_key')),
+
+    ssh_password VARCHAR(255),
+    ssh_private_key TEXT,
 
     last_validation_attempt TIMESTAMP,
     validation_duration_seconds INTEGER,
@@ -282,6 +286,7 @@ CREATE TABLE vm_requests (
     build_seed VARCHAR(64) NOT NULL,
     difficulty_override VARCHAR(50),
     telemetry_enabled BOOLEAN NOT NULL DEFAULT false,
+    failed_flag_attempts INTEGER NOT NULL DEFAULT 0,
 
     state VARCHAR(50) NOT NULL DEFAULT 'QUEUED',
     CONSTRAINT chk_vm_requests_state CHECK (state IN ('QUEUED','BUILDING','EXPORTING','READY','FAILED','ARCHIVED')),
@@ -369,16 +374,24 @@ CREATE TABLE provenance_records (
     difficulty_level VARCHAR(50),
     telemetry_enabled BOOLEAN NOT NULL,
     ova_sha256 VARCHAR(64) NOT NULL,
+    worker_id VARCHAR(100),
+    build_started_at TIMESTAMP,
+    build_finished_at TIMESTAMP,
+    vm_login_password VARCHAR(64),
     finalised_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE provenance_scripts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     provenance_id UUID NOT NULL REFERENCES provenance_records(id),
+    execution_order INTEGER NOT NULL,
     script_identifier VARCHAR(255) NOT NULL,
     script_version VARCHAR(50) NOT NULL,
     script_sha256 VARCHAR(64) NOT NULL,
-    execution_order INTEGER NOT NULL,
-    PRIMARY KEY (provenance_id, execution_order)
+    script_id UUID,
+    exit_code INTEGER,
+    duration_seconds INTEGER,
+    UNIQUE (provenance_id, execution_order)
 );
 
 CREATE TABLE provenance_parameters (
@@ -437,11 +450,12 @@ CREATE TABLE telemetry_uploads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vm_request_id UUID NOT NULL REFERENCES vm_requests(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    file_path TEXT NOT NULL,
+    file_path TEXT,
     file_sha256 VARCHAR(64) NOT NULL,
     file_size_bytes BIGINT NOT NULL,
     uploaded_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMP
+    deleted_at TIMESTAMP,
+    raw_json JSONB
 );
 
 CREATE INDEX idx_telemetry_request ON telemetry_uploads(vm_request_id);

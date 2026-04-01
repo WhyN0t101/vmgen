@@ -134,7 +134,9 @@ class ProxmoxClient:
 
     def stop_vm(self, vmid: int, node: str | None = None):
         log.info(f"Stopping VM {vmid}...")
-        task = self._node_api(node).qemu(vmid).status.stop.post()
+        # Use ACPI shutdown (not hard stop) so the guest OS unmounts filesystems
+        # cleanly and all dirty pages are flushed to the virtual disk before export.
+        task = self._node_api(node).qemu(vmid).status.shutdown.post()
         self._wait_for_task(task, node, timeout=120)
         log.info(f"VM {vmid} stopped")
 

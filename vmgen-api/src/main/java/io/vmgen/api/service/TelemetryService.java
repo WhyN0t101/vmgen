@@ -22,6 +22,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -40,9 +41,11 @@ public class TelemetryService {
         byte[] jsonBytes = serialize(body);
 
         if (jsonBytes.length > MAX_SIZE_BYTES) {
-            throw new ValidationException("Telemetry file exceeds 1 MB limit");
-        }
+        throw new ValidationException(
+                "Validation failed",
+                List.of("Telemetry file exceeds 1 MB limit"));
 
+    }
         VmRequest build = vmRequestRepository.findById(buildId)
                 .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + buildId));
 
@@ -51,11 +54,16 @@ public class TelemetryService {
         }
 
         if (!Boolean.TRUE.equals(build.getTelemetryEnabled())) {
-            throw new ValidationException("Telemetry is not enabled for this build");
-        }
+        throw new ValidationException(
+                "Validation failed",
+                List.of("Telemetry is not enabled for this build"));
 
+    }
         if (build.getState() != VmRequestState.READY) {
-            throw new ValidationException("Telemetry can only be submitted for READY builds");
+            throw new ValidationException(
+                    "Validation failed",
+                    List.of("Telemetry can only be submitted for READY builds"));
+
         }
 
         String sha256 = computeSha256(jsonBytes);
@@ -100,8 +108,12 @@ public class TelemetryService {
         try {
             return objectMapper.writeValueAsBytes(body);
         } catch (Exception e) {
-            throw new ValidationException("Failed to serialize telemetry JSON");
-        }
+        throw new ValidationException(
+                "Validation failed",
+                List.of("Failed to serialize telemetry JSON"));
+
+    }
+
     }
 
     private String computeSha256(byte[] data) {

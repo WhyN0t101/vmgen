@@ -86,14 +86,6 @@ function closeTelemetry() {
   telemetryError.value = null
 }
 
-function formatDuration(startMs: number, endMs: number): string {
-  const secs = Math.round((endMs - startMs) / 1000)
-  if (secs < 60) return `${secs}s`
-  const mins = Math.floor(secs / 60)
-  const rem = secs % 60
-  return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`
-}
-
 function stateBadgeClass(state: string) {
   switch (state) {
     case 'ready':     return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
@@ -311,19 +303,6 @@ function stateBadgeClass(state: string) {
                 <p class="font-mono text-sm text-slate-200">{{ selectedTelemetry.fileSizeBytes }} B</p>
               </div>
             </div>
-
-            <!-- Tools detected -->
-            <div v-if="telemetryParsed.tools_detected?.length">
-              <p class="text-xs text-slate-500 mb-2">Tools detected</p>
-              <div class="flex flex-wrap gap-1.5">
-                <span
-                  v-for="tool in telemetryParsed.tools_detected"
-                  :key="tool"
-                  class="px-2 py-0.5 rounded-full text-xs font-mono bg-violet-500/15 text-violet-300 border border-violet-500/30"
-                >{{ tool }}</span>
-              </div>
-            </div>
-            <p v-else class="text-xs text-slate-600">No known tools detected.</p>
 
             <!-- Raw JSON toggle -->
             <div>

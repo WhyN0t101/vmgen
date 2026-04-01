@@ -5,7 +5,6 @@ import io.vmgen.api.dto.flag.FlagSubmitRequest;
 import io.vmgen.api.dto.flag.FlagSubmitResponse;
 import io.vmgen.api.exceptions.AccountLockedException;
 import io.vmgen.api.exceptions.ForbiddenException;
-import io.vmgen.api.exceptions.RateLimitExceededException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ValidationException;
 import io.vmgen.api.models.flag.Flag;
@@ -60,18 +59,24 @@ public class FlagService {
         }
 
         if (build.getState() != VmRequestState.READY) {
-            throw new ValidationException("Flag submission requires build to be in READY state");
+            throw new ValidationException(
+                    "Validation failed",
+                    List.of("Flag submission requires build to be in READY state"));
         }
 
         // 3. Check per-build attempt limit
         if (build.getFailedFlagAttempts() >= MAX_ATTEMPTS_PER_BUILD) {
-            throw new RateLimitExceededException("Maximum flag attempts reached for this build");
+            throw new ValidationException(
+                    "Validation failed",
+                    List.of("Maximum flag attempts reached for this build"));
         }
 
         // 4. Load registered flag hashes for this build
         List<Flag> flags = flagRepository.findByVmRequest_Id(buildId);
         if (flags.isEmpty()) {
-            throw new ValidationException("No flags registered for this build");
+            throw new ValidationException(
+                    "Validation failed",
+                    List.of("No flags registered for this build"));
         }
 
         // 5. Constant-time comparison: hash submitted value, check against each stored hash

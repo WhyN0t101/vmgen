@@ -14,6 +14,7 @@ import { useToast } from '@/composables/useToast'
 const router = useRouter()
 const registerMutation = useRegisterTemplate()
 const { show } = useToast()
+const submitError = ref<string | null>(null)
 
 // Compatible scripts selection — load enriched (includes conflict/dep data)
 const selectedCompatibleScriptIds = ref<Set<string>>(new Set())
@@ -198,6 +199,7 @@ async function selectVm(vm: any) {
 }
 
 async function handleSubmit() {
+  submitError.value = null
   try {
     const result = await registerMutation.mutateAsync(form.value)
 
@@ -212,8 +214,11 @@ async function handleSubmit() {
     }
 
     router.push({ name: 'admin-template-detail', params: { id: result.id } })
-  } catch (error) {
-    // Error handled by mutation via toast.
+  } catch (error: any) {
+    submitError.value =
+      error?.response?.data?.message ??
+      error?.message ??
+      'Failed to register template'
   }
 }
 </script>
@@ -682,6 +687,14 @@ async function handleSubmit() {
           </p>
         </div>
       </BaseCard>
+
+      <!-- Submit error -->
+      <div
+        v-if="submitError"
+        class="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+      >
+        {{ submitError }}
+      </div>
 
       <!-- Submit -->
       <div class="flex justify-end gap-4">

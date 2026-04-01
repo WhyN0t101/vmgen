@@ -15,6 +15,26 @@ const { data: build, isLoading } = useBuildStatus(requestId)
 const downloading = ref(false)
 const downloadingProvenance = ref(false)
 
+// Flag submission
+const flagInput = ref('')
+const flagSubmitting = ref(false)
+const flagResult = ref<{ correct: boolean; attemptsRemaining: number } | null>(null)
+const flagError = ref<string | null>(null)
+
+async function submitFlag() {
+  if (!build.value || !flagInput.value.trim()) return
+  flagSubmitting.value = true
+  flagResult.value = null
+  flagError.value = null
+  try {
+    flagResult.value = await api.submitFlag(build.value.id, flagInput.value.trim())
+  } catch (e: any) {
+    flagError.value = e?.response?.data?.message ?? e?.message ?? 'Submission failed'
+  } finally {
+    flagSubmitting.value = false
+  }
+}
+
 // Telemetry upload
 const telemetryFile = ref<File | null>(null)
 const telemetryUploading = ref(false)
@@ -65,12 +85,12 @@ async function downloadManifest() {
 }
 
 const stateConfig = {
-  queued: { label: 'Queued', color: 'info', icon: '⏳' },
-  building: { label: 'Building', color: 'info', icon: '⟳' },
-  exporting: { label: 'Exporting', color: 'info', icon: '📦' },
-  ready: { label: 'Ready', color: 'success', icon: '✓' },
-  failed: { label: 'Failed', color: 'danger', icon: '✗' },
-  archived: { label: 'Archived', color: 'default', icon: '📁' },
+  queued:    { label: 'Queued',    color: 'info'    },
+  building:  { label: 'Building',  color: 'info'    },
+  exporting: { label: 'Exporting', color: 'info'    },
+  ready:     { label: 'Ready',     color: 'success' },
+  failed:    { label: 'Failed',    color: 'danger'  },
+  archived:  { label: 'Archived',  color: 'default' },
 } as const
 
 const stateInfo = computed(() => {
@@ -109,7 +129,7 @@ function formatBytes(bytes?: number) {
           <div class="flex items-center justify-between mb-2">
             <h1 class="text-2xl md:text-3xl font-semibold text-slate-50">Build status</h1>
             <BaseBadge v-if="stateInfo" :variant="stateInfo.color">
-              {{ stateInfo.icon }} {{ stateInfo.label }}
+              {{ stateInfo.label }}
             </BaseBadge>
           </div>
           <div class="flex items-center gap-4 text-sm text-slate-400 flex-wrap">
@@ -151,7 +171,6 @@ function formatBytes(bytes?: number) {
         <!-- Ready state -->
         <BaseCard v-if="build.state === 'ready'" padding="lg">
           <div class="text-center mb-6">
-            <div class="text-4xl mb-2">✓</div>
             <h2 class="text-2xl font-bold text-slate-100 mb-2">Build Complete</h2>
             <p class="text-slate-400">Your vulnerable VM is ready for download.</p>
           </div>
@@ -211,15 +230,43 @@ function formatBytes(bytes?: number) {
             </div>
           </div>
 
-          <div class="mt-6 pt-6 border-t border-slate-800 flex gap-4">
-            <BaseButton variant="primary" class="flex-1">Submit Flag</BaseButton>
+          <div class="mt-6 pt-6 border-t border-slate-800 space-y-3">
+            <p class="text-xs font-mono tracking-widest uppercase text-slate-400">Submit Flag</p>
+
+            <div v-if="flagResult?.correct" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
+              Correct flag — challenge complete.
+            </div>
+
+            <template v-else>
+              <div class="flex gap-2">
+                <input
+                  v-model="flagInput"
+                  type="text"
+                  placeholder="FLAG{…}"
+                  class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-primary-500"
+                  :disabled="flagSubmitting"
+                  @keyup.enter="submitFlag"
+                />
+                <BaseButton
+                  variant="primary"
+                  :disabled="!flagInput.trim() || flagSubmitting"
+                  @click="submitFlag"
+                >
+                  {{ flagSubmitting ? 'Checking…' : 'Submit' }}
+                </BaseButton>
+              </div>
+
+              <div v-if="flagResult && !flagResult.correct" class="text-sm text-red-400">
+                Incorrect. {{ flagResult.attemptsRemaining }} attempt{{ flagResult.attemptsRemaining === 1 ? '' : 's' }} remaining.
+              </div>
+              <div v-if="flagError" class="text-sm text-red-400">{{ flagError }}</div>
+            </template>
           </div>
         </BaseCard>
 
         <!-- Failed state -->
         <BaseCard v-if="build.state === 'failed'" padding="lg">
           <div class="text-center mb-6">
-            <div class="text-4xl mb-2">✗</div>
             <h2 class="text-2xl font-bold text-danger-500 mb-2">Build Failed</h2>
             <p v-if="build.failureReason" class="text-slate-400 font-mono text-sm bg-slate-800/60 p-4 rounded">
               {{ build.failureReason }}

@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useConfirm } from '@/composables/useConfirm'
 
-const { isOpen, options, resolve } = useConfirm()
+const confirmStore = useConfirm()
+const { isOpen, options } = storeToRefs(confirmStore)
 
-const handleCancel = () => resolve(false)
-const handleConfirm = () => resolve(true)
+const handleCancel = () => confirmStore.resolve(false)
+const handleConfirm = () => confirmStore.resolve(true)
 </script>
 
 <template>

@@ -4,7 +4,14 @@
 def generate_ovf(vm_name: str, cpu_count: int, memory_mb: int,
                  disk_capacity_bytes: int, vmdk_size_bytes: int) -> str:
     """
-    Generate a minimal OVF 1.0 descriptor compatible with VirtualBox and VMware.
+    Generate a minimal OVF 1.0 descriptor compatible with VMware Workstation and VirtualBox.
+
+    NetworkSection declares "NAT" as the network name — both hypervisors recognise this
+    keyword natively and attach the NIC to their NAT adapter without prompting.
+    The Connection element in the NIC item must reference a name declared here;
+    omitting the NetworkSection (or using an undeclared name) causes VMware to reject
+    the import with "Invalid value for element Connection".
+
     Declares a lsilogic SCSI controller (InstanceID 4) that the disk item references
     as its parent — required for VMware/VirtualBox to enumerate and boot the disk.
     """
@@ -16,6 +23,12 @@ def generate_ovf(vm_name: str, cpu_count: int, memory_mb: int,
   <References>
     <File ovf:id="disk1" ovf:href="disk.vmdk" ovf:size="{vmdk_size_bytes}"/>
   </References>
+  <NetworkSection>
+    <Info>Available virtual networks</Info>
+    <Network ovf:name="NAT">
+      <Description>NAT network — provides outbound connectivity via the host</Description>
+    </Network>
+  </NetworkSection>
   <DiskSection>
     <Info>Virtual disk information</Info>
     <Disk ovf:diskId="disk1" ovf:fileRef="disk1"
@@ -63,9 +76,9 @@ def generate_ovf(vm_name: str, cpu_count: int, memory_mb: int,
         <rasd:ResourceType>17</rasd:ResourceType>
       </Item>
       <Item>
-        <rasd:AutomaticAllocation>false</rasd:AutomaticAllocation>
-        <rasd:Connection>VM Network</rasd:Connection>
-        <rasd:Description>Ethernet adapter (disconnected by default)</rasd:Description>
+        <rasd:AutomaticAllocation>true</rasd:AutomaticAllocation>
+        <rasd:Connection>NAT</rasd:Connection>
+        <rasd:Description>Ethernet adapter on NAT network</rasd:Description>
         <rasd:ElementName>Ethernet 0</rasd:ElementName>
         <rasd:InstanceID>5</rasd:InstanceID>
         <rasd:ResourceSubType>E1000</rasd:ResourceSubType>
