@@ -1,7 +1,7 @@
-from proxmoxer import ProxmoxAPI
+from proxmoxer import ProxmoxAPI # type: ignore
 from proxmox.ovf import generate_ovf
 import hashlib
-import paramiko
+import paramiko # type: ignore
 import time
 import logging
 
@@ -33,7 +33,7 @@ class ProxmoxClient:
         deadline = time.time() + timeout  # absolute timestamp, not a countdown
 
         while time.time() < deadline:
-            status = self._px.nodes(node or self._node).tasks(task_id).status.get()
+            status = self._node_api(node).tasks(task_id).status.get()
             if status.get('status') == 'stopped':
                 if status.get('exitstatus') == 'OK':
                     return   # success

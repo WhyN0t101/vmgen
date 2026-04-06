@@ -2,7 +2,9 @@
 
 paramiko==3.4.0           # SSH client for guest provisioning
 proxmoxer==2.0.1          # Proxmox API client
+psycopg2-binary==2.9.9    # PostgreSQL adapter
 cryptography==41.0.7      # Pinned — transitive dep of paramiko (SSH crypto)
 requests==2.31.0          # HTTP client for Backend API
+pyyaml==6.0.1             # YAML config parsing
 psutil==5.9.8             # CPU/memory metrics for heartbeat reporting
 python-dotenv==1.0.0      # Environment variable management

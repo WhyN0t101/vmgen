@@ -2,7 +2,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-import requests
+import requests # type: ignore
 
 log = logging.getLogger(__name__)
 

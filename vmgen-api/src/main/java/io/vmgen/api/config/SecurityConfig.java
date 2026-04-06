@@ -74,6 +74,9 @@ public class SecurityConfig {
                         // Public authentication endpoints
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
 
+                        // Health check (unauthenticated, details hidden via management.endpoint.health.show-details=never)
+                        .requestMatchers("/actuator/health").permitAll()
+
                         // Worker API endpoints (protected by WorkerApiKeyFilter)
                         .requestMatchers("/api/worker/**").permitAll()
 

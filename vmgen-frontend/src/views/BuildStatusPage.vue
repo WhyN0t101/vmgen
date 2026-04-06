@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useBuildStatus } from '@/composables/useBuildStatus'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -81,6 +81,25 @@ async function downloadManifest() {
     await api.downloadProvenance(build.value.id)
   } finally {
     downloadingProvenance.value = false
+  }
+}
+
+// Clone (retry) failed build
+const cloning = ref(false)
+const cloneError = ref<string | null>(null)
+const router = useRouter()
+
+async function retryBuild() {
+  if (!build.value) return
+  cloning.value = true
+  cloneError.value = null
+  try {
+    const newBuild = await api.cloneBuild(build.value.id)
+    router.push({ name: 'build-status', params: { requestId: newBuild.id } })
+  } catch (e: any) {
+    cloneError.value = e?.response?.data?.message ?? e?.message ?? 'Failed to retry build'
+  } finally {
+    cloning.value = false
   }
 }
 
@@ -271,6 +290,12 @@ function formatBytes(bytes?: number) {
             <p v-if="build.failureReason" class="text-slate-400 font-mono text-sm bg-slate-800/60 p-4 rounded">
               {{ build.failureReason }}
             </p>
+          </div>
+          <div class="space-y-2">
+            <BaseButton class="w-full" :disabled="cloning" @click="retryBuild">
+              {{ cloning ? 'Retrying…' : 'Retry Build' }}
+            </BaseButton>
+            <p v-if="cloneError" class="text-sm text-red-400 text-center">{{ cloneError }}</p>
           </div>
         </BaseCard>
       </div>

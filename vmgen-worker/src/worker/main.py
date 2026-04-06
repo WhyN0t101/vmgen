@@ -7,13 +7,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import psutil
+import psutil # type: ignore
 
 from worker.config import Config
 from proxmox.client import ProxmoxClient
 from worker.backend.client import BackendClient
 from build.pipeline import BuildPipeline
-import urllib3
+import urllib3 # type: ignore
 # Proxmox VE uses a self-signed certificate in the reference deployment — suppress noise
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -39,6 +39,10 @@ def main() -> int:
         print(f"Error loading config: {e}", file=sys.stderr)
         return 1
 
+
+    if args.worker_id:
+        config.worker.id = args.worker_id
+
     errors = config.validate()
     if errors:
         print("Configuration errors:", file=sys.stderr)
@@ -46,8 +50,6 @@ def main() -> int:
             print(f"  - {error}", file=sys.stderr)
         return 1
 
-    if args.worker_id:
-        config.worker.id = args.worker_id
 
     logger = setup_logging(config.log_level, config.worker.id)
 
@@ -84,7 +86,7 @@ def main() -> int:
     signal.signal(signal.SIGINT, _handle_shutdown)
 
     executor = ThreadPoolExecutor(max_workers=config.worker.max_concurrent_builds)
-    active: dict = {}  # future → job
+    active: dict = {}  # future -> job
     HEARTBEAT_INTERVAL = 60  # seconds
     last_heartbeat = 0.0
 

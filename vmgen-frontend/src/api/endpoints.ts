@@ -90,6 +90,10 @@ export const api = {
     URL.revokeObjectURL(url)
   },
 
+  cloneBuild: async (id: string): Promise<Build> => {
+    return apiRequest<Build>(`/api/builds/${id}/clone`, { method: 'POST' })
+  },
+
   // Telemetry
   uploadTelemetry: async (id: string, jsonData: unknown): Promise<TelemetryUploadResponse> => {
     return apiRequest<TelemetryUploadResponse>(`/api/builds/${id}/telemetry`, {
