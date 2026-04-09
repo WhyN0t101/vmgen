@@ -57,8 +57,8 @@ function save() {
     show('Parameter name and display name are required.', 'error')
     return
   }
-  if (!/^[A-Z_]+$/.test(form.value.parameterName.trim())) {
-    show('Parameter name must be uppercase with underscores (e.g., DATABASE_PASSWORD).', 'error')
+  if (!/^[A-Z_][A-Z0-9_]*$/.test(form.value.parameterName.trim())) {
+    show('Parameter name must be uppercase letters, digits, and underscores (e.g., DATABASE_PASSWORD, VAR1).', 'error')
     return
   }
   if (hasNameConflict.value) {

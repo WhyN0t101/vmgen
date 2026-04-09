@@ -44,7 +44,7 @@ public class ScriptParameter {
     @JoinColumn(name = "script_id", nullable = false)
     private Script script;
 
-    @Pattern(regexp = "^[A-Z_]+$", message = "Parameter name must be uppercase with underscores")
+    @Pattern(regexp = "^[A-Z_][A-Z0-9_]*$", message = "Parameter name must be uppercase letters, digits, and underscores")
     @Column(name = "parameter_name", nullable = false, length = 100)
     private String parameterName;
 

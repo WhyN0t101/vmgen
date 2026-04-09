@@ -194,7 +194,7 @@ async function handleSubmit() {
                 v-model="form.identifier"
                 type="text"
                 class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                pattern="[a-z0-9-]+"
+                pattern="[a-z0-9\-]+"
                 :disabled="isEditing"
                 required
               />

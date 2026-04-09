@@ -17,7 +17,7 @@ import lombok.Data;
 public class CreateScriptParameterRequest {
 
     @NotBlank
-    @Pattern(regexp = "^[A-Z_]+$", message = "Must be uppercase with underscores")
+    @Pattern(regexp = "^[A-Z_][A-Z0-9_]*$", message = "Must be uppercase letters, digits, and underscores")
     private String parameterName;
 
     @NotBlank

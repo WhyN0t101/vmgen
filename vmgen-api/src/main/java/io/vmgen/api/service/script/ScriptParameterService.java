@@ -469,7 +469,9 @@ public class ScriptParameterService {
     private String pickRandomChoice(ScriptParameter param) {
         List<ScriptParameterChoice> choices = param.getChoices();
         if (choices == null || choices.isEmpty()) {
-            throw new IllegalStateException("No choices defined for parameter " + param.getParameterName());
+            throw new ParameterValidationException(
+                    param.getDisplayName() + " is configured as Auto choice but has no choices defined. "
+                    + "Add choices to the parameter in the script editor.");
         }
         int index = RANDOM.nextInt(choices.size());
         return choices.get(index).getChoiceValue();

@@ -1,12 +1,35 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBuildStatus } from '@/composables/useBuildStatus'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseProgress from '@/components/ui/BaseProgress.vue'
 import { formatTimeAgoVerbose as formatTimeAgo } from '@/utils/dateFormat'
 import { api } from '@/api/endpoints'
+
+// Pipeline stage definitions — order matters for the step list
+const PIPELINE_STAGES: { key: string; label: string; percent: number }[] = [
+  { key: 'VERIFY_TEMPLATE',     label: 'Verify template',      percent: 5  },
+  { key: 'CLONE_TEMPLATE',      label: 'Clone template',       percent: 10 },
+  { key: 'CONFIGURE_NETWORK',   label: 'Configure network',    percent: 18 },
+  { key: 'START_VM',            label: 'Start VM',             percent: 22 },
+  { key: 'WAIT_FOR_SSH',        label: 'Wait for SSH',         percent: 27 },
+  { key: 'EXECUTE_SCRIPTS',     label: 'Execute scripts',      percent: 45 },
+  { key: 'GENERATE_FLAGS',      label: 'Generate flags',       percent: 60 },
+  { key: 'PLACE_FLAGS',         label: 'Place flags',          percent: 65 },
+  { key: 'SANITIZE_VM',         label: 'Sanitize VM',          percent: 70 },
+  { key: 'SHUTDOWN_VM',         label: 'Shut down VM',         percent: 75 },
+  { key: 'REMOVE_NETWORK',      label: 'Remove network',       percent: 80 },
+  { key: 'EXPORT_OVA',          label: 'Export OVA',           percent: 87 },
+  { key: 'COMPUTE_HASHES',      label: 'Compute hashes',       percent: 91 },
+  { key: 'ASSEMBLE_PROVENANCE', label: 'Assemble provenance',  percent: 94 },
+  { key: 'REGISTER_COMPLETION', label: 'Register completion',  percent: 97 },
+  { key: 'CLEANUP',             label: 'Clean up',             percent: 99 },
+]
+
+const STAGE_INDEX = Object.fromEntries(PIPELINE_STAGES.map((s, i) => [s.key, i]))
 
 const route = useRoute()
 const requestId = computed(() => route.params.requestId as string)
@@ -123,6 +146,47 @@ const isActive = computed(() =>
   build.value?.state === 'exporting'
 )
 
+const progressPercent = computed(() => {
+  if (!build.value) return 0
+  const { state, currentWorkerStage } = build.value
+  if (state === 'ready' || state === 'archived') return 100
+  if (state === 'failed') return 0
+  if (state === 'queued') return 2
+  const stage = PIPELINE_STAGES.find(s => s.key === currentWorkerStage?.toUpperCase())
+  return stage?.percent ?? (state === 'exporting' ? 85 : 15)
+})
+
+const currentStageIndex = computed(() => {
+  const key = build.value?.currentWorkerStage?.toUpperCase()
+  return key !== undefined ? (STAGE_INDEX[key] ?? -1) : -1
+})
+
+// Elapsed time ticker
+const elapsedSeconds = ref(0)
+let elapsedTimer: ReturnType<typeof setInterval> | null = null
+
+function startElapsed() {
+  if (elapsedTimer) return
+  elapsedTimer = setInterval(() => {
+    if (!build.value?.submittedAt) return
+    elapsedSeconds.value = Math.floor((Date.now() - new Date(build.value.submittedAt).getTime()) / 1000)
+  }, 1000)
+}
+
+function stopElapsed() {
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null }
+}
+
+onMounted(startElapsed)
+onUnmounted(stopElapsed)
+
+const elapsedLabel = computed(() => {
+  const s = elapsedSeconds.value
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  const rem = s % 60
+  return `${m}m ${rem}s`
+})
 
 function formatBytes(bytes?: number) {
   if (!bytes) return ''
@@ -176,15 +240,55 @@ function formatBytes(bytes?: number) {
         </BaseCard>
 
         <!-- Active build progress -->
-        <BaseCard v-if="isActive" padding="md">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-4 h-4 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
-            <span class="text-sm text-slate-300 font-medium">Build in progress…</span>
+        <BaseCard v-if="isActive" padding="md" class="space-y-5">
+          <!-- Header row -->
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-4 h-4 rounded-full border-2 border-primary-500 border-t-transparent animate-spin shrink-0" />
+              <span class="text-sm text-slate-200 font-medium">Build in progress</span>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-slate-500">
+              <span>Elapsed: <span class="text-slate-300 font-mono">{{ elapsedLabel }}</span></span>
+              <span>{{ progressPercent }}%</span>
+            </div>
           </div>
-          <p v-if="build.currentWorkerStage" class="text-xs text-slate-500 font-mono">
-            {{ build.currentWorkerStage }}
+
+          <!-- Progress bar -->
+          <BaseProgress :value="progressPercent" :show-label="false" />
+
+          <!-- Current stage label -->
+          <p class="text-xs font-mono text-slate-400">
+            <template v-if="build.currentWorkerStage">
+              {{ PIPELINE_STAGES.find(s => s.key === build.currentWorkerStage?.toUpperCase())?.label ?? build.currentWorkerStage }}
+            </template>
+            <template v-else>
+              Waiting for a worker to claim the job…
+            </template>
           </p>
-          <p v-else class="text-xs text-slate-500">Waiting for worker to pick up the job</p>
+
+          <!-- Pipeline step list -->
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 pt-1 border-t border-slate-800">
+            <div
+              v-for="(stage, idx) in PIPELINE_STAGES"
+              :key="stage.key"
+              class="flex items-center gap-2 text-xs"
+              :class="{
+                'text-primary-400': idx === currentStageIndex,
+                'text-slate-500 line-through decoration-slate-700': idx < currentStageIndex,
+                'text-slate-600': idx > currentStageIndex,
+              }"
+            >
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="{
+                  'bg-primary-400 animate-pulse': idx === currentStageIndex,
+                  'bg-slate-600': idx < currentStageIndex,
+                  'bg-slate-800': idx > currentStageIndex,
+                }"
+              />
+              {{ stage.label }}
+            </div>
+          </div>
         </BaseCard>
 
         <!-- Ready state -->

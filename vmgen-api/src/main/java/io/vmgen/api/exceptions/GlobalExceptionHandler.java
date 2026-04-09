@@ -1,5 +1,6 @@
 package io.vmgen.api.exceptions;
 
+import jakarta.validation.ConstraintViolationException;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -145,6 +146,19 @@ public class GlobalExceptionHandler {
         log.warn("Invalid argument: {}", ex.getMessage());
         return ResponseEntity.badRequest()
                 .body(Map.of("message", "Invalid request parameters"));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        List<String> errors = ex.getConstraintViolations()
+                .stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                .toList();
+        return ResponseEntity.badRequest()
+                .body(Map.of(
+                        "message", "Validation failed",
+                        "errors", errors
+                ));
     }
 
     @ExceptionHandler(Exception.class)
