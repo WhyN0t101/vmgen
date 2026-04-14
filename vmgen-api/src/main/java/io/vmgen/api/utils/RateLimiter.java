@@ -31,17 +31,6 @@ public class RateLimiter {
     }
 
     /**
-     * Get remaining requests for a key.
-     */
-    public int getRemaining(String key) {
-        Bucket bucket = buckets.get(key);
-        if (bucket == null) {
-            return maxRequests;
-        }
-        return bucket.getRemaining();
-    }
-
-    /**
      * Get time until rate limit resets (in seconds).
      */
     public long getResetSeconds(String key) {

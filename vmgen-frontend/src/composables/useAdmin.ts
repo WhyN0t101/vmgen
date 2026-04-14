@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import { api } from '@/api/endpoints'
 import type { ActiveSession } from '@/types'
 import { useToast } from '@/composables/useToast'
+import { extractApiError } from '@/utils/apiError'
 
 /**
  * Admin-only composables for managing active sessions and user roles

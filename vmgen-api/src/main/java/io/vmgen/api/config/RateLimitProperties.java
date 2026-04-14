@@ -15,13 +15,8 @@ import org.springframework.stereotype.Component;
  */
 public class RateLimitProperties {
 
-    /**
-     * Maximum number of login requests allowed per window.
-     */
+
     private int maxRequests = 5;
 
-    /**
-     * Time window in seconds.
-     */
     private long windowSeconds = 300; // 5 minutes
 }

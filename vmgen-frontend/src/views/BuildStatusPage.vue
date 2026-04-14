@@ -43,6 +43,7 @@ const flagInput = ref('')
 const flagSubmitting = ref(false)
 const flagResult = ref<{ correct: boolean; attemptsRemaining: number } | null>(null)
 const flagError = ref<string | null>(null)
+const flagExhausted = computed(() => flagResult.value !== null && flagResult.value.attemptsRemaining === 0)
 
 async function submitFlag() {
   if (!build.value || !flagInput.value.trim()) return
@@ -258,8 +259,8 @@ function formatBytes(bytes?: number) {
 
           <!-- Current stage label -->
           <p class="text-xs font-mono text-slate-400">
-            <template v-if="build.currentWorkerStage">
-              {{ PIPELINE_STAGES.find(s => s.key === build.currentWorkerStage?.toUpperCase())?.label ?? build.currentWorkerStage }}
+            <template v-if="build?.currentWorkerStage">
+              {{ PIPELINE_STAGES.find(s => s.key === build?.currentWorkerStage?.toUpperCase())?.label ?? build?.currentWorkerStage }}
             </template>
             <template v-else>
               Waiting for a worker to claim the job…
@@ -361,28 +362,34 @@ function formatBytes(bytes?: number) {
             </div>
 
             <template v-else>
-              <div class="flex gap-2">
-                <input
-                  v-model="flagInput"
-                  type="text"
-                  placeholder="FLAG{…}"
-                  class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-primary-500"
-                  :disabled="flagSubmitting"
-                  @keyup.enter="submitFlag"
-                />
-                <BaseButton
-                  variant="primary"
-                  :disabled="!flagInput.trim() || flagSubmitting"
-                  @click="submitFlag"
-                >
-                  {{ flagSubmitting ? 'Checking…' : 'Submit' }}
-                </BaseButton>
+              <div v-if="flagExhausted" class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm text-red-400">
+                No attempts remaining for this build.
               </div>
 
-              <div v-if="flagResult && !flagResult.correct" class="text-sm text-red-400">
-                Incorrect. {{ flagResult.attemptsRemaining }} attempt{{ flagResult.attemptsRemaining === 1 ? '' : 's' }} remaining.
-              </div>
-              <div v-if="flagError" class="text-sm text-red-400">{{ flagError }}</div>
+              <template v-else>
+                <div class="flex gap-2">
+                  <input
+                    v-model="flagInput"
+                    type="text"
+                    placeholder="FLAG{…}"
+                    class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="flagSubmitting"
+                    @keyup.enter="submitFlag"
+                  />
+                  <BaseButton
+                    variant="primary"
+                    :disabled="!flagInput.trim() || flagSubmitting"
+                    @click="submitFlag"
+                  >
+                    {{ flagSubmitting ? 'Checking…' : 'Submit' }}
+                  </BaseButton>
+                </div>
+
+                <div v-if="flagResult && !flagResult.correct" class="text-sm text-red-400">
+                  Incorrect. {{ flagResult.attemptsRemaining }} attempt{{ flagResult.attemptsRemaining === 1 ? '' : 's' }} remaining.
+                </div>
+                <div v-if="flagError" class="text-sm text-red-400">{{ flagError }}</div>
+              </template>
             </template>
           </div>
         </BaseCard>

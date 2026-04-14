@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 public class ProxmoxApiConfig {
     
     private String url;
-    private String tokenId;      // Format: user@realm!tokenname
+    private String tokenId;      // Format: user@realm!token_name
     private String tokenSecret;  // The actual token value
     private boolean verifySsl = false;
     private String node;         // Default node for operations

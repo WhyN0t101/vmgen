@@ -292,13 +292,13 @@ public class WorkerService {
         if (p.getBuildStartedAt() != null) {
             try { provenance.setBuildStartedAt(Instant.parse(p.getBuildStartedAt())); }
             catch (DateTimeParseException e) {
-                log.warn("Unparseable provenance timestamp, field skipped: {}", e.getMessage());
+                log.warn("Unparseable provenance start timestamp, field skipped: {}", e.getMessage());
             }
         }
         if (p.getBuildFinishedAt() != null) {
             try { provenance.setBuildFinishedAt(Instant.parse(p.getBuildFinishedAt())); }
             catch (DateTimeParseException e) {
-                log.warn("Unparseable provenance timestamp, field skipped: {}", e.getMessage());
+                log.warn("Unparseable provenance finish timestamp, field skipped: {}", e.getMessage());
             }
         }
         if (p.getFlagDerivationTimestamp() != null) {

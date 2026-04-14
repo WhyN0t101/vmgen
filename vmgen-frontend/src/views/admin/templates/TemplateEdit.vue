@@ -153,6 +153,9 @@ async function handleSubmit() {
                 type="text"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              <p class="mt-1 text-[11px] text-slate-500">
+                Username the worker will use for guest SSH checks and provisioning.
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-2">Expected SSH Port</label>
@@ -163,6 +166,9 @@ async function handleSubmit() {
                 max="65535"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              <p class="mt-1 text-[11px] text-slate-500">
+                Port the worker expects SSH to be listening on inside the template.
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-2">Network Bridge</label>
@@ -171,6 +177,9 @@ async function handleSubmit() {
                 type="text"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              <p class="mt-1 text-[11px] text-slate-500">
+                Proxmox bridge used for build VMs (e.g. the isolated build bridge).
+              </p>
             </div>
           </div>
 
@@ -183,6 +192,9 @@ async function handleSubmit() {
                 min="512"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              <p class="mt-1 text-[11px] text-slate-500">
+                Compatibility hint used to avoid applying scripts that require more memory.
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-slate-300 mb-2">Min CPU Cores</label>
@@ -192,6 +204,9 @@ async function handleSubmit() {
                 min="1"
                 class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              <p class="mt-1 text-[11px] text-slate-500">
+                Compatibility hint for scripts that need additional CPU resources.
+              </p>
             </div>
           </div>
         </div>

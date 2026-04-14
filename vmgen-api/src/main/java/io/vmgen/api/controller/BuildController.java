@@ -120,7 +120,7 @@ public class BuildController {
                     .body(file);
         }
 
-        HttpRange range = ranges.get(0);
+        HttpRange range = ranges.getFirst();
         long start = range.getRangeStart(fileLength);
         long end   = range.getRangeEnd(fileLength);
 

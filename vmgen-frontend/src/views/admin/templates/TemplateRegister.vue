@@ -334,6 +334,9 @@ async function handleSubmit() {
               type="text"
               class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
+            <p class="mt-1 text-xs text-slate-400">
+              Proxmox storage ID used for the template disk (must match where the VM disk lives).
+            </p>
           </div>
         </div>
       </BaseCard>
@@ -528,6 +531,9 @@ async function handleSubmit() {
               type="text"
               class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
+            <p class="mt-1 text-xs text-slate-400">
+              Username the worker will SSH as during validation and builds.
+            </p>
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-2">Expected SSH Port</label>
@@ -536,6 +542,9 @@ async function handleSubmit() {
               type="number"
               class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
+            <p class="mt-1 text-xs text-slate-400">
+              Port the worker will connect to inside the guest (default: 22).
+            </p>
           </div>
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-2">Network Bridge</label>
@@ -545,6 +554,9 @@ async function handleSubmit() {
               class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="vmbr1"
             />
+            <p class="mt-1 text-xs text-slate-400">
+              Proxmox bridge where build VMs will be attached (typically the isolated build bridge).
+            </p>
           </div>
         </div>
       </BaseCard>
