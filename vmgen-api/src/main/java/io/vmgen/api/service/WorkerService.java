@@ -471,25 +471,30 @@ public class WorkerService {
     }
 
     /**
-     * Marks all BUILDING and EXPORTING jobs as FAILED if no progress update has been
-     * received within the given timeout duration.
-     * Intended to be called periodically by a scheduled task.
+     * Marks BUILDING and EXPORTING jobs as FAILED if no progress update has been received
+     * within their respective timeouts. EXPORTING gets a longer window because the
+     * qemu-img VMDK conversion step can run for 20-30 minutes without emitting progress.
      */
     @Transactional
-    public void markStaleJobsAsFailed(Duration timeout) {
-        Instant threshold = Instant.now().minus(timeout);
-        List<VmRequest> staleJobs = vmRequestRepository.findStaleJobs(
-                List.of(VmRequestState.BUILDING, VmRequestState.EXPORTING), threshold);
+    public void markStaleJobsAsFailed(Duration buildingTimeout, Duration exportingTimeout) {
+        Instant now = Instant.now();
+        List<VmRequest> stale = new java.util.ArrayList<>();
 
-        staleJobs.forEach(job -> {
+        stale.addAll(vmRequestRepository.findStaleJobs(
+                List.of(VmRequestState.BUILDING), now.minus(buildingTimeout)));
+        stale.addAll(vmRequestRepository.findStaleJobs(
+                List.of(VmRequestState.EXPORTING), now.minus(exportingTimeout)));
+
+        stale.forEach(job -> {
+            Duration timeout = job.getState() == VmRequestState.EXPORTING ? exportingTimeout : buildingTimeout;
             job.setState(VmRequestState.FAILED);
-            job.setFailedAt(Instant.now());
+            job.setFailedAt(now);
             job.setFailureReason("TIMEOUT: No progress update for " + timeout.toMinutes() + " minutes");
         });
-        vmRequestRepository.saveAll(staleJobs);
-        
-        if (!staleJobs.isEmpty()) {
-            log.info("Marked {} stale jobs as failed", staleJobs.size());
+        vmRequestRepository.saveAll(stale);
+
+        if (!stale.isEmpty()) {
+            log.info("Marked {} stale jobs as failed", stale.size());
         }
     }
 

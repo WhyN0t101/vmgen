@@ -184,7 +184,8 @@ class ProxmoxClient:
     def _ssh_connect(self) -> paramiko.SSHClient:
         """Open an authenticated SSH connection to the Proxmox host."""
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.load_host_keys(self._config.known_hosts_path)
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
         client.connect(
             self._config.host,
             username=self._config.ssh_user,

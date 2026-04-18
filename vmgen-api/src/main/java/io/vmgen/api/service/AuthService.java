@@ -143,7 +143,7 @@ public class AuthService {
 
         log.info("User logged in: {} (session: {})", user.getUsername(), sessionId);
 
-        return new AuthResponse(token, exp.toString(), user.getRole().name());
+        return new AuthResponse(token, exp.toString(), user.getRole().name(), user.getId());
     }
 
     /**

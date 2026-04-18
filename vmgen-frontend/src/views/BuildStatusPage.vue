@@ -22,7 +22,7 @@ const PIPELINE_STAGES: { key: string; label: string; percent: number }[] = [
   { key: 'SANITIZE_VM',         label: 'Sanitize VM',          percent: 70 },
   { key: 'SHUTDOWN_VM',         label: 'Shut down VM',         percent: 75 },
   { key: 'REMOVE_NETWORK',      label: 'Remove network',       percent: 80 },
-  { key: 'EXPORT_OVA',          label: 'Export OVA',           percent: 87 },
+  { key: 'EXPORTING',            label: 'Export OVA',           percent: 87 },
   { key: 'COMPUTE_HASHES',      label: 'Compute hashes',       percent: 91 },
   { key: 'ASSEMBLE_PROVENANCE', label: 'Assemble provenance',  percent: 94 },
   { key: 'REGISTER_COMPLETION', label: 'Register completion',  percent: 97 },

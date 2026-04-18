@@ -13,7 +13,23 @@ VMGen Worker - Setup Instructions
 3. INSTALL DEPENDENCIES
    pip install -r requirements.txt
 
-4. GENERATE SSH KEY FOR PROXMOX HOST ACCESS
+4. TRUST THE PROXMOX HOST KEY (one-time)
+   The worker verifies the Proxmox host's SSH fingerprint before connecting.
+   Run this once on the machine where the worker will run:
+
+   ssh-keyscan -H <PROXMOX_HOST_IP> >> ~/.ssh/known_hosts
+
+   Example for this lab:
+   ssh-keyscan -H 172.22.21.95 >> ~/.ssh/known_hosts
+
+   This appends the Proxmox host's public key to your local known_hosts file.
+   The worker reads this file at startup (PROXMOX_KNOWN_HOSTS_PATH in .env).
+   If the file is missing or the host is not in it, the worker will refuse to start.
+
+   You only need to redo this if the Proxmox host's SSH host key changes
+   (e.g. after a full OS reinstall of the Proxmox host).
+
+5. GENERATE SSH KEY FOR PROXMOX HOST ACCESS
    The worker needs SSH access to the Proxmox host to run qm exportovf (OVA export).
    This is separate from the Proxmox API token — it's direct shell access.
 

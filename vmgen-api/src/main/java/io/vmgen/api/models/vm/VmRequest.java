@@ -21,6 +21,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +60,7 @@ public class VmRequest {
     
     @OneToMany(mappedBy = "vmRequest", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @OrderBy("executionOrder ASC")
+    @BatchSize(size = 25)
     private List<VmRequestScript> requestScripts = new ArrayList<>();
     
     @OneToMany(mappedBy = "vmRequest", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

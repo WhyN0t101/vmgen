@@ -367,6 +367,16 @@ export interface Build {
   ovaSizeBytes?: number
 }
 
+export interface ProvenanceScriptInfo {
+  scriptId: string
+  identifier: string
+  version: string
+  sha256: string
+  executionOrder: number
+  exitCode?: number
+  durationSeconds?: number
+}
+
 export interface ProvenanceResponse {
   buildId: string
   templateIdentifier: string
@@ -378,6 +388,10 @@ export interface ProvenanceResponse {
   ovaSha256: string
   flagDerivationTimestamp: string
   finalisedAt: string
+  workerId: string
+  buildStartedAt: string
+  buildFinishedAt: string
+  scripts: ProvenanceScriptInfo[]
 }
 
 export interface User {

@@ -31,10 +31,14 @@ async function handleSubmit() {
     // Use push instead of replace to ensure navigation happens
     await router.push(redirect)
   } catch (e: any) {
+    const status = e.response?.status
     const message = e.response?.data?.message || e.message || 'Login failed'
-    
-    // Map backend error messages to user-friendly messages
-    if (message === 'Authentication failed') {
+
+    if (status === 423) {
+      const retryAfter: number = e.response?.data?.retryAfter ?? 0
+      const minutes = Math.ceil(retryAfter / 60)
+      errorMessage.value = `Account is temporarily locked. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`
+    } else if (message === 'Authentication failed') {
       errorMessage.value = 'Invalid username or password'
     } else if (message.includes('Session')) {
       errorMessage.value = 'Unable to create session. Please try again.'

@@ -13,8 +13,9 @@ class ProxmoxConfig:
     verify_ssl: bool
     node: str
     isolated_bridge: str
-    ssh_user: str             
-    ssh_key_path: str        
+    ssh_user: str
+    ssh_key_path: str
+    known_hosts_path: str    # path to SSH known_hosts file for Proxmox host verification
 
 @dataclass
 class BackendConfig:
@@ -50,6 +51,8 @@ class Config:
             isolated_bridge=os.getenv("PROXMOX_ISOLATED_BRIDGE", "vmbr1"),
             ssh_user=os.getenv("PROXMOX_SSH_USER", "root"),
             ssh_key_path=os.getenv("PROXMOX_SSH_KEY_PATH", ""),
+            known_hosts_path=os.getenv("PROXMOX_KNOWN_HOSTS_PATH",
+                                       str(Path.home() / ".ssh" / "known_hosts")),
         )
 
         worker = WorkerConfig(
@@ -88,6 +91,15 @@ class Config:
                 errors.append(f"SSH key file not found: {self.proxmox.ssh_key_path}")
             elif sys.platform != "win32" and ssh_key.stat().st_mode & 0o077:
                 errors.append(f"SSH key has insecure permissions (expected 0600): {self.proxmox.ssh_key_path}")
+        if not Path(self.proxmox.known_hosts_path).exists():
+            errors.append(
+                f"PROXMOX_KNOWN_HOSTS_PATH not found: {self.proxmox.known_hosts_path}. "
+                "Run: ssh-keyscan -H <proxmox-host> >> ~/.ssh/known_hosts"
+            )
+
+        # Worker
+        if not self.worker.id or not self.worker.id.strip():
+            errors.append("WORKER_ID is required and must not be blank")
 
         # Backend
         if not self.backend.url:

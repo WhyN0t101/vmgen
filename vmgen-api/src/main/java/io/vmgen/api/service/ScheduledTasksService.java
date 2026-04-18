@@ -41,7 +41,7 @@ public class ScheduledTasksService {
     @Scheduled(fixedDelay = 60_000) // Every 1 minute
     public void detectStaleBuilds() {
         try{
-            workerService.markStaleJobsAsFailed(Duration.ofMinutes(10));
+            workerService.markStaleJobsAsFailed(Duration.ofMinutes(10), Duration.ofMinutes(35));
 
         }catch(Exception e){
             log.error("Scheduled detectStaleBuilds failed", e);

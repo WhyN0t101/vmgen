@@ -22,7 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => (user.value?.role || role.value)?.toLowerCase() === 'admin')
 
   async function login(identifier: string, password: string) {
-    const data = await rawRequest<{ token: string; role: string; expiresAt: string }>(
+    const data = await rawRequest<{ token: string; role: string; expiresAt: string; userId: string }>(
       '/api/auth/login',
       { method: 'POST', body: JSON.stringify({ identifier, password }) },
     )
@@ -34,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
     expiresAt.value = data.expiresAt
 
     user.value = {
-      id: 'unknown',
+      id: data.userId,
       email: identifier,
       role: roleValue ?? 'user',
       created_at: new Date().toISOString(),

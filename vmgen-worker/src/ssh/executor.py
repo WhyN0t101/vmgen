@@ -16,6 +16,7 @@ class SSHExecutor:
         jump_host: str | None = None,
         jump_username: str | None = None,
         jump_key_path: str | None = None,
+        jump_known_hosts_path: str | None = None,
     ):
         self.host = host
         self.username = username
@@ -25,13 +26,18 @@ class SSHExecutor:
         self.jump_host = jump_host
         self.jump_username = jump_username
         self.jump_key_path = jump_key_path
+        self.jump_known_hosts_path = jump_known_hosts_path
         self._client: paramiko.SSHClient | None = None
         self._jump_client: paramiko.SSHClient | None = None
 
     def _open_jump_channel(self):
         """Open a TCP channel through the jump host to self.host:22."""
         self._jump_client = paramiko.SSHClient()
-        self._jump_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        if self.jump_known_hosts_path:
+            self._jump_client.load_host_keys(self.jump_known_hosts_path)
+            self._jump_client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        else:
+            self._jump_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self._jump_client.connect(
             self.jump_host,
             username=self.jump_username,
@@ -44,6 +50,8 @@ class SSHExecutor:
     def connect(self):
         sock = self._open_jump_channel() if self.jump_host else None
         self._client = paramiko.SSHClient()
+        # Build VMs are ephemeral clones — SSH host keys rotate every build,
+        # so pre-verification via known_hosts is not possible here.
         self._client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self._client.connect(
             self.host,
