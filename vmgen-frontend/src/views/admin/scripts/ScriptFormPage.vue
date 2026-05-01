@@ -94,29 +94,52 @@ watch(existingScript, (s) => {
   }
 }, { immediate: true })
 
-// Auto-detect {{PARAM_NAME}} placeholders in script content and add missing parameters.
+// Auto-detect {{PARAM_NAME}} placeholders in script content and sync the parameter list.
 // Only runs in create mode — in edit mode parameters are managed via the API.
+// Debounced so partial typing ({{P}}, {{PO}}...) doesn't create stale entries.
+// Tracks which names were auto-detected so they can be removed when no longer present.
+const autoDetectedNames = new Set<string>()
+let autoDetectTimer: ReturnType<typeof setTimeout> | null = null
+
 watch(() => form.value.scriptContent, (content) => {
-  if (isEditing.value || !content) return
-  const found = [...content.matchAll(/\{\{([A-Z][A-Z0-9_]*)\}\}/g)].map(m => m[1]).filter((n): n is string => !!n)
-  const params = form.value.parameters as CreateScriptParameterRequest[]
-  for (const name of found) {
-    if (params.some(p => p.parameterName === name)) continue
-    params.push({
-      parameterName: name,
-      displayName: name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      description: '',
-      parameterType: 'STRING',
-      valueSource: 'USER_INPUT',
-      defaultValue: '',
-      isRequired: true,
-      validationRules: {},
-      randomConfig: {},
-      userCanOverride: false,
-      displayOrder: params.length,
-      choices: [],
-    })
-  }
+  if (isEditing.value) return
+  if (autoDetectTimer) clearTimeout(autoDetectTimer)
+  autoDetectTimer = setTimeout(() => {
+    const found = new Set(
+      [...(content ?? '').matchAll(/\{\{([A-Z][A-Z0-9_]*)\}\}/g)]
+        .map(m => m[1])
+        .filter((n): n is string => !!n)
+    )
+    const params = form.value.parameters as CreateScriptParameterRequest[]
+
+    // Remove auto-detected params that are no longer in the script
+    const toRemove = [...autoDetectedNames].filter(n => !found.has(n))
+    for (const name of toRemove) {
+      const idx = params.findIndex(p => p.parameterName === name)
+      if (idx !== -1) params.splice(idx, 1)
+      autoDetectedNames.delete(name)
+    }
+
+    // Add newly detected params
+    for (const name of found) {
+      if (params.some(p => p.parameterName === name)) continue
+      params.push({
+        parameterName: name,
+        displayName: name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        description: '',
+        parameterType: 'STRING',
+        valueSource: 'USER_INPUT',
+        defaultValue: '',
+        isRequired: true,
+        validationRules: {},
+        randomConfig: {},
+        userCanOverride: false,
+        displayOrder: params.length,
+        choices: [],
+      })
+      autoDetectedNames.add(name)
+    }
+  }, 400)
 })
 
 function handleCancel() {

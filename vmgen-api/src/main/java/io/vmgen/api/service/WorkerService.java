@@ -170,7 +170,7 @@ public class WorkerService {
         }
         
         // Update progress fields
-        request.setCurrentWorkerStage(update.getStage() + ": " + update.getMessage());
+        request.setCurrentWorkerStage(update.getStage());
         request.setLastProgressAt(Instant.now());
         request.setWorkerLastHeartbeatAt(Instant.now());
         

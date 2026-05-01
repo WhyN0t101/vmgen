@@ -215,33 +215,56 @@ const choiceCountWarning = computed(() => {
     </div>
 
     <!-- Random config (optional, shown only in ScriptParameterEditor) -->
-    <div
-      v-if="props.showRandomConfig && (form.valueSource === 'AUTO_RANDOM' || form.valueSource === 'USER_INPUT_OR_RANDOM')"
-      class="grid gap-4 md:grid-cols-2"
-    >
-      <div>
-        <label class="mb-1 block text-xs font-medium text-slate-400">Random length</label>
-        <input
-          v-model.number="form.randomConfig!.length"
-          type="number"
-          min="1"
-          class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-        />
-        <p class="mt-1 text-[11px] text-slate-500">Number of characters to generate.</p>
+    <template v-if="props.showRandomConfig && (form.valueSource === 'AUTO_RANDOM' || form.valueSource === 'USER_INPUT_OR_RANDOM')">
+      <!-- Integer: min/max range -->
+      <div v-if="form.parameterType === 'INTEGER'" class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Min value</label>
+          <input
+            v-model.number="form.randomConfig!.min"
+            type="number"
+            placeholder="0"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+          <p class="mt-1 text-[11px] text-slate-500">Inclusive lower bound.</p>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Max value</label>
+          <input
+            v-model.number="form.randomConfig!.max"
+            type="number"
+            placeholder="100"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+          <p class="mt-1 text-[11px] text-slate-500">Inclusive upper bound.</p>
+        </div>
       </div>
-      <div>
-        <label class="mb-1 block text-xs font-medium text-slate-400">Charset</label>
-        <select
-          v-model="form.randomConfig!.charset"
-          class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-        >
-          <option value="alphanumeric">Alphanumeric (a–z, A–Z, 0–9)</option>
-          <option value="alphanumeric_special">Alphanumeric + symbols</option>
-          <option value="hex">Hex (0–9, a–f)</option>
-          <option value="numeric">Numeric only (0–9)</option>
-        </select>
+      <!-- String/other: length + charset -->
+      <div v-else class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Random length</label>
+          <input
+            v-model.number="form.randomConfig!.length"
+            type="number"
+            min="1"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          />
+          <p class="mt-1 text-[11px] text-slate-500">Number of characters to generate.</p>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-slate-400">Charset</label>
+          <select
+            v-model="form.randomConfig!.charset"
+            class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+          >
+            <option value="alphanumeric">Alphanumeric (a–z, A–Z, 0–9)</option>
+            <option value="alphanumeric_special">Alphanumeric + symbols</option>
+            <option value="hex">Hex (0–9, a–f)</option>
+            <option value="numeric">Numeric only (0–9)</option>
+          </select>
+        </div>
       </div>
-    </div>
+    </template>
 
     <!-- Choices editor -->
     <div v-if="props.showChoices && (form.parameterType === 'CHOICE' || form.valueSource === 'AUTO_CHOICE')">

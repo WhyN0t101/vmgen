@@ -144,6 +144,8 @@ function save() {
       <ParameterFormFields
         v-model="form"
         :has-name-conflict="hasNameConflict"
+        show-random-config
+        show-choices
       />
 
       <div class="flex justify-end gap-2">
