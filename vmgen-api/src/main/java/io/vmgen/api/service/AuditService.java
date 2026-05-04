@@ -38,6 +38,7 @@ public class AuditService {
     // Worker events
     private static final String ACTION_WORKER_JOB_COMPLETED = "worker_job_completed";
     private static final String ACTION_WORKER_JOB_FAILED = "worker_job_failed";
+    private static final String ACTION_BUILD_ARCHIVED = "build_archived";
 
     // Flag events (used by FlagService)
     public static final String ACTION_FLAG_SUBMITTED = "flag_submitted";
@@ -128,6 +129,12 @@ public class AuditService {
     public void logWorkerJobFailed(String workerId, UUID buildId, String errorType) {
         write(null, ACTION_WORKER_JOB_FAILED, "build", buildId, null,
                 Map.of("workerId", workerId, "buildId", buildId.toString(), "errorType", errorType));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logBuildArchived(UUID buildId) {
+        write(null, ACTION_BUILD_ARCHIVED, "build", buildId, null,
+                Map.of("buildId", buildId.toString()));
     }
 
     //  Flag events 

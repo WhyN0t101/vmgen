@@ -313,14 +313,14 @@ public class VmRequestService {
         if (!request.getUser().getId().equals(user.getId())) {
             throw new ResourceNotFoundException("Build not found: " + requestId);
         }
+        if (request.getState() == VmRequestState.ARCHIVED) {
+            throw new GoneException("Build has been archived — the OVA is no longer available for download");
+        }
         if (request.getState() != VmRequestState.READY) {
             throw new ConflictException("Build is not ready for download (state: " + request.getState() + ")");
         }
-        if (request.getStorageDeletedAt() != null) {
-            throw new ResourceNotFoundException("OVA file has been deleted");
-        }
-        if (request.getStoragePath() == null) {
-            throw new ResourceNotFoundException("OVA storage path not available");
+        if (request.getStorageDeletedAt() != null || request.getStoragePath() == null) {
+            throw new GoneException("OVA file is no longer available");
         }
         auditService.logBuildDownloaded(user, requestId, ctx);
         return new BuildDownloadInfo(

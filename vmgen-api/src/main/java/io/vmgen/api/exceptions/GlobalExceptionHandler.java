@@ -135,6 +135,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("message", "Request body is required or malformed"));
     }
 
+    @ExceptionHandler(GoneException.class)
+    public ResponseEntity<Map<String, Object>> handleGone(GoneException ex) {
+        return ResponseEntity.status(HttpStatus.GONE)
+                .body(Map.of("message", ex.getPublicMessage()));
+    }
+
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(ConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

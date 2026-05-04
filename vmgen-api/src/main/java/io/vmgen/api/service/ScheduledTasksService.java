@@ -5,6 +5,7 @@ import java.util.List;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,9 @@ public class ScheduledTasksService {
     private final WorkerService workerService;
 
     private static final Duration IDLE_TIMEOUT = Duration.ofHours(24);
+
+    @Value("${vmgen.ova.retention-days:7}")
+    private int ovaRetentionDays;
 
     @Scheduled(fixedDelay = 300_000) // Every 5 minutes
     public void cleanupSessions() {
@@ -54,6 +58,15 @@ public class ScheduledTasksService {
             workerService.markLongRunningJobsAsFailed(Duration.ofHours(3));
         } catch (Exception e) {
             log.error("Scheduled detectLongRunningBuilds failed", e);
+        }
+    }
+
+    @Scheduled(fixedDelay = 3_600_000) // Every hour
+    public void archiveExpiredBuilds() {
+        try {
+            workerService.archiveExpiredBuilds(Duration.ofDays(ovaRetentionDays));
+        } catch (Exception e) {
+            log.error("Scheduled archiveExpiredBuilds failed", e);
         }
     }
 

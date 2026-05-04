@@ -109,4 +109,11 @@ public interface VmRequestRepository extends JpaRepository<VmRequest, UUID> {
      */
     @Query("SELECT COUNT(vr) FROM VmRequest vr WHERE vr.user.id = :userId AND vr.failedFlagAttempts >= :threshold")
     long countExhaustedBuilds(@Param("userId") UUID userId, @Param("threshold") int threshold);
+
+    /**
+     * Find READY builds whose completedAt timestamp is before the given cutoff.
+     * Used by the archival scheduled task to expire OVA artefacts after the retention period.
+     */
+    @Query("SELECT vr FROM VmRequest vr WHERE vr.state = 'READY' AND vr.completedAt < :cutoff")
+    List<VmRequest> findReadyBuildsCompletedBefore(@Param("cutoff") Instant cutoff);
 }

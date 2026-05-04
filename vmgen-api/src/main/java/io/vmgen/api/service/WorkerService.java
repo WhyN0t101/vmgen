@@ -566,6 +566,32 @@ public class WorkerService {
     }
 
     /**
+     * Transitions READY builds whose completedAt is older than the retention period to ARCHIVED.
+     * Clears storage_path and sets storage_deleted_at so the download endpoint returns 410.
+     * Physical OVA deletion from Proxmox storage is left to an operator or future cleanup task;
+     * this method only marks artefacts as no longer available to users.
+     */
+    @Transactional
+    public void archiveExpiredBuilds(Duration retentionPeriod) {
+        Instant cutoff = Instant.now().minus(retentionPeriod);
+        List<VmRequest> expired = vmRequestRepository.findReadyBuildsCompletedBefore(cutoff);
+
+        if (expired.isEmpty()) return;
+
+        Instant now = Instant.now();
+        expired.forEach(job -> {
+            job.setState(VmRequestState.ARCHIVED);
+            job.setArchivedAt(now);
+            job.setStorageDeletedAt(now);
+            job.setStoragePath(null);
+        });
+        vmRequestRepository.saveAll(expired);
+
+        expired.forEach(job -> auditService.logBuildArchived(job.getId()));
+        log.info("Archived {} builds (retention period: {} days)", expired.size(), retentionPeriod.toDays());
+    }
+
+    /**
      * Derives raw flags and the VM login password for a build job.
      * Called by the worker so the platform secret never leaves the backend.
      */

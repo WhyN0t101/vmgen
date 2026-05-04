@@ -394,6 +394,22 @@ function formatBytes(bytes?: number) {
           </div>
         </BaseCard>
 
+        <!-- Archived state -->
+        <BaseCard v-if="build.state === 'archived'" padding="lg">
+          <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-slate-300 mb-2">Build Archived</h2>
+            <p class="text-slate-400">
+              This build has been archived. The OVA file is no longer available for download.
+              Provenance records and flag submission remain accessible.
+            </p>
+          </div>
+          <div class="space-y-3">
+            <BaseButton variant="secondary" class="w-full" :disabled="downloadingProvenance" @click="downloadManifest">
+              {{ downloadingProvenance ? 'Downloading…' : 'Download Provenance Manifest' }}
+            </BaseButton>
+          </div>
+        </BaseCard>
+
         <!-- Failed state -->
         <BaseCard v-if="build.state === 'failed'" padding="lg">
           <div class="text-center mb-6">
