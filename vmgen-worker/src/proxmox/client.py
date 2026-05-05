@@ -60,6 +60,33 @@ class ProxmoxClient:
         self._wait_for_task(task, node, timeout=600)  # cloning a full disk takes time
         log.info(f"VM {new_vmid} cloned successfully")
 
+    def configure_resources(self, vmid: int, ram_mb: int | None, disk_gb: int | None, node: str | None = None):
+        """Adjust RAM and/or disk on a cloned VM before it starts. Both params are optional."""
+        if ram_mb:
+            self._node_api(node).qemu(vmid).config.put(memory=ram_mb)
+            log.info(f"Set RAM on VM {vmid} to {ram_mb} MB")
+        if disk_gb:
+            config = self.get_vm_config(vmid, node)
+            disk_key = next(
+                (k for k in config
+                 if k in ('scsi0', 'virtio0', 'ide0', 'sata0')
+                 and 'cloudinit' not in config[k]
+                 and 'media=cdrom' not in config[k]),
+                None,
+            )
+            if disk_key:
+                current_bytes = self._parse_disk_size(
+                    next((p[5:] for p in config[disk_key].split(',') if p.startswith('size=')), '0')
+                )
+                requested_bytes = disk_gb * (1024 ** 3)
+                if requested_bytes > current_bytes:
+                    self._node_api(node).qemu(vmid).resize.post(disk=disk_key, size=f"{disk_gb}G")
+                    log.info(f"Resized {disk_key} on VM {vmid} to {disk_gb} GB")
+                else:
+                    log.info(f"VM {vmid}: disk already {current_bytes // (1024**3)} GB >= requested {disk_gb} GB — skipping resize")
+            else:
+                log.warning(f"VM {vmid}: no resizable disk found — disk resize skipped")
+
     def configure_network(self, vmid: int, node: str | None = None):
         """Attach VM to the isolated build bridge (from config)."""
         log.info(f"Attaching VM {vmid} to isolated bridge {self._config.isolated_bridge}")

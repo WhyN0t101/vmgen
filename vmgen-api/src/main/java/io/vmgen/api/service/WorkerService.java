@@ -412,6 +412,8 @@ public class WorkerService {
                         .executionOrder(vrs.getExecutionOrder())
                         .scriptContent(vrs.getScript().getScriptContent())
                         .parameterValues(paramsByScriptId.getOrDefault(vrs.getScript().getId(), Map.of()))
+                        .minRamMb(vrs.getScript().getMinRamMb())
+                        .minDiskGb(vrs.getScript().getMinDiskGb())
                         .build())
                 .toList();
 

@@ -50,5 +50,7 @@ public class ClaimJobResponse {
         private Integer executionOrder;
         private String scriptContent;
         private Map<String, String> parameterValues;
+        private Integer minRamMb;
+        private Integer minDiskGb;
     }
 }

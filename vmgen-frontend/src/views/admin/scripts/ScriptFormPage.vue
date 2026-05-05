@@ -63,8 +63,6 @@ const form = ref<ScriptFormState>({
   flagLocation: '/root/flag.txt',
   flagOwnership: '',
   flagPermissions: '0644',
-  requiredOsFamilies: ['linux'],
-  requiredCapabilities: ['ssh'],
   minRamMb: null,
   minDiskGb: null,
   conflictsWithScriptIds: [],
@@ -87,8 +85,6 @@ watch(existingScript, (s) => {
     flagLocation: s.flagLocation,
     flagOwnership: s.flagOwnership,
     flagPermissions: s.flagPermissions || '0644',
-    requiredOsFamilies: s.requiredOsFamilies || ['linux'],
-    requiredCapabilities: s.requiredCapabilities || ['ssh'],
     minRamMb: s.minRamMb ?? null,
     minDiskGb: s.minDiskGb ?? null,
   }
@@ -162,8 +158,6 @@ async function handleSubmit() {
       flagLocation: form.value.flagLocation,
       flagOwnership: form.value.flagOwnership,
       flagPermissions: form.value.flagPermissions,
-      requiredOsFamilies: form.value.requiredOsFamilies,
-      requiredCapabilities: form.value.requiredCapabilities,
       minRamMb: form.value.minRamMb,
       minDiskGb: form.value.minDiskGb,
     }
@@ -307,78 +301,20 @@ async function handleSubmit() {
         <!-- Requirements -->
         <section class="space-y-4 border-b border-slate-800 pb-6">
           <h2 class="text-lg font-semibold text-slate-100">Template requirements</h2>
-          <p class="text-xs text-slate-400">
-            These fields describe which templates this script can be safely applied to. They will be used
-            by the compatibility system.
-          </p>
 
-          <div class="grid gap-4 md:grid-cols-2">
-            <div>
-              <label class="mb-1 block text-sm font-medium text-slate-300">Required OS families</label>
-              <div class="flex flex-wrap gap-3 text-sm text-slate-200">
-                <label class="flex items-center gap-2">
-                  <input
-                    v-model="form.requiredOsFamilies"
-                    type="checkbox"
-                    value="linux"
-                  />
-                  Linux
-                </label>
-                <label class="flex items-center gap-2">
-                  <input
-                    v-model="form.requiredOsFamilies"
-                    type="checkbox"
-                    value="windows"
-                  />
-                  Windows
-                </label>
-              </div>
-            </div>
-            <div>
-              <label class="mb-1 block text-sm font-medium text-slate-300">Required capabilities</label>
-              <div class="flex flex-wrap gap-3 text-sm text-slate-200">
-                <label class="flex items-center gap-2">
-                  <input
-                    v-model="form.requiredCapabilities"
-                    type="checkbox"
-                    value="ssh"
-                  />
-                  SSH
-                </label>
-                <label class="flex items-center gap-2">
-                  <input
-                    v-model="form.requiredCapabilities"
-                    type="checkbox"
-                    value="web_server"
-                  />
-                  Web server
-                </label>
-                <label class="flex items-center gap-2">
-                  <input
-                    v-model="form.requiredCapabilities"
-                    type="checkbox"
-                    value="database"
-                  />
-                  Database
-                </label>
-                <label class="flex items-center gap-2">
-                  <input
-                    v-model="form.requiredCapabilities"
-                    type="checkbox"
-                    value="docker"
-                  />
-                  Docker
-                </label>
-                <label class="flex items-center gap-2">
-                  <input
-                    v-model="form.requiredCapabilities"
-                    type="checkbox"
-                    value="systemd"
-                  />
-                  Systemd
-                </label>
-              </div>
-            </div>
+          <!-- Resource adjustment callout -->
+          <div class="rounded-lg border border-sky-800 bg-sky-950/40 px-4 py-3 text-xs text-sky-300 space-y-1">
+            <p class="font-semibold text-sky-200">How resource requirements work</p>
+            <p>
+              When a build starts, the worker clones the selected template and then automatically
+              adjusts the VM's resources to meet the highest requirement across all selected scripts.
+            </p>
+            <ul class="list-disc list-inside space-y-0.5 mt-1">
+              <li>If a script sets <span class="font-mono">Minimum RAM = 4096 MB</span> but the template has 2048 MB, the cloned VM is resized to 4096 MB before it boots.</li>
+              <li>If a script sets <span class="font-mono">Minimum disk = 20 GB</span> but the template has 10 GB, the disk is grown to 20 GB. Disk can only grow — never shrink.</li>
+              <li>If no script specifies a resource requirement, the template's configured value is used as-is.</li>
+              <li>When multiple scripts are selected, the <span class="font-mono">maximum</span> requirement across all scripts wins.</li>
+            </ul>
           </div>
 
           <div class="grid gap-4 md:grid-cols-2">
@@ -389,8 +325,11 @@ async function handleSubmit() {
                 type="number"
                 min="512"
                 class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                placeholder="1024"
+                placeholder="e.g. 2048"
               />
+              <p class="mt-1 text-[11px] text-slate-500">
+                Leave blank to use the template default. If set, the VM will be resized to at least this value before the build starts.
+              </p>
             </div>
             <div>
               <label class="mb-1 block text-sm font-medium text-slate-300">Minimum disk size (GB)</label>
@@ -399,10 +338,14 @@ async function handleSubmit() {
                 type="number"
                 min="1"
                 class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                placeholder="2"
+                placeholder="e.g. 10"
               />
+              <p class="mt-1 text-[11px] text-slate-500">
+                Leave blank to use the template default. The disk will only be grown — never shrunk — so setting a value smaller than the template disk has no effect.
+              </p>
             </div>
           </div>
+
         </section>
 
         <!-- Script content -->

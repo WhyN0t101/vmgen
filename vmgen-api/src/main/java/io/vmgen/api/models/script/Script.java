@@ -63,6 +63,12 @@ public class Script {
     @Column(name = "flag_permissions", length = 10)
     private String flagPermissions;
 
+    @Column(name = "min_ram_mb")
+    private Integer minRamMb;
+
+    @Column(name = "min_disk_gb")
+    private Integer minDiskGb;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

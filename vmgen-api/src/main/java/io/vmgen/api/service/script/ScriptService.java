@@ -91,7 +91,7 @@ public class ScriptService {
         Script script = new Script();
         script.setIdentifier(request.getIdentifier());
         script.setVersion(request.getVersion());
-        buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions());
+        buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions(), request.getMinRamMb(), request.getMinDiskGb());
         User admin = userRepository.findByUsernameIgnoreCase(adminUsername)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + adminUsername));
         script.setCreatedBy(admin);
@@ -147,7 +147,7 @@ public class ScriptService {
     /**
      * Constructs a new {@link Script} entity from the request, category, and creator.
      */
-    private void buildScript(VulnerabilityCategory category, Script script, String name, String description, String difficultyLevel, String scriptContent, String flagLocation, String flagOwnership, String flagPermissions) {
+    private void buildScript(VulnerabilityCategory category, Script script, String name, String description, String difficultyLevel, String scriptContent, String flagLocation, String flagOwnership, String flagPermissions, Integer minRamMb, Integer minDiskGb) {
         script.setName(name);
         script.setDescription(description);
         script.setCategory(category);
@@ -157,6 +157,8 @@ public class ScriptService {
         script.setFlagLocation(flagLocation);
         script.setFlagOwnership(flagOwnership);
         script.setFlagPermissions(flagPermissions);
+        script.setMinRamMb(minRamMb);
+        script.setMinDiskGb(minDiskGb);
     }
 
     /**
@@ -170,7 +172,7 @@ public class ScriptService {
         VulnerabilityCategory category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.getCategoryId()));
 
-        buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions());
+        buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions(), request.getMinRamMb(), request.getMinDiskGb());
 
         Script saved = scriptRepository.save(script);
         auditService.logScriptUpdated(admin, saved.getId(), ctx);
@@ -228,11 +230,10 @@ public class ScriptService {
                 .createdAt(script.getCreatedAt())
                 .createdByUsername(script.getCreatedBy() != null ? script.getCreatedBy().getUsername() : null)
                 .deprecatedAt(script.getDeprecatedAt())
-                // Requirements to be populated when requirement entities are introduced
                 .requiredOsFamilies(List.of())
                 .requiredCapabilities(List.of())
-                .minRamMb(null)
-                .minDiskGb(null)
+                .minRamMb(script.getMinRamMb())
+                .minDiskGb(script.getMinDiskGb())
                 .build();
     }
 }

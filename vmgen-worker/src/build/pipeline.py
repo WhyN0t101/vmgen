@@ -75,6 +75,17 @@ class BuildPipeline:
         self._progress(job_id, "CONFIGURE_NETWORK", 18)
         self._proxmox.configure_network(build_vmid, proxmox_node)
 
+        # Adjust RAM / disk to satisfy the highest requirement across all selected scripts.
+        # Scripts that don't specify a requirement contribute 0 and are ignored.
+        required_ram  = max((s.get("minRamMb")  or 0 for s in scripts), default=0) or None
+        required_disk = max((s.get("minDiskGb") or 0 for s in scripts), default=0) or None
+        if required_ram is not None or required_disk is not None:
+            self._proxmox.configure_resources(build_vmid, required_ram, required_disk, proxmox_node)
+            self._log(job_id, "INFO",
+                      f"VM resources adjusted — RAM: {required_ram or 'unchanged'} MB, "
+                      f"disk: {required_disk or 'unchanged'} GB",
+                      "CONFIGURE_NETWORK")
+
         # For cloud-init: inject ephemeral key BEFORE starting the VM
         ephemeral_pkey = None
         if ssh_auth == "cloudinit":
