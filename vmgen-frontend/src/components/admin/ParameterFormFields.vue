@@ -61,6 +61,13 @@ const choiceCountWarning = computed(() => {
   if (form.value.valueSource !== 'AUTO_CHOICE' && form.value.parameterType !== 'CHOICE') return false
   return (form.value.choices?.length ?? 0) === 0
 })
+
+const privilegedPortWarning = computed(() => {
+  if (form.value.parameterType !== 'INTEGER') return false
+  if (form.value.valueSource !== 'AUTO_RANDOM' && form.value.valueSource !== 'USER_INPUT_OR_RANDOM') return false
+  const min = form.value.randomConfig?.min
+  return min == null || min < 1024
+})
 </script>
 
 <template>
@@ -239,6 +246,9 @@ const choiceCountWarning = computed(() => {
           <p class="mt-1 text-[11px] text-slate-500">Inclusive upper bound.</p>
         </div>
       </div>
+      <p v-if="privilegedPortWarning" class="text-[11px] text-amber-400">
+        ⚠ Min is below 1024. If this parameter is a port, services binding below 1024 require root — set min ≥ 1024 unless this is intentional.
+      </p>
       <!-- String/other: length + charset -->
       <div v-else class="grid gap-4 md:grid-cols-2">
         <div>

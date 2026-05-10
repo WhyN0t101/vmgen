@@ -60,7 +60,7 @@ const form = ref<ScriptFormState>({
   categoryId: '',
   difficultyLevel: 'MEDIUM',
   scriptContent: '',
-  flagLocation: '/root/flag.txt',
+  flagLocation: '',
   flagOwnership: '',
   flagPermissions: '0644',
   minRamMb: null,
@@ -391,11 +391,15 @@ echo "{{FLAG_VALUE}}" > <span class="text-sky-400">{{FLAG_PATH}}</span></pre>
             <input
               v-model="form.flagLocation"
               type="text"
-              class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+              class="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 font-mono"
+              placeholder="/opt/vmgen/flags/flag_<script-id>.txt"
               required
             />
             <p class="mt-1 text-[11px] text-slate-500">
-              Absolute path where the derived flag will be written (e.g. /opt/vmgen/flags/sql1.txt).
+              Absolute path where the derived flag will be written.
+              Use the convention <span class="font-mono text-slate-300">/opt/vmgen/flags/flag_&lt;script-id&gt;.txt</span>
+              (e.g. <span class="font-mono text-slate-300">/opt/vmgen/flags/flag_apache-path-traversal.txt</span>)
+              to avoid collisions when multiple scripts are combined in the same build.
             </p>
           </div>
           <div class="grid gap-4 md:grid-cols-2">

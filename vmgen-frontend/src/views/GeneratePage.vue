@@ -177,6 +177,36 @@ const requiredParamsFilled = computed(() => {
 
 const parameterErrors = ref(false)
 
+// Warn when two scripts share the same parameter name and the same user-entered value.
+// Identical values on a shared param name (e.g. PORT) will cause one service to fail at VM boot.
+const paramConflictWarnings = computed(() => {
+  const seen: Record<string, { scriptName: string; value: string }[]> = {}
+
+  for (const { id, name, params } of scriptsWithUserInputParams.value) {
+    for (const param of params) {
+      const isRand = randomizeFlags.value[id]?.[param.parameterName] ?? false
+      if (isRand) continue
+      const value = parameterValues.value[id]?.[param.parameterName]?.trim() ?? ''
+      if (!value) continue
+      if (!seen[param.parameterName]) seen[param.parameterName] = []
+      seen[param.parameterName].push({ scriptName: name, value })
+    }
+  }
+
+  const warnings: { paramName: string; value: string; scripts: string[] }[] = []
+  for (const [paramName, entries] of Object.entries(seen)) {
+    const byValue: Record<string, string[]> = {}
+    for (const { value, scriptName } of entries) {
+      if (!byValue[value]) byValue[value] = []
+      byValue[value].push(scriptName)
+    }
+    for (const [value, scripts] of Object.entries(byValue)) {
+      if (scripts.length > 1) warnings.push({ paramName, value, scripts })
+    }
+  }
+  return warnings
+})
+
 const canSubmit = computed(() =>
   !!selectedTemplateId.value && selectedVulnIds.value.length > 0 && requiredParamsFilled.value && !parameterErrors.value
 )
@@ -245,6 +275,20 @@ function handleSubmit() {
             v-model:has-errors="parameterErrors"
             :scripts="scriptsWithUserInputParams"
           />
+
+          <div v-if="paramConflictWarnings.length" class="mt-3 space-y-2">
+            <div
+              v-for="w in paramConflictWarnings"
+              :key="w.paramName + w.value"
+              class="rounded-md border border-amber-600/40 bg-amber-950/30 px-3 py-2 text-xs text-amber-300"
+            >
+              <span class="font-semibold">Parameter conflict:</span>
+              <span class="font-mono ml-1">{{ w.paramName }}</span> is set to
+              <span class="font-mono">{{ w.value }}</span> in multiple scripts
+              ({{ w.scripts.join(', ') }}) — this will cause one service to fail at boot.
+              Use different values or enable randomisation.
+            </div>
+          </div>
         </div>
 
         <!-- Right: Config -->
