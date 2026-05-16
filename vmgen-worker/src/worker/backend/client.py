@@ -152,6 +152,24 @@ class BackendClient:
         resp.raise_for_status()
         return resp.json()
 
+    def update_template_hash(self, template_id: str, sha256: str) -> None:
+        """
+        Report the computed SHA-256 of the template config to the backend.
+        The backend only writes it if the current value is still 'PENDING' — idempotent.
+        Non-fatal: a failure here must not abort the build.
+        """
+        try:
+            resp = requests.patch(
+                f"{self.url}/api/worker/templates/{template_id}/hash",
+                json={"sha256": sha256},
+                headers=self._headers,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            resp.raise_for_status()
+            log.info("Template %s hash reported to backend: %s", template_id, sha256)
+        except Exception as e:
+            log.warning("Failed to report template hash for %s (non-fatal): %s", template_id, e)
+
     def fail_job(self, job_id: str, error_type: str, message: str, logs: str = ""):
         # error_type: "script_failed" | "timeout" | "proxmox_error"
         log.info(f"[{job_id}] Reporting failure: type={error_type}")

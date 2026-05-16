@@ -94,6 +94,12 @@ const router = createRouter({
       component: () => import('@/views/templates/TemplateCatalog.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/trust',
+      name: 'trust',
+      component: () => import('@/views/TrustModelPage.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

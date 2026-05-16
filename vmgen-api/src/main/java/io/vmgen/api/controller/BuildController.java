@@ -2,6 +2,7 @@ package io.vmgen.api.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.vmgen.api.dto.build.BuildDownloadInfo;
+import io.vmgen.api.dto.build.BuildLogDto;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.CreateBuildRequest;
 import io.vmgen.api.dto.build.ProvenanceResponse;
@@ -185,5 +186,25 @@ public class BuildController {
     ) {
         User user = userService.requireUser(authentication);
         return ResponseEntity.ok(flagService.submitFlag(id, request, user, auditContext(http, Map.of())));
+    }
+
+    @GetMapping("/{id}/logs")
+    public ResponseEntity<List<BuildLogDto>> getBuildLogs(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        User user = userService.requireUser(authentication);
+        return ResponseEntity.ok(vmRequestService.getBuildLogs(id, user));
+    }
+
+    @DeleteMapping("/{id}/telemetry")
+    public ResponseEntity<Void> deleteTelemetry(
+            @PathVariable UUID id,
+            Authentication authentication,
+            HttpServletRequest http
+    ) {
+        User user = userService.requireUser(authentication);
+        telemetryService.deleteTelemetry(id, user, auditContext(http, Map.of()));
+        return ResponseEntity.noContent().build();
     }
 }

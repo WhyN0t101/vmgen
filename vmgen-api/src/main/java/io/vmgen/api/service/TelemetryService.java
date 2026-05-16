@@ -2,6 +2,7 @@ package io.vmgen.api.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.telemetry.TelemetryUploadResponse;
 import io.vmgen.api.exceptions.ForbiddenException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
@@ -34,6 +35,7 @@ public class TelemetryService {
 
     private final VmRequestRepository vmRequestRepository;
     private final TelemetryRepository telemetryRepository;
+    private final AuditService auditService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -84,6 +86,22 @@ public class TelemetryService {
 
         log.info("Telemetry uploaded for build {} by user {}", buildId, user.getId());
         return toResponse(upload);
+    }
+
+    @Transactional
+    public void deleteTelemetry(UUID buildId, User user, AuditContext ctx) {
+        VmRequest build = vmRequestRepository.findById(buildId)
+                .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + buildId));
+        if (!build.getUser().getId().equals(user.getId())) {
+            throw new ForbiddenException("Build does not belong to current user");
+        }
+        TelemetryUpload upload = telemetryRepository
+                .findByVmRequest_IdAndDeletedAtIsNull(buildId)
+                .orElseThrow(() -> new ResourceNotFoundException("No telemetry found for build: " + buildId));
+        upload.setDeletedAt(Instant.now());
+        telemetryRepository.save(upload);
+        log.info("Telemetry deleted for build {} by user {}", buildId, user.getId());
+        auditService.logTelemetryDeleted(user, buildId, ctx);
     }
 
     @Transactional(readOnly = true)

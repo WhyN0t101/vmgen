@@ -468,6 +468,17 @@ export interface AdminMetrics {
   avgWaitMinutes: number
   completionRate24h: number
   workers: WorkerStatus[]
+  dbStatus: 'UP' | 'DOWN'
+  storageTotalBytes: number
+  storageUsableBytes: number
+}
+
+export interface BuildLogEntry {
+  id: number
+  logLevel: string
+  stage: string | null
+  message: string
+  loggedAt: string
 }
 
 

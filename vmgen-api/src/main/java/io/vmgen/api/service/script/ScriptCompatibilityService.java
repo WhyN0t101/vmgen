@@ -67,7 +67,16 @@ public class ScriptCompatibilityService {
         Set<UUID> resolved = new LinkedHashSet<>(selectedScriptIds);
         List<UUID> autoAdded = resolveDependencies(resolved);
 
-        // 3) Derive execution order using a dependency-aware topological sort.
+        // 3) Re-check conflicts over the fully resolved set (catches conflicts
+        //    between auto-added dependencies and other selected scripts).
+        if (!autoAdded.isEmpty()) {
+            List<String> resolvedConflicts = detectConflicts(new ArrayList<>(resolved));
+            if (!resolvedConflicts.isEmpty()) {
+                throw new ScriptConflictException("Script conflicts detected after dependency resolution", resolvedConflicts);
+            }
+        }
+
+        // 4) Derive execution order using a dependency-aware topological sort.
         List<UUID> ordered = topologicalSort(resolved);
 
         log.debug("Resolved {} selected scripts into {} scripts ({} auto-added)",

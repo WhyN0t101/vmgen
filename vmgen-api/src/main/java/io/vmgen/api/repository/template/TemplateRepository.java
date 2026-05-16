@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -47,4 +48,12 @@ public interface TemplateRepository extends JpaRepository<Template, UUID> {
      * Checks whether a template already exists for the given Proxmox VMID and node.
      */
     boolean existsByProxmoxVmidAndProxmoxNode(Integer proxmoxVmid, String proxmoxNode);
+
+    /**
+     * Atomically sets sha256_hash only when the current value is 'PENDING'.
+     * Returns the number of rows updated (1 = written, 0 = already set by another worker).
+     */
+    @Modifying
+    @Query("UPDATE Template t SET t.sha256Hash = :hash WHERE t.id = :id AND t.sha256Hash = 'PENDING'")
+    int updateHashIfPending(@Param("id") UUID id, @Param("hash") String hash);
 }

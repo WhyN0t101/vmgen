@@ -46,6 +46,13 @@ function logout() {
               Templates
             </router-link>
             <router-link
+              to="/trust"
+              class="text-slate-400 hover:text-slate-100 transition-colors"
+              active-class="text-primary-500"
+            >
+              Trust Model
+            </router-link>
+            <router-link
               v-if="authStore.isAdmin"
               to="/admin"
               class="text-slate-400 hover:text-slate-100 transition-colors"

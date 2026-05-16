@@ -4,12 +4,15 @@ import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.build.AdminBuildCredentialsResponse;
 import io.vmgen.api.dto.build.AdminBuildSummaryDto;
 import io.vmgen.api.dto.build.BuildDownloadInfo;
+import io.vmgen.api.dto.build.BuildLogDto;
 import io.vmgen.api.dto.build.BuildResponse;
 import io.vmgen.api.dto.build.BuildScriptDto;
 import io.vmgen.api.dto.build.CreateBuildRequest;
 import io.vmgen.api.dto.build.ProvenanceResponse;
+import io.vmgen.api.models.build.BuildLog;
 import io.vmgen.api.models.provenance.ProvenanceRecord;
 import io.vmgen.api.models.vm.VmRequestState;
+import io.vmgen.api.repository.BuildLogRepository;
 import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
 import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.dto.script.ScriptParameterDto;
@@ -63,6 +66,7 @@ public class VmRequestService {
     private final ScriptCompatibilityService scriptCompatibilityService;
     private final ScriptParameterService scriptParameterService;
     private final ProvenanceRecordRepository provenanceRecordRepository;
+    private final BuildLogRepository buildLogRepository;
     private final AuditService auditService;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -435,6 +439,18 @@ public class VmRequestService {
                 .sshUsername(request.getTemplate().getExpectedSshUser())
                 .vmLoginPassword(provenance.getVmLoginPassword())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<BuildLogDto> getBuildLogs(UUID buildId, User user) {
+        VmRequest build = vmRequestRepository.findById(buildId)
+                .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + buildId));
+        if (!build.getUser().getId().equals(user.getId())) {
+            throw new ForbiddenException("Build does not belong to current user");
+        }
+        return buildLogRepository.findByVmRequest_IdOrderByLoggedAtAsc(buildId).stream()
+                .map(l -> new BuildLogDto(l.getId(), l.getLogLevel(), l.getStage(), l.getMessage(), l.getLoggedAt()))
+                .toList();
     }
 
     private Map<String, Boolean> buildRandomiseFlagsForScript(UUID scriptId, Map<String, String> userValues) {

@@ -419,6 +419,7 @@ public class WorkerService {
 
         return ClaimJobResponse.builder()
                 .requestId(request.getId())
+                .templateId(template.getId())
                 .templateIdentifier(template.getIdentifier())
                 .templateVersion(template.getVersion())
                 .templateSha256(template.getSha256Hash())
@@ -470,6 +471,24 @@ public class WorkerService {
         }
 
         buildLogRepository.save(entry);
+    }
+
+    /**
+     * Updates the template SHA-256 hash only when the current value is 'PENDING'.
+     * The conditional update is atomic — concurrent workers computing the same hash
+     * will each attempt the update, but only the first write wins (subsequent rows = 0).
+     */
+    @Transactional
+    public void updateTemplateHash(UUID templateId, String sha256) {
+        if (!templateRepository.existsById(templateId)) {
+            throw new ResourceNotFoundException("Template not found: " + templateId);
+        }
+        int updated = templateRepository.updateHashIfPending(templateId, sha256);
+        if (updated > 0) {
+            log.info("Template {} SHA-256 hash set to {}", templateId, sha256);
+        } else {
+            log.debug("Template {} hash already set — skipping worker update", templateId);
+        }
     }
 
     /**

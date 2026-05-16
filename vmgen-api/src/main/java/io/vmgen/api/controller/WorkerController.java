@@ -9,6 +9,7 @@ import io.vmgen.api.dto.worker.HeartbeatRequest;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
 import io.vmgen.api.dto.worker.ProgressUpdateRequest;
+import io.vmgen.api.dto.worker.UpdateTemplateHashRequest;
 import io.vmgen.api.dto.worker.WorkerAckResponse;
 import io.vmgen.api.service.WorkerService;
 import jakarta.validation.Valid;
@@ -97,5 +98,14 @@ public class WorkerController {
 
         DeriveFlagsResponse response = workerService.deriveBuildSecrets(requestId, request);
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/templates/{id}/hash")
+    public ResponseEntity<WorkerAckResponse> updateTemplateHash(
+            @PathVariable("id") UUID templateId,
+            @Valid @RequestBody UpdateTemplateHashRequest request) {
+
+        workerService.updateTemplateHash(templateId, request.getSha256());
+        return ResponseEntity.ok(new WorkerAckResponse(true));
     }
 }

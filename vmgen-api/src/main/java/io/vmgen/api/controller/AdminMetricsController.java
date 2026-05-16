@@ -24,6 +24,9 @@ public class AdminMetricsController {
                 .avgWaitMinutes(adminMetricsService.getAvgWaitMinutes())
                 .completionRate24h(adminMetricsService.getCompletionRate24h())
                 .workers(adminMetricsService.getWorkerStatus())
+                .dbStatus(adminMetricsService.getDbStatus())
+                .storageTotalBytes(adminMetricsService.getStorageTotalBytes())
+                .storageUsableBytes(adminMetricsService.getStorageUsableBytes())
                 .build();
         return ResponseEntity.ok(response);
     }

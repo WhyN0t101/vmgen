@@ -14,4 +14,7 @@ public class AdminMetricsResponse {
     private double avgWaitMinutes;
     private int completionRate24h;
     private List<WorkerStatusDTO> workers;
+    private String dbStatus;
+    private long storageTotalBytes;
+    private long storageUsableBytes;
 }

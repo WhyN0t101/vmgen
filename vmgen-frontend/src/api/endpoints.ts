@@ -6,6 +6,7 @@ import type {
   AdminMetrics,
   AuthResponse,
   Build,
+  BuildLogEntry,
   BuildSpec,
   ProvenanceResponse,
   TelemetryUploadResponse,
@@ -100,6 +101,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(jsonData),
     })
+  },
+
+  deleteTelemetry: async (id: string): Promise<void> => {
+    return apiRequest<void>(`/api/builds/${id}/telemetry`, { method: 'DELETE' })
+  },
+
+  // Build logs
+  getBuildLogs: async (id: string): Promise<BuildLogEntry[]> => {
+    return apiRequest<BuildLogEntry[]>(`/api/builds/${id}/logs`)
   },
 
   // Flags

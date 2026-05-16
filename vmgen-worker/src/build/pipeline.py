@@ -47,6 +47,8 @@ class BuildPipeline:
     def _run_stages(self, job: dict, build_started_at: str) -> None:
         job_id = str(job["requestId"])   # requestId IS the job ID
         template_vmid = job["proxmoxVmid"]
+        template_id = job.get("templateId")
+        template_sha256_known = job.get("templateSha256", "")
         proxmox_node = job.get("proxmoxNode")
         scripts = job["scripts"]         # [{scriptId, identifier, scriptContent, flagLocation}, ...]
         seed_hex = job["buildSeed"]
@@ -61,6 +63,8 @@ class BuildPipeline:
         template_sha256 = self._proxmox.get_template_config_hash(template_vmid, proxmox_node)
         log.info(f"[{job_id}] Template config SHA-256: {template_sha256}")
         self._log(job_id, "INFO", f"Template VMID {template_vmid} verified (config SHA-256: {template_sha256})", "VERIFY_TEMPLATE")
+        if template_id and template_sha256_known == "PENDING":
+            self._backend.update_template_hash(template_id, template_sha256)
 
         # Stage 2: CLONE_TEMPLATE
         self._progress(job_id, "CLONE_TEMPLATE", 10)

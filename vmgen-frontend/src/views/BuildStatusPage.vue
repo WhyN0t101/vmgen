@@ -8,6 +8,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseProgress from '@/components/ui/BaseProgress.vue'
 import { formatTimeAgoVerbose as formatTimeAgo } from '@/utils/dateFormat'
 import { api } from '@/api/endpoints'
+import type { BuildLogEntry } from '@/types'
 
 // Pipeline stage definitions — order matters for the step list
 const PIPELINE_STAGES: { key: string; label: string; percent: number }[] = [
@@ -64,6 +65,60 @@ const telemetryFile = ref<File | null>(null)
 const telemetryUploading = ref(false)
 const telemetrySubmitted = ref(false)
 const telemetryError = ref<string | null>(null)
+
+// Telemetry deletion
+const telemetryDeleting = ref(false)
+const telemetryDeleted = ref(false)
+const telemetryDeleteError = ref<string | null>(null)
+
+async function deleteTelemetry() {
+  if (!build.value) return
+  telemetryDeleting.value = true
+  telemetryDeleteError.value = null
+  try {
+    await api.deleteTelemetry(build.value.id)
+    telemetryDeleted.value = true
+    telemetrySubmitted.value = false
+  } catch (e: any) {
+    telemetryDeleteError.value = e?.response?.data?.message ?? e?.message ?? 'Deletion failed'
+  } finally {
+    telemetryDeleting.value = false
+  }
+}
+
+// Build logs
+const logsVisible = ref(false)
+const buildLogs = ref<BuildLogEntry[]>([])
+const logsLoading = ref(false)
+const logsError = ref<string | null>(null)
+
+async function toggleLogs() {
+  logsVisible.value = !logsVisible.value
+  if (logsVisible.value && buildLogs.value.length === 0 && !logsLoading.value) {
+    await loadLogs()
+  }
+}
+
+async function loadLogs() {
+  if (!build.value) return
+  logsLoading.value = true
+  logsError.value = null
+  try {
+    buildLogs.value = await api.getBuildLogs(build.value.id)
+  } catch (e: any) {
+    logsError.value = e?.response?.data?.message ?? e?.message ?? 'Failed to load logs'
+  } finally {
+    logsLoading.value = false
+  }
+}
+
+const logLevelClass: Record<string, string> = {
+  INFO:    'text-slate-300',
+  WARN:    'text-amber-400',
+  WARNING: 'text-amber-400',
+  ERROR:   'text-red-400',
+  DEBUG:   'text-slate-500',
+}
 
 function onTelemetryFileChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -315,6 +370,11 @@ function formatBytes(bytes?: number) {
               </BaseButton>
             </div>
 
+            <div class="rounded-lg border border-slate-700/50 bg-slate-800/30 px-4 py-3 text-xs text-slate-400 space-y-1">
+              <p class="font-medium text-slate-300">Trust boundary notice</p>
+              <p>Once downloaded, this VM runs outside platform control. The platform cannot enforce or verify runtime integrity post-export. To independently verify the artefact, recompute its SHA-256 and compare it against the provenance manifest.</p>
+            </div>
+
             <div class="bg-slate-800/60 rounded-lg p-4">
               <span class="text-slate-300 font-mono text-sm">provenance-{{ build.id }}.json</span>
               <BaseButton variant="secondary" class="w-full mt-2" :disabled="downloadingProvenance" @click="downloadManifest">
@@ -327,8 +387,18 @@ function formatBytes(bytes?: number) {
           <div v-if="build.telemetryEnabled" class="mt-6 pt-6 border-t border-slate-800">
             <p class="text-xs font-mono tracking-widest uppercase text-slate-400 mb-3">Session Telemetry</p>
 
-            <div v-if="telemetrySubmitted" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
-              Telemetry submitted — your instructor can now review your session.
+            <div v-if="telemetryDeleted" class="bg-slate-800/60 border border-slate-700/50 rounded-lg p-4 text-sm text-slate-400">
+              Telemetry has been deleted.
+            </div>
+
+            <div v-else-if="telemetrySubmitted" class="space-y-3">
+              <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
+                Telemetry submitted — your instructor can now review your session.
+              </div>
+              <div v-if="telemetryDeleteError" class="text-xs text-red-400">{{ telemetryDeleteError }}</div>
+              <BaseButton variant="secondary" class="w-full" :disabled="telemetryDeleting" @click="deleteTelemetry">
+                {{ telemetryDeleting ? 'Deleting…' : 'Delete Telemetry' }}
+              </BaseButton>
             </div>
 
             <div v-else class="space-y-3">
@@ -336,6 +406,9 @@ function formatBytes(bytes?: number) {
                 Run <code class="bg-slate-800 px-1 rounded">collect-telemetry</code> inside the VM, then upload
                 <code class="bg-slate-800 px-1 rounded">/tmp/vmgen-telemetry.json</code> here.
               </p>
+              <div class="rounded-lg border border-slate-700/50 bg-slate-800/30 px-3 py-2 text-xs text-slate-400">
+                Telemetry is self-reported by the guest VM. The platform cannot verify its authenticity or completeness.
+              </div>
               <input
                 type="file"
                 accept=".json,application/json"
@@ -423,6 +496,38 @@ function formatBytes(bytes?: number) {
               {{ cloning ? 'Retrying…' : 'Retry Build' }}
             </BaseButton>
             <p v-if="cloneError" class="text-sm text-red-400 text-center">{{ cloneError }}</p>
+          </div>
+        </BaseCard>
+
+        <!-- Build logs (all states) -->
+        <BaseCard padding="md">
+          <button
+            class="flex items-center justify-between w-full text-left"
+            @click="toggleLogs"
+          >
+            <p class="text-xs font-mono tracking-widest uppercase text-slate-400">Build Logs</p>
+            <span class="text-slate-500 text-xs">{{ logsVisible ? '▲ hide' : '▼ show' }}</span>
+          </button>
+
+          <div v-if="logsVisible" class="mt-4">
+            <div v-if="logsLoading" class="text-xs text-slate-500">Loading…</div>
+            <div v-else-if="logsError" class="text-xs text-red-400">{{ logsError }}</div>
+            <div v-else-if="buildLogs.length === 0" class="text-xs text-slate-500">No logs yet.</div>
+            <div v-else class="space-y-0.5 max-h-80 overflow-y-auto font-mono text-xs">
+              <div
+                v-for="entry in buildLogs"
+                :key="entry.id"
+                class="flex gap-2 leading-5"
+              >
+                <span class="text-slate-600 shrink-0">{{ entry.loggedAt.slice(11, 19) }}</span>
+                <span
+                  class="shrink-0 w-12"
+                  :class="logLevelClass[entry.logLevel] ?? 'text-slate-400'"
+                >{{ entry.logLevel }}</span>
+                <span v-if="entry.stage" class="text-slate-500 shrink-0">[{{ entry.stage }}]</span>
+                <span class="text-slate-300 break-all">{{ entry.message }}</span>
+              </div>
+            </div>
           </div>
         </BaseCard>
       </div>

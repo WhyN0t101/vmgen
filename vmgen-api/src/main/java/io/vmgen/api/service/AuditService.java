@@ -51,6 +51,9 @@ public class AuditService {
     private static final String ACTION_TEMPLATE_DEPRECATED = "template_deprecated";
     private static final String ACTION_TEMPLATE_METADATA_UPDATED = "template_metadata_updated";
 
+    // Telemetry events
+    private static final String ACTION_TELEMETRY_DELETED = "telemetry_deleted";
+
     // Script admin events
     private static final String ACTION_SCRIPT_CREATED = "script_created";
     private static final String ACTION_SCRIPT_UPDATED = "script_updated";
@@ -198,6 +201,14 @@ public class AuditService {
     public void logScriptDeprecated(User admin, UUID scriptId, AuditContext ctx) {
         write(admin, ACTION_SCRIPT_DEPRECATED, "script", scriptId, ctx,
                 Map.of("scriptId", scriptId.toString()));
+    }
+
+    //  Telemetry events
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logTelemetryDeleted(User user, UUID buildId, AuditContext ctx) {
+        write(user, ACTION_TELEMETRY_DELETED, "build", buildId, ctx,
+                Map.of("buildId", buildId.toString()));
     }
 
     /**

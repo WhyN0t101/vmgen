@@ -42,6 +42,12 @@ function formatLastSeen(iso: string): string {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   return `${Math.floor(diff / 3600)}h ago`
 }
+
+function formatBytes(bytes: number): string {
+  if (bytes < 0) return 'N/A'
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`
+}
 </script>
 
 <template>
@@ -173,6 +179,28 @@ function formatLastSeen(iso: string): string {
               <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
                 <p class="text-[11px] font-mono tracking-widest uppercase text-slate-500">Active Workers</p>
                 <p class="text-3xl font-semibold text-slate-50">{{ metrics.workers.length }}</p>
+              </div>
+            </div>
+
+            <!-- Service health -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
+                <p class="text-[11px] font-mono tracking-widest uppercase text-slate-500">Database</p>
+                <p
+                  class="text-lg font-semibold font-mono"
+                  :class="metrics.dbStatus === 'UP' ? 'text-emerald-400' : 'text-red-400'"
+                >{{ metrics.dbStatus }}</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
+                <p class="text-[11px] font-mono tracking-widest uppercase text-slate-500">Storage Total</p>
+                <p class="text-lg font-semibold text-slate-50">{{ formatBytes(metrics.storageTotalBytes) }}</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
+                <p class="text-[11px] font-mono tracking-widest uppercase text-slate-500">Storage Free</p>
+                <p
+                  class="text-lg font-semibold"
+                  :class="metrics.storageUsableBytes >= 0 && metrics.storageTotalBytes > 0 && (metrics.storageUsableBytes / metrics.storageTotalBytes) < 0.1 ? 'text-amber-400' : 'text-slate-50'"
+                >{{ formatBytes(metrics.storageUsableBytes) }}</p>
               </div>
             </div>
 

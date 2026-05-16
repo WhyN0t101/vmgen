@@ -15,8 +15,9 @@ import java.util.UUID;
 @Builder
 public class ClaimJobResponse {
     private UUID requestId;
-    
+
     // Template info
+    private UUID templateId;
     private String templateIdentifier;
     private String templateVersion;
     private String templateSha256;

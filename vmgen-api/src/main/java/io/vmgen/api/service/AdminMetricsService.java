@@ -1,9 +1,16 @@
 package io.vmgen.api.service;
 
 import io.vmgen.api.dto.admin.WorkerStatusDTO;
+import java.io.IOException;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +21,9 @@ public class AdminMetricsService {
 
     private final WorkerService workerService;
     private final JdbcTemplate jdbcTemplate;
+
+    @Value("${vmgen.ova.storage-dir:/var/lib/vmgen/exports}")
+    private String ovaStorageDir;
 
     /**
      * Number of jobs currently waiting to be claimed by a worker.
@@ -62,5 +72,49 @@ public class AdminMetricsService {
                         .lastSeenAt(state.lastSeenAt())
                         .build())
                 .toList();
+    }
+
+    /**
+     * Returns "UP" if the database responds to a ping within the connection timeout,
+     * or "DOWN" if it does not.
+     */
+    public String getDbStatus() {
+        try {
+            jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+            return "UP";
+        } catch (DataAccessException e) {
+            log.warn("Database health check failed", e);
+            return "DOWN";
+        }
+    }
+
+    /**
+     * Total bytes on the OVA storage filesystem.
+     * Returns -1 if the path is inaccessible (e.g. not yet mounted in development).
+     */
+    public long getStorageTotalBytes() {
+        return storageMetric(true);
+    }
+
+    /**
+     * Usable bytes remaining on the OVA storage filesystem.
+     * Returns -1 if the path is inaccessible.
+     */
+    public long getStorageUsableBytes() {
+        return storageMetric(false);
+    }
+
+    private long storageMetric(boolean total) {
+        try {
+            Path path = Paths.get(ovaStorageDir);
+            if (!Files.exists(path)) {
+                return -1L;
+            }
+            FileStore store = Files.getFileStore(path);
+            return total ? store.getTotalSpace() : store.getUsableSpace();
+        } catch (IOException e) {
+            log.warn("Could not read storage metrics for {}: {}", ovaStorageDir, e.getMessage());
+            return -1L;
+        }
     }
 }
