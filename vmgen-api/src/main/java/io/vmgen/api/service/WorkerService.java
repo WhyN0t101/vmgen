@@ -11,9 +11,12 @@ import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.models.build.BuildLog;
 import io.vmgen.api.models.flag.Flag;
+import io.vmgen.api.models.provenance.ProvenanceDependency;
+import io.vmgen.api.models.provenance.ProvenanceParameter;
 import io.vmgen.api.models.provenance.ProvenanceRecord;
 import io.vmgen.api.models.provenance.ProvenanceScript;
-import io.vmgen.api.models.template.Template;
+import io.vmgen.api.models.script.Script;
+import io.vmgen.api.models.script.ScriptDependency;
 import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestScript;
 import io.vmgen.api.models.vm.VmRequestScriptParameter;
@@ -21,6 +24,7 @@ import io.vmgen.api.models.vm.VmRequestState;
 import io.vmgen.api.repository.BuildLogRepository;
 import io.vmgen.api.repository.flag.FlagRepository;
 import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
+import io.vmgen.api.repository.script.ScriptDependencyRepository;
 import io.vmgen.api.repository.script.ScriptRepository;
 import io.vmgen.api.repository.template.TemplateRepository;
 import io.vmgen.api.repository.vm.VmRequestRepository;
@@ -32,6 +36,8 @@ import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Objects;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -64,6 +70,7 @@ public class WorkerService {
     private final ProvenanceRecordRepository provenanceRecordRepository;
     private final FlagRepository flagRepository;
     private final ScriptRepository scriptRepository;
+    private final ScriptDependencyRepository scriptDependencyRepository;
     private final TemplateRepository templateRepository;
     private final BuildLogRepository buildLogRepository;
     private final AuditService auditService;
@@ -144,6 +151,7 @@ public class WorkerService {
         }
         
         log.info("Worker {} claimed job {}", workerId, request.get().getId());
+        auditService.logBuildStateTransition(workerId, request.get().getId(), "queued", "building");
         
         // Build response with full build specification
         return Optional.of(buildClaimResponse(request.get()));
@@ -178,6 +186,7 @@ public class WorkerService {
         if ("exporting".equalsIgnoreCase(update.getStage()) && request.getState() == VmRequestState.BUILDING) {
             request.setState(VmRequestState.EXPORTING);
             request.setExportingStartedAt(Instant.now());
+            auditService.logBuildStateTransition(update.getWorkerId(), requestId, "building", "exporting");
         }
         
         vmRequestRepository.save(request);
@@ -210,6 +219,7 @@ public class WorkerService {
         }
         
         // Update with artefact info
+        String previousState = request.getState().name().toLowerCase();
         request.setState(VmRequestState.READY);
         request.setCompletedAt(Instant.now());
         request.setStoragePath(completion.getOvaPath());
@@ -230,6 +240,7 @@ public class WorkerService {
             verifyAndPersistFlags(requestId, completion, request);
         }
 
+        auditService.logBuildStateTransition(completion.getWorkerId(), requestId, previousState, "ready");
         auditService.logWorkerJobCompleted(completion.getWorkerId(), requestId);
         log.info("Job {} completed successfully by worker {}", requestId, completion.getWorkerId());
     }
@@ -330,6 +341,9 @@ public class WorkerService {
             provenance.setScripts(scriptRecords);
         }
 
+        persistProvenanceParameters(provenance, request);
+        persistProvenanceDependencies(provenance, request);
+
         provenanceRecordRepository.save(provenance);
 
         // Update the template's sha256Hash if it was pending and the worker computed a real one
@@ -345,6 +359,87 @@ public class WorkerService {
                 }
             });
         }
+    }
+
+    /** Snapshots resolved script parameter values into immutable provenance rows. */
+    private void persistProvenanceParameters(ProvenanceRecord provenance, VmRequest request) {
+        List<VmRequestScriptParameter> storedParams =
+                vmRequestScriptParameterRepository.findByVmRequest_Id(request.getId());
+        if (storedParams.isEmpty()) {
+            return;
+        }
+
+        Map<UUID, Script> scriptsById = scriptRepository.findAllById(
+                storedParams.stream().map(p -> p.getScript().getId()).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(Script::getId, s -> s));
+
+        List<ProvenanceParameter> parameterRecords = new ArrayList<>();
+        for (VmRequestScriptParameter stored : storedParams) {
+            Script script = scriptsById.get(stored.getScript().getId());
+            String scriptIdentifier = script != null ? script.getIdentifier() : stored.getScript().getId().toString();
+
+            ProvenanceParameter row = new ProvenanceParameter();
+            row.setProvenanceRecord(provenance);
+            row.setParameterName(provenanceParameterKey(scriptIdentifier, stored.getParameterName()));
+            row.setParameterValue(stored.getParameterValue());
+            parameterRecords.add(row);
+        }
+        provenance.setParameters(parameterRecords);
+    }
+
+    /**
+     * Records script-to-script dependency edges that were resolved for this build.
+     * Only edges where both the dependent and required script are in the build are stored.
+     */
+    private void persistProvenanceDependencies(ProvenanceRecord provenance, VmRequest request) {
+        List<VmRequestScript> requestScripts =
+                vmRequestScriptRepository.findWithScriptByVmRequestId(request.getId());
+        if (requestScripts.isEmpty()) {
+            return;
+        }
+
+        Set<UUID> scriptIds = requestScripts.stream()
+                .map(VmRequestScript::getScriptId)
+                .collect(Collectors.toCollection(HashSet::new));
+        Map<UUID, Script> scriptsById = requestScripts.stream()
+                .collect(Collectors.toMap(VmRequestScript::getScriptId, VmRequestScript::getScript, (a, b) -> a));
+
+        List<ScriptDependency> edges = scriptDependencyRepository.findAllByScriptIdIn(new ArrayList<>(scriptIds));
+        List<ProvenanceDependency> dependencyRecords = new ArrayList<>();
+        Instant capturedAt = Instant.now();
+
+        for (ScriptDependency edge : edges) {
+            if (!scriptIds.contains(edge.getRequiresScriptId())) {
+                continue;
+            }
+            Script dependent = scriptsById.get(edge.getScriptId());
+            Script required = scriptsById.get(edge.getRequiresScriptId());
+            if (dependent == null || required == null) {
+                continue;
+            }
+
+            ProvenanceDependency row = new ProvenanceDependency();
+            row.setProvenanceRecord(provenance);
+            row.setDependencyType("script");
+            row.setDependencyName(required.getIdentifier());
+            row.setDependencyVersion(required.getVersion());
+            row.setSourceUrl("required-by:" + dependent.getIdentifier());
+            row.setSha256Hash(required.getSha256Hash());
+            row.setRetrievedAt(capturedAt);
+            dependencyRecords.add(row);
+        }
+        provenance.setDependencies(dependencyRecords);
+    }
+
+    /** Builds a unique parameter key within the 100-char provenance_parameters limit. */
+    private static String provenanceParameterKey(String scriptIdentifier, String parameterName) {
+        String key = scriptIdentifier + "." + parameterName;
+        if (key.length() <= 100) {
+            return key;
+        }
+        int maxIdentifierLen = Math.max(1, 100 - parameterName.length() - 1);
+        return scriptIdentifier.substring(0, maxIdentifierLen) + "." + parameterName;
     }
 
     /**
@@ -369,12 +464,18 @@ public class WorkerService {
             return; // Already in terminal state
         }
         
+        String previousState = request.getState().name().toLowerCase();
         request.setState(VmRequestState.FAILED);
         request.setFailedAt(Instant.now());
         request.setFailureReason(failure.getErrorType() + ": " + failure.getMessage());
         request.setLastProgressAt(Instant.now());
         
         vmRequestRepository.save(request);
+        auditService.logBuildStateTransition(
+                failure.getWorkerId() != null ? failure.getWorkerId() : "system",
+                requestId,
+                previousState,
+                "failed");
         auditService.logWorkerJobFailed(
                 failure.getWorkerId() != null ? failure.getWorkerId() : "unknown",
                 requestId,
@@ -409,6 +510,8 @@ public class WorkerService {
                         .version(vrs.getScript().getVersion())
                         .sha256(vrs.getScript().getSha256Hash())
                         .flagLocation(vrs.getScript().getFlagLocation())
+                        .flagOwnership(vrs.getScript().getFlagOwnership())
+                        .flagPermissions(vrs.getScript().getFlagPermissions())
                         .executionOrder(vrs.getExecutionOrder())
                         .scriptContent(vrs.getScript().getScriptContent())
                         .parameterValues(paramsByScriptId.getOrDefault(vrs.getScript().getId(), Map.of()))
@@ -492,6 +595,27 @@ public class WorkerService {
     }
 
     /**
+     * Records a lightweight liveness ping for an in-flight job.
+     * Updates workerLastHeartbeatAt only — intentionally does NOT touch lastProgressAt so
+     * that the silence-based stale detection in markStaleJobsAsFailed() still fires after
+     * 10 minutes of no genuine stage progress. Used by the worker during long-running script
+     * execution to prevent the job being marked stale while work is ongoing.
+     */
+    @Transactional
+    public void pingJob(UUID requestId, String workerId) {
+        VmRequest request = vmRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("VmRequest not found: " + requestId));
+        if (!Objects.equals(workerId, request.getClaimedByWorkerId())) {
+            throw new ConflictException("Worker " + workerId + " does not own this job");
+        }
+        if (request.getState() != VmRequestState.BUILDING && request.getState() != VmRequestState.EXPORTING) {
+            throw new ConflictException("Cannot ping job in state: " + request.getState());
+        }
+        request.setWorkerLastHeartbeatAt(Instant.now());
+        vmRequestRepository.save(request);
+    }
+
+    /**
      * Marks BUILDING and EXPORTING jobs as FAILED if no progress update has been received
      * within their respective timeouts. EXPORTING gets a longer window because the
      * qemu-img VMDK conversion step can run for 20-30 minutes without emitting progress.
@@ -508,9 +632,11 @@ public class WorkerService {
 
         stale.forEach(job -> {
             Duration timeout = job.getState() == VmRequestState.EXPORTING ? exportingTimeout : buildingTimeout;
+            String previousState = job.getState().name().toLowerCase();
             job.setState(VmRequestState.FAILED);
             job.setFailedAt(now);
             job.setFailureReason("TIMEOUT: No progress update for " + timeout.toMinutes() + " minutes");
+            auditService.logBuildStateTransition("system", job.getId(), previousState, "failed");
         });
         vmRequestRepository.saveAll(stale);
 
@@ -531,9 +657,11 @@ public class WorkerService {
                 List.of(VmRequestState.BUILDING, VmRequestState.EXPORTING), threshold);
 
         longRunningJobs.forEach(job -> {
+            String previousState = job.getState().name().toLowerCase();
             job.setState(VmRequestState.FAILED);
             job.setFailedAt(Instant.now());
             job.setFailureReason("TIMEOUT: Build exceeded maximum duration of " + maxDuration.toHours() + " hours");
+            auditService.logBuildStateTransition("system", job.getId(), previousState, "failed");
         });
         vmRequestRepository.saveAll(longRunningJobs);
 
@@ -601,6 +729,7 @@ public class WorkerService {
 
         Instant now = Instant.now();
         expired.forEach(job -> {
+            auditService.logBuildStateTransition("system", job.getId(), "ready", "archived");
             job.setState(VmRequestState.ARCHIVED);
             job.setArchivedAt(now);
             job.setStorageDeletedAt(now);

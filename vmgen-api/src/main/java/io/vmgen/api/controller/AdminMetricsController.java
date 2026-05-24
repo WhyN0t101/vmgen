@@ -27,6 +27,7 @@ public class AdminMetricsController {
                 .dbStatus(adminMetricsService.getDbStatus())
                 .storageTotalBytes(adminMetricsService.getStorageTotalBytes())
                 .storageUsableBytes(adminMetricsService.getStorageUsableBytes())
+                .authStatus(adminMetricsService.getAuthStatus())
                 .build();
         return ResponseEntity.ok(response);
     }

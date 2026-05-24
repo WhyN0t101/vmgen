@@ -61,13 +61,64 @@ export const api = {
     return apiRequest<PagedResponse<Build>>(`/api/builds?page=${page}&size=${size}`)
   },
 
-  downloadBuild: async (id: string, filename: string): Promise<void> => {
+  downloadBuild: async (id: string, filename: string, expectedSha256?: string): Promise<void> => {
     const authStore = useAuthStore()
-    const response = await fetch(`${API_BASE}/api/builds/${id}/download`, {
-      headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {},
+    const authHeaders: Record<string, string> = {}
+    if (authStore.token) authHeaders.Authorization = `Bearer ${authStore.token}`
+
+    const CHUNK_SIZE = 4 * 1024 * 1024
+
+    async function sha256Hex(blob: Blob): Promise<string> {
+      const buffer = await blob.arrayBuffer()
+      const hash = await crypto.subtle.digest('SHA-256', buffer)
+      return Array.from(new Uint8Array(hash))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+    }
+
+    const probe = await fetch(`${API_BASE}/api/builds/${id}/download`, {
+      headers: { ...authHeaders, Range: 'bytes=0-0' },
     })
-    if (!response.ok) throw new Error(`Download failed: ${response.statusText}`)
-    const blob = await response.blob()
+
+    if (!probe.ok && probe.status !== 206) {
+      throw new Error(`Download failed: ${probe.statusText}`)
+    }
+
+    const checksumHeader = probe.headers.get('X-Checksum-SHA256')
+    const expectedHash = (expectedSha256 ?? checksumHeader ?? '').toLowerCase()
+    const contentRange = probe.headers.get('Content-Range')
+    const totalSize = contentRange ? Number.parseInt(contentRange.split('/')[1] ?? '0', 10) : 0
+
+    let blob: Blob
+
+    if (totalSize > CHUNK_SIZE) {
+      const parts: BlobPart[] = []
+      let offset = 0
+      while (offset < totalSize) {
+        const end = Math.min(offset + CHUNK_SIZE - 1, totalSize - 1)
+        const chunkResp = await fetch(`${API_BASE}/api/builds/${id}/download`, {
+          headers: { ...authHeaders, Range: `bytes=${offset}-${end}` },
+        })
+        if (!chunkResp.ok && chunkResp.status !== 206) {
+          throw new Error(`Download failed at byte ${offset}: ${chunkResp.statusText}`)
+        }
+        parts.push(await chunkResp.arrayBuffer())
+        offset = end + 1
+      }
+      blob = new Blob(parts)
+    } else {
+      const fullResp = await fetch(`${API_BASE}/api/builds/${id}/download`, { headers: authHeaders })
+      if (!fullResp.ok) throw new Error(`Download failed: ${fullResp.statusText}`)
+      blob = await fullResp.blob()
+    }
+
+    if (expectedHash) {
+      const actual = (await sha256Hex(blob)).toLowerCase()
+      if (actual !== expectedHash) {
+        throw new Error('Download checksum verification failed')
+      }
+    }
+
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

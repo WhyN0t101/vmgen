@@ -17,11 +17,15 @@ public class ScheduledTasksService {
     private final SessionService sessionService;
     private final RateLimitService rateLimitService;
     private final WorkerService workerService;
+    private final TelemetryService telemetryService;
 
     private static final Duration IDLE_TIMEOUT = Duration.ofHours(24);
 
     @Value("${vmgen.ova.retention-days:7}")
     private int ovaRetentionDays;
+
+    @Value("${vmgen.telemetry.retention-days:90}")
+    private int telemetryRetentionDays;
 
     @Scheduled(fixedDelay = 300_000) // Every 5 minutes
     public void cleanupSessions() {
@@ -67,6 +71,15 @@ public class ScheduledTasksService {
             workerService.archiveExpiredBuilds(Duration.ofDays(ovaRetentionDays));
         } catch (Exception e) {
             log.error("Scheduled archiveExpiredBuilds failed", e);
+        }
+    }
+
+    @Scheduled(fixedDelay = 86_400_000) // Every 24 hours
+    public void purgeExpiredTelemetry() {
+        try {
+            telemetryService.deleteExpiredTelemetry(Duration.ofDays(telemetryRetentionDays));
+        } catch (Exception e) {
+            log.error("Scheduled purgeExpiredTelemetry failed", e);
         }
     }
 

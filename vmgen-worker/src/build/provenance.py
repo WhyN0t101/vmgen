@@ -1,14 +1,21 @@
 import hashlib
-from datetime import datetime, timezone
+from pathlib import Path
 
 
-def compute_sha256(file_path: str) -> str:
-    """SHA-256 of a file, read in chunks to handle large OVAs."""
-    h = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
-            h.update(chunk)
-    return h.hexdigest()
+def compute_sha256(file_path: str, *, allowed_base: str | Path | None = None) -> str:    """SHA-256 of a file, read in chunks to handle large OVAs."""
+    path = Path(file_path).expanduser().resolve()
+    if allowed_base is not None:
+        base = Path(allowed_base).expanduser().resolve()
+        try:
+            path.relative_to(base)
+        except ValueError as exc:
+            raise ValueError(f"Path {path} escapes allowed directory {base}") from exc
+
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def assemble_provenance(

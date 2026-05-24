@@ -1,4 +1,5 @@
 import io
+import hashlib
 import logging
 import os
 import shlex
@@ -12,8 +13,25 @@ from ssh.executor import SSHExecutor
 from worker.backend.client import BackendClient
 from build.flags import hash_flag
 from build.provenance import compute_sha256, assemble_provenance
+from utils.path_safe import resolve_under_base, validate_guest_path, cleanup_export_dir
 
 log = logging.getLogger(__name__)
+
+_HASH_LABEL_PENDING = "PENDING"
+
+
+def _verify_hash_match(label: str, expected: str, actual: str) -> None:
+    if not expected or expected.upper() == _HASH_LABEL_PENDING:
+        return
+    if actual.lower() != expected.lower():
+        raise RuntimeError(f"{label} SHA-256 mismatch: expected {expected}, got {actual}")
+
+
+def _verify_content_hash(label: str, expected: str, content: str) -> None:
+    if not expected or expected.upper() == _HASH_LABEL_PENDING:
+        return
+    actual = hashlib.sha256(content.encode()).hexdigest()
+    _verify_hash_match(label, expected, actual)
 
 
 class BuildPipeline:
@@ -34,6 +52,7 @@ class BuildPipeline:
             log.error(f"Build {job_id} failed: {e}", exc_info=True)
             self._backend.append_log(job_id, "ERROR", f"Build failed: {e}")
             self._cleanup_vm()
+            self._cleanup_export_artifacts(job_id)
             error_type = "proxmox_error"
             if "script" in str(e).lower():
                 error_type = "script_failed"
@@ -62,6 +81,7 @@ class BuildPipeline:
             raise RuntimeError(f"Template VM {template_vmid} not found")
         template_sha256 = self._proxmox.get_template_config_hash(template_vmid, proxmox_node)
         log.info(f"[{job_id}] Template config SHA-256: {template_sha256}")
+        _verify_hash_match("Template", template_sha256_known, template_sha256)
         self._log(job_id, "INFO", f"Template VMID {template_vmid} verified (config SHA-256: {template_sha256})", "VERIFY_TEMPLATE")
         if template_id and template_sha256_known == "PENDING":
             self._backend.update_template_hash(template_id, template_sha256)
@@ -145,6 +165,12 @@ class BuildPipeline:
                 log.info(f"[{job_id}] Executing script {i}/{total_scripts}: '{script['identifier']}' ({script_id})")
                 self._log(job_id, "INFO", f"Executing script {i}/{total_scripts}: '{script['identifier']}' ({script_id})", "EXECUTE_SCRIPTS")
 
+                _verify_content_hash(
+                    f"Script '{script['identifier']}'",
+                    script.get("sha256", ""),
+                    script["scriptContent"],
+                )
+
                 # Substitute {{PARAM_NAME}} placeholders with resolved values, then
                 # also export them as shell variables so $PARAM_NAME works too.
                 param_values: dict = script.get("parameterValues") or {}
@@ -160,7 +186,7 @@ class BuildPipeline:
 
                 t_start = time.time()
                 exit_code, _, stderr = self._with_heartbeat(
-                    job_id, "EXECUTE_SCRIPTS", 45,
+                    job_id,
                     lambda c=content: ssh.execute_content(c),
                 )
                 duration = int(time.time() - t_start)
@@ -174,6 +200,12 @@ class BuildPipeline:
                     )
                 log.info(f"[{job_id}] Script '{script['identifier']}' completed in {duration}s")
                 self._log(job_id, "INFO", f"Script '{script['identifier']}' completed in {duration}s", "EXECUTE_SCRIPTS")
+
+                # Reset lastProgressAt after each script so the 10-minute silence timer
+                # only fires if THIS script hangs, not the entire EXECUTE_SCRIPTS batch.
+                script_done_pct = 45 + int(15 * i / total_scripts)
+                self._progress(job_id, "EXECUTE_SCRIPTS", script_done_pct)
+
                 scripts_executed.append({
                     "scriptId": script_id,
                     "scriptIdentifier": script["identifier"],
@@ -194,13 +226,14 @@ class BuildPipeline:
             for script in scripts:
                 script_id = str(script["scriptId"])
                 raw_flag = flags_raw[script_id]
-                placement = script["flagLocation"]
+                placement = validate_guest_path(script["flagLocation"], field_name="flagLocation")
+                flag_mode = script.get("flagPermissions") or "644"
+                flag_owner = script.get("flagOwnership")
                 log.info(f"[{job_id}] Placing flag for '{script['identifier']}' at {placement}")
-                # write_remote_file pipes the value via stdin — raw flag never appears in the command string
-                ssh.write_remote_file(raw_flag, placement)
+                ssh.write_remote_file(raw_flag, placement, mode=flag_mode, ownership=flag_owner)
 
                 # Verify the flag actually landed — read it back and compare
-                exit_code, readback, _ = ssh.execute(f"sudo cat {placement}")
+                exit_code, readback, _ = ssh.execute(f"sudo cat {shlex.quote(placement)}")
                 if exit_code != 0 or readback.strip() != raw_flag.strip():
                     raise RuntimeError(
                         f"Flag verification failed for '{script['identifier']}' at {placement}: "
@@ -282,13 +315,13 @@ class BuildPipeline:
 
         # Stage 12: EXPORTING — this stage name triggers the BUILDING→EXPORTING state transition in the backend
         self._progress(job_id, "EXPORTING", 77)
-        ova_path = f"{self._config.export_path}/{job_id}/{vm_name}.ova"
+        ova_path = str(resolve_under_base(self._config.export_path, job_id, f"{vm_name}.ova"))
         self._proxmox.export_ova(build_vmid, ova_path, storage=disk_storage)
 
         # Stage 13: COMPUTE_HASHES
         # NOTE: ova_path must be accessible from the worker machine (e.g. via NFS mount)
         self._progress(job_id, "COMPUTE_HASHES", 91)
-        ova_checksum = compute_sha256(ova_path)
+        ova_checksum = compute_sha256(ova_path, allowed_base=self._config.export_path)
         ova_size = os.path.getsize(ova_path)
         self._log(job_id, "INFO",
                   f"OVA exported: {ova_path} ({ova_size // (1024 * 1024)} MB, SHA-256: {ova_checksum})",
@@ -334,15 +367,18 @@ class BuildPipeline:
         self._log(job_id, "INFO", "Build complete — build VM deleted, all stages finished")
         log.info(f"Build {job_id} complete")
 
-    def _with_heartbeat(self, job_id: str, stage: str, percent: int, fn):
-        """Run fn() while sending a progress update every 60s to reset the backend's
-        stale-detection timer (which checks lastProgressAt, not log activity)."""
+    def _with_heartbeat(self, job_id: str, fn):
+        """Run fn() while pinging the backend every 60s for worker liveness.
+        Uses ping_job() (not update_progress()) so lastProgressAt is NOT reset —
+        the backend's 10-minute script-silence timer therefore fires correctly if a
+        script hangs. lastProgressAt is only updated via _progress() on real stage
+        transitions (i.e. after each script completes successfully)."""
         stop = threading.Event()
 
         def _beat():
             while not stop.wait(60):
-                log.info(f"[{job_id}] Heartbeat — still executing '{stage}'")
-                self._backend.update_progress(job_id, stage, percent)
+                log.info(f"[{job_id}] Heartbeat — still executing script")
+                self._backend.ping_job(job_id)
 
         t = threading.Thread(target=_beat, daemon=True)
         t.start()
@@ -369,3 +405,7 @@ class BuildPipeline:
                 log.error(f"Cleanup failed for VM {self._build_vmid}: {e}")
             self._build_vmid = None
             self._build_node = None
+
+    def _cleanup_export_artifacts(self, job_id: str) -> None:
+        """Remove partial or failed export files from the worker export directory (NFR7)."""
+        cleanup_export_dir(self._config.export_path, job_id)

@@ -49,8 +49,10 @@ public interface TemplateRepository extends JpaRepository<Template, UUID> {
      */
     boolean existsByProxmoxVmidAndProxmoxNode(Integer proxmoxVmid, String proxmoxNode);
 
+    @Query("SELECT t FROM Template t LEFT JOIN FETCH t.capabilities WHERE t.id = :id")
+    Optional<Template> findByIdWithCapabilities(@Param("id") UUID id);
+
     /**
-     * Atomically sets sha256_hash only when the current value is 'PENDING'.
      * Returns the number of rows updated (1 = written, 0 = already set by another worker).
      */
     @Modifying

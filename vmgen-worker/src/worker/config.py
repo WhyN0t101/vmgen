@@ -110,5 +110,9 @@ class Config:
         # Build output
         if not self.export_path:
             errors.append("EXPORT_PATH is required")
+        else:
+            export = Path(self.export_path).expanduser()
+            if not export.is_absolute():
+                errors.append("EXPORT_PATH must be an absolute path")
 
         return errors

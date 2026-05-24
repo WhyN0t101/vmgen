@@ -170,6 +170,24 @@ class BackendClient:
         except Exception as e:
             log.warning("Failed to report template hash for %s (non-fatal): %s", template_id, e)
 
+    def ping_job(self, job_id: str) -> None:
+        """
+        Lightweight liveness ping for an in-flight job.
+        Updates workerLastHeartbeatAt only — does NOT reset lastProgressAt — so the
+        backend's 10-minute script-silence timer is not affected.
+        Non-fatal: a failure here must never abort the build.
+        """
+        try:
+            resp = requests.patch(
+                f"{self.url}/api/worker/jobs/{job_id}/ping",
+                json={"workerId": self.worker_id},
+                headers=self._headers,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            resp.raise_for_status()
+        except Exception as e:
+            log.warning("[%s] Ping failed (non-fatal): %s", job_id, e)
+
     def fail_job(self, job_id: str, error_type: str, message: str, logs: str = ""):
         # error_type: "script_failed" | "timeout" | "proxmox_error"
         log.info(f"[{job_id}] Reporting failure: type={error_type}")

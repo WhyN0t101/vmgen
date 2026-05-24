@@ -8,9 +8,13 @@ import io.vmgen.api.exceptions.ConflictException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ScriptConflictException;
 import io.vmgen.api.models.script.Script;
+import io.vmgen.api.models.script.ScriptCapability;
+import io.vmgen.api.models.script.ScriptRequirement;
 import io.vmgen.api.models.user.User;
 import io.vmgen.api.models.vulnerability.VulnerabilityCategory;
 import io.vmgen.api.repository.script.ScriptRepository;
+import io.vmgen.api.repository.script.ScriptCapabilityRepository;
+import io.vmgen.api.repository.script.ScriptRequirementRepository;
 import io.vmgen.api.repository.UserRepository;
 import io.vmgen.api.repository.vm.VulnerabilityCategoryRepository;
 import java.time.Instant;
@@ -37,6 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ScriptService {
 
     private final ScriptRepository scriptRepository;
+    private final ScriptRequirementRepository scriptRequirementRepository;
+    private final ScriptCapabilityRepository scriptCapabilityRepository;
     private final VulnerabilityCategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final ScriptCompatibilityService compatibilityService;
@@ -97,6 +103,8 @@ public class ScriptService {
         script.setCreatedBy(admin);
 
         Script saved = scriptRepository.save(script);
+
+        syncScriptConstraints(saved.getId(), request.getRequiredOsFamilies(), request.getRequiredCapabilities());
 
         // Optional: create compatibility and parameter definitions atomically with the script.
         createCompatibilityAndParametersIfPresent(saved.getId(), request, admin.getId());
@@ -175,6 +183,7 @@ public class ScriptService {
         buildScript(category, script, request.getName(), request.getDescription(), request.getDifficultyLevel(), request.getScriptContent(), request.getFlagLocation(), request.getFlagOwnership(), request.getFlagPermissions(), request.getMinRamMb(), request.getMinDiskGb());
 
         Script saved = scriptRepository.save(script);
+        syncScriptConstraints(saved.getId(), request.getRequiredOsFamilies(), request.getRequiredCapabilities());
         auditService.logScriptUpdated(admin, saved.getId(), ctx);
         log.info("Updated script {}@{}", saved.getIdentifier(), saved.getVersion());
         return toDetailDto(saved);
@@ -197,6 +206,42 @@ public class ScriptService {
         log.info("Deprecated script {}@{}", script.getIdentifier(), script.getVersion());
     }
 
+    private void syncScriptConstraints(UUID scriptId, List<String> osFamilies, List<String> capabilities) {
+        scriptRequirementRepository.deleteByScriptId(scriptId);
+        scriptCapabilityRepository.deleteByScriptId(scriptId);
+
+        if (osFamilies != null) {
+            for (String family : osFamilies) {
+                if (family == null || family.isBlank()) continue;
+                ScriptRequirement req = new ScriptRequirement();
+                req.setScriptId(scriptId);
+                req.setRequirementType(ScriptRequirement.TYPE_OS_FAMILY);
+                req.setRequirementValue(family.trim().toLowerCase());
+                scriptRequirementRepository.save(req);
+            }
+        }
+
+        if (capabilities != null) {
+            for (String capability : capabilities) {
+                if (capability == null || capability.isBlank()) continue;
+                scriptCapabilityRepository.save(new ScriptCapability(scriptId, capability.trim()));
+            }
+        }
+    }
+
+    private List<String> loadRequiredOsFamilies(UUID scriptId) {
+        return scriptRequirementRepository.findByScriptId(scriptId).stream()
+                .filter(r -> ScriptRequirement.TYPE_OS_FAMILY.equals(r.getRequirementType()))
+                .map(ScriptRequirement::getRequirementValue)
+                .toList();
+    }
+
+    private List<String> loadRequiredCapabilities(UUID scriptId) {
+        return scriptCapabilityRepository.findByScriptId(scriptId).stream()
+                .map(ScriptCapability::getCapability)
+                .toList();
+    }
+
     /**
      * Maps a {@link Script} entity to a lightweight list DTO.
      */
@@ -206,7 +251,6 @@ public class ScriptService {
 
     /**
      * Maps a {@link Script} entity to a full detail DTO.
-     * Placeholder empty lists are used for requirements pending entity introduction.
      */
     private ScriptDetailDto toDetailDto(Script script) {
         VulnerabilityCategory category = script.getCategory();
@@ -230,8 +274,8 @@ public class ScriptService {
                 .createdAt(script.getCreatedAt())
                 .createdByUsername(script.getCreatedBy() != null ? script.getCreatedBy().getUsername() : null)
                 .deprecatedAt(script.getDeprecatedAt())
-                .requiredOsFamilies(List.of())
-                .requiredCapabilities(List.of())
+                .requiredOsFamilies(loadRequiredOsFamilies(script.getId()))
+                .requiredCapabilities(loadRequiredCapabilities(script.getId()))
                 .minRamMb(script.getMinRamMb())
                 .minDiskGb(script.getMinDiskGb())
                 .build();

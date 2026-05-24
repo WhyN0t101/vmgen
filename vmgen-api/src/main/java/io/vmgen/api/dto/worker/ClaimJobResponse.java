@@ -48,6 +48,8 @@ public class ClaimJobResponse {
         private String version;
         private String sha256;
         private String flagLocation;
+        private String flagOwnership;
+        private String flagPermissions;
         private Integer executionOrder;
         private String scriptContent;
         private Map<String, String> parameterValues;

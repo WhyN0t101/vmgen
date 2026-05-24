@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
@@ -109,6 +110,25 @@ public class TelemetryService {
         TelemetryUpload upload = telemetryRepository.findByVmRequest_IdAndDeletedAtIsNull(buildId)
                 .orElseThrow(() -> new ResourceNotFoundException("No telemetry found for build: " + buildId));
         return toResponse(upload);
+    }
+
+    /**
+     * Soft-deletes telemetry uploads older than the given retention period.
+     * Intended to be called by a scheduled task. Implements the platform's
+     * 90-day telemetry retention policy disclosed in the Trust Model page.
+     */
+    @Transactional
+    public int deleteExpiredTelemetry(Duration retentionPeriod) {
+        Instant cutoff = Instant.now().minus(retentionPeriod);
+        List<TelemetryUpload> expired = telemetryRepository.findActiveUploadedBefore(cutoff);
+        Instant now = Instant.now();
+        expired.forEach(t -> t.setDeletedAt(now));
+        telemetryRepository.saveAll(expired);
+        if (!expired.isEmpty()) {
+            log.info("Auto-deleted {} expired telemetry uploads (retention: {} days)",
+                    expired.size(), retentionPeriod.toDays());
+        }
+        return expired.size();
     }
 
     private TelemetryUploadResponse toResponse(TelemetryUpload upload) {

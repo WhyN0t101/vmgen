@@ -183,13 +183,20 @@ function formatBytes(bytes: number): string {
             </div>
 
             <!-- Service health -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
                 <p class="text-[11px] font-mono tracking-widest uppercase text-slate-500">Database</p>
                 <p
                   class="text-lg font-semibold font-mono"
                   :class="metrics.dbStatus === 'UP' ? 'text-emerald-400' : 'text-red-400'"
                 >{{ metrics.dbStatus }}</p>
+              </div>
+              <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
+                <p class="text-[11px] font-mono tracking-widest uppercase text-slate-500">Authentication</p>
+                <p
+                  class="text-lg font-semibold font-mono"
+                  :class="metrics.authStatus === 'UP' ? 'text-emerald-400' : 'text-red-400'"
+                >{{ metrics.authStatus }}</p>
               </div>
               <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 space-y-1">
                 <p class="text-[11px] font-mono tracking-widest uppercase text-slate-500">Storage Total</p>

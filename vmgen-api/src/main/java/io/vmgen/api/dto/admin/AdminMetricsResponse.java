@@ -17,4 +17,6 @@ public class AdminMetricsResponse {
     private String dbStatus;
     private long storageTotalBytes;
     private long storageUsableBytes;
+    /** Authentication service health (embedded in API — UP when the application responds). */
+    private String authStatus;
 }

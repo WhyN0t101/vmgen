@@ -9,6 +9,7 @@ import io.vmgen.api.dto.worker.HeartbeatRequest;
 import io.vmgen.api.dto.worker.JobCompleteRequest;
 import io.vmgen.api.dto.worker.JobFailRequest;
 import io.vmgen.api.dto.worker.ProgressUpdateRequest;
+import io.vmgen.api.dto.worker.PingJobRequest;
 import io.vmgen.api.dto.worker.UpdateTemplateHashRequest;
 import io.vmgen.api.dto.worker.WorkerAckResponse;
 import io.vmgen.api.service.WorkerService;
@@ -98,6 +99,14 @@ public class WorkerController {
 
         DeriveFlagsResponse response = workerService.deriveBuildSecrets(requestId, request);
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/jobs/{id}/ping")
+    public ResponseEntity<Void> pingJob(
+            @PathVariable("id") UUID requestId,
+            @Valid @RequestBody PingJobRequest request) {
+        workerService.pingJob(requestId, request.getWorkerId());
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/templates/{id}/hash")

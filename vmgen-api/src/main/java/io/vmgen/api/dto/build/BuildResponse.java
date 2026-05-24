@@ -27,9 +27,16 @@ public class BuildResponse {
     private String currentWorkerStage;
 
     private Instant submittedAt;
+    private Instant claimedAt;
+    private Instant buildingStartedAt;
+    private Instant exportingStartedAt;
     private Instant completedAt;
     private Instant failedAt;
+    private Instant archivedAt;
     private String failureReason;
+
+    /** Estimated completion time for in-progress builds (heuristic). */
+    private Instant estimatedCompletionAt;
 
     /** OVA artifact fields — populated once state is READY. */
     private String ovaFilename;

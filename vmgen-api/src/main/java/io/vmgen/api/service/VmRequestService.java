@@ -19,8 +19,11 @@ import io.vmgen.api.dto.script.ScriptParameterDto;
 import io.vmgen.api.dto.script.ScriptSelectionResult;
 import io.vmgen.api.exceptions.*;
 import io.vmgen.api.models.script.Script;
+import io.vmgen.api.models.script.ScriptCapability;
+import io.vmgen.api.models.script.ScriptRequirement;
 import io.vmgen.api.models.template.ScriptCompatibility;
 import io.vmgen.api.models.template.Template;
+import io.vmgen.api.models.template.TemplateCapability;
 import io.vmgen.api.models.template.TemplateStatus;
 import io.vmgen.api.models.user.User;
 import io.vmgen.api.models.vm.VmRequest;
@@ -30,6 +33,8 @@ import io.vmgen.api.repository.vm.VmRequestRepository;
 import io.vmgen.api.repository.vm.VmRequestScriptParameterRepository;
 import io.vmgen.api.repository.vm.VmRequestScriptRepository;
 import io.vmgen.api.repository.script.ScriptCompatibilityRepository;
+import io.vmgen.api.repository.script.ScriptCapabilityRepository;
+import io.vmgen.api.repository.script.ScriptRequirementRepository;
 import io.vmgen.api.repository.script.ScriptRepository;
 import io.vmgen.api.repository.template.TemplateRepository;
 import io.vmgen.api.service.script.ScriptCompatibilityService;
@@ -38,6 +43,7 @@ import io.vmgen.api.service.script.ScriptParameterService.ParameterProcessingRes
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
+import java.time.Instant;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -62,6 +68,8 @@ public class VmRequestService {
     private final VmRequestScriptParameterRepository scriptParameterRepository;
     private final TemplateRepository templateRepository;
     private final ScriptRepository scriptRepository;
+    private final ScriptRequirementRepository scriptRequirementRepository;
+    private final ScriptCapabilityRepository scriptCapabilityRepository;
     private final ScriptCompatibilityRepository compatibilityRepository;
     private final ScriptCompatibilityService scriptCompatibilityService;
     private final ScriptParameterService scriptParameterService;
@@ -86,8 +94,8 @@ public class VmRequestService {
                     List.of("Duplicate script IDs in request"));
         }
 
-        // 1. Validate template exists and is ACTIVE.
-        Template template = templateRepository.findById(request.getTemplateId())
+        // 1. Validate template exists and is ACTIVE (with capabilities for constraint checks).
+        Template template = templateRepository.findByIdWithCapabilities(request.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
         if (template.getStatus() != TemplateStatus.ACTIVE) {
             throw new ValidationException("Validation failed",
@@ -158,6 +166,9 @@ public class VmRequestService {
             throw new ValidationException("Validation failed",
                     List.of("One or more required dependency scripts are not found or inactive: " + missing));
         }
+
+        // 5b. Validate script OS/capability constraints and difficulty against template/build.
+        validateScriptConstraints(template, scripts, request.getDifficulty());
 
         // 6. Build the VmRequest, save it first to obtain the generated ID.
         VmRequest vmRequest = new VmRequest();
@@ -372,6 +383,30 @@ public class VmRequestService {
                         .build())
                 .toList();
 
+        List<ProvenanceResponse.ParameterInfo> parameterInfos =
+                provenance.getParameters() != null
+                        ? provenance.getParameters().stream()
+                                .map(p -> ProvenanceResponse.ParameterInfo.builder()
+                                        .name(p.getParameterName())
+                                        .value(p.getParameterValue())
+                                        .build())
+                                .toList()
+                        : List.of();
+
+        List<ProvenanceResponse.DependencyInfo> dependencyInfos =
+                provenance.getDependencies() != null
+                        ? provenance.getDependencies().stream()
+                                .map(d -> ProvenanceResponse.DependencyInfo.builder()
+                                        .type(d.getDependencyType())
+                                        .name(d.getDependencyName())
+                                        .version(d.getDependencyVersion())
+                                        .sourceUrl(d.getSourceUrl())
+                                        .sha256(d.getSha256Hash())
+                                        .retrievedAt(d.getRetrievedAt())
+                                        .build())
+                                .toList()
+                        : List.of();
+
         return ProvenanceResponse.builder()
                 .buildId(requestId)
                 .templateIdentifier(provenance.getTemplateIdentifier())
@@ -387,6 +422,8 @@ public class VmRequestService {
                 .buildStartedAt(provenance.getBuildStartedAt())
                 .buildFinishedAt(provenance.getBuildFinishedAt())
                 .scripts(scriptInfos)
+                .parameters(parameterInfos)
+                .dependencies(dependencyInfos)
                 .build();
     }
 
@@ -508,13 +545,128 @@ public class VmRequestService {
                 .telemetryEnabled(Boolean.TRUE.equals(r.getTelemetryEnabled()))
                 .currentWorkerStage(r.getCurrentWorkerStage())
                 .submittedAt(r.getSubmittedAt())
+                .claimedAt(r.getClaimedAt())
+                .buildingStartedAt(r.getBuildingStartedAt())
+                .exportingStartedAt(r.getExportingStartedAt())
                 .completedAt(r.getCompletedAt())
                 .failedAt(r.getFailedAt())
+                .archivedAt(r.getArchivedAt())
+                .estimatedCompletionAt(estimateCompletionAt(r))
                 .failureReason(r.getFailureReason())
                 .ovaFilename(r.getOvaFilename())
                 .ovaSha256(r.getOvaSha256())
                 .ovaSizeBytes(r.getOvaSizeBytes())
                 .build();
+    }
+
+    private void validateScriptConstraints(Template template, List<Script> scripts, String buildDifficulty) {
+        List<UUID> scriptIds = scripts.stream().map(Script::getId).toList();
+        Map<UUID, List<ScriptRequirement>> requirementsByScript = scriptRequirementRepository
+                .findByScriptIdIn(scriptIds).stream()
+                .collect(Collectors.groupingBy(ScriptRequirement::getScriptId));
+        Map<UUID, List<ScriptCapability>> capabilitiesByScript = scriptCapabilityRepository
+                .findByScriptIdIn(scriptIds).stream()
+                .collect(Collectors.groupingBy(ScriptCapability::getScriptId));
+
+        Set<String> templateCapabilities = template.getCapabilities() != null
+                ? template.getCapabilities().stream()
+                        .map(TemplateCapability::getCapability)
+                        .map(String::toLowerCase)
+                        .collect(Collectors.toSet())
+                : Set.of();
+        String templateOs = template.getOsFamily() != null ? template.getOsFamily().toLowerCase() : "";
+
+        List<String> errors = new ArrayList<>();
+        int buildRank = difficultyRank(buildDifficulty);
+
+        for (Script script : scripts) {
+            int scriptRank = difficultyRank(script.getDifficultyLevel());
+            if (scriptRank > buildRank) {
+                errors.add("Script '" + script.getIdentifier() + "' requires difficulty "
+                        + script.getDifficultyLevel() + " but build is set to " + buildDifficulty);
+            }
+
+            List<ScriptRequirement> requirements = requirementsByScript.getOrDefault(script.getId(), List.of());
+            List<String> requiredOs = requirements.stream()
+                    .filter(r -> ScriptRequirement.TYPE_OS_FAMILY.equals(r.getRequirementType()))
+                    .map(ScriptRequirement::getRequirementValue)
+                    .toList();
+            if (!requiredOs.isEmpty() && !requiredOs.contains(templateOs)) {
+                errors.add("Script '" + script.getIdentifier() + "' requires OS family "
+                        + requiredOs + " but template is " + template.getOsFamily());
+            }
+
+            for (ScriptCapability required : capabilitiesByScript.getOrDefault(script.getId(), List.of())) {
+                String cap = required.getCapability().toLowerCase();
+                if (!templateCapabilities.contains(cap)) {
+                    errors.add("Script '" + script.getIdentifier() + "' requires capability '"
+                            + required.getCapability() + "' not present on template");
+                }
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new ValidationException("Script constraint validation failed", errors);
+        }
+    }
+
+    private static int difficultyRank(String difficulty) {
+        if (difficulty == null) return 0;
+        return switch (difficulty.toLowerCase()) {
+            case "easy" -> 1;
+            case "medium" -> 2;
+            case "hard" -> 3;
+            default -> 0;
+        };
+    }
+
+    private Instant estimateCompletionAt(VmRequest request) {
+        VmRequestState state = request.getState();
+        if (state != VmRequestState.QUEUED && state != VmRequestState.BUILDING && state != VmRequestState.EXPORTING) {
+            return null;
+        }
+
+        double avgBuildSec = Optional.ofNullable(vmRequestRepository.averageBuildDurationSeconds())
+                .filter(v -> v > 0)
+                .orElse(1800.0);
+
+        if (state == VmRequestState.QUEUED) {
+            return Instant.now().plusSeconds((long) avgBuildSec);
+        }
+
+        int progress = estimateProgressPercent(request);
+        long remaining = Math.max(120L, (long) (avgBuildSec * (100 - progress) / 100.0));
+        return Instant.now().plusSeconds(remaining);
+    }
+
+    private static int estimateProgressPercent(VmRequest request) {
+        if (request.getState() == VmRequestState.EXPORTING) {
+            return 85;
+        }
+        String stage = request.getCurrentWorkerStage();
+        if (stage == null) {
+            return 15;
+        }
+        return switch (stage.toUpperCase()) {
+            case "VERIFY_TEMPLATE" -> 5;
+            case "CLONE_TEMPLATE" -> 10;
+            case "CONFIGURE_NETWORK" -> 18;
+            case "START_VM" -> 22;
+            case "WAIT_FOR_SSH" -> 27;
+            case "EXECUTE_SCRIPTS" -> 45;
+            case "GENERATE_FLAGS" -> 60;
+            case "PLACE_FLAGS" -> 65;
+            case "INSTALL_TELEMETRY" -> 67;
+            case "SANITIZE_VM" -> 70;
+            case "SHUTDOWN_VM" -> 75;
+            case "REMOVE_NETWORK" -> 80;
+            case "EXPORTING" -> 87;
+            case "COMPUTE_HASHES" -> 91;
+            case "ASSEMBLE_PROVENANCE" -> 94;
+            case "REGISTER_COMPLETION" -> 97;
+            case "CLEANUP" -> 99;
+            default -> 15;
+        };
     }
 
     private static String generateBuildSeed() {

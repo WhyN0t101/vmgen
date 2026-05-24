@@ -359,12 +359,31 @@ export interface Build {
   telemetryEnabled: boolean
   currentWorkerStage?: string
   submittedAt: string
+  claimedAt?: string
+  buildingStartedAt?: string
+  exportingStartedAt?: string
   completedAt?: string
   failedAt?: string
+  archivedAt?: string
+  estimatedCompletionAt?: string
   failureReason?: string
   ovaFilename?: string
   ovaSha256?: string
   ovaSizeBytes?: number
+}
+
+export interface ProvenanceParameterInfo {
+  name: string
+  value: string
+}
+
+export interface ProvenanceDependencyInfo {
+  type: string
+  name: string
+  version?: string
+  sourceUrl?: string
+  sha256?: string
+  retrievedAt?: string
 }
 
 export interface ProvenanceScriptInfo {
@@ -392,6 +411,8 @@ export interface ProvenanceResponse {
   buildStartedAt: string
   buildFinishedAt: string
   scripts: ProvenanceScriptInfo[]
+  parameters?: ProvenanceParameterInfo[]
+  dependencies?: ProvenanceDependencyInfo[]
 }
 
 export interface User {
@@ -469,6 +490,7 @@ export interface AdminMetrics {
   completionRate24h: number
   workers: WorkerStatus[]
   dbStatus: 'UP' | 'DOWN'
+  authStatus: 'UP' | 'DOWN'
   storageTotalBytes: number
   storageUsableBytes: number
 }

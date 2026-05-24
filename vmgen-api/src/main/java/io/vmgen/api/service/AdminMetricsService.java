@@ -104,6 +104,13 @@ public class AdminMetricsService {
         return storageMetric(false);
     }
 
+    /**
+     * Authentication is embedded in the API; if this endpoint responds, auth is operational.
+     */
+    public String getAuthStatus() {
+        return "UP";
+    }
+
     private long storageMetric(boolean total) {
         try {
             Path path = Paths.get(ovaStorageDir);

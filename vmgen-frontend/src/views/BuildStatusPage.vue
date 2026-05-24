@@ -147,7 +147,7 @@ async function downloadOva() {
   downloading.value = true
   try {
     const filename = build.value.ovaFilename ?? `vm-${build.value.id}.ova`
-    await api.downloadBuild(build.value.id, filename)
+    await api.downloadBuild(build.value.id, filename, build.value.ovaSha256)
   } finally {
     downloading.value = false
   }
@@ -244,6 +244,22 @@ const elapsedLabel = computed(() => {
   return `${m}m ${rem}s`
 })
 
+const etaLabel = computed(() => {
+  if (!build.value?.estimatedCompletionAt || !isActive.value) return null
+  const etaMs = new Date(build.value.estimatedCompletionAt).getTime() - Date.now()
+  if (etaMs <= 0) return 'any moment'
+  const s = Math.ceil(etaMs / 1000)
+  if (s < 60) return `~${s}s`
+  const m = Math.floor(s / 60)
+  const rem = s % 60
+  return rem > 0 ? `~${m}m ${rem}s` : `~${m}m`
+})
+
+function formatTimestamp(value?: string) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString()
+}
+
 function formatBytes(bytes?: number) {
   if (!bytes) return ''
   if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
@@ -295,6 +311,37 @@ function formatBytes(bytes?: number) {
           </div>
         </BaseCard>
 
+        <!-- State transition timestamps -->
+        <BaseCard padding="md">
+          <p class="text-xs font-mono tracking-widest uppercase text-slate-400 mb-3">Timeline</p>
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Submitted</dt>
+              <dd class="text-slate-300 font-mono text-xs">{{ formatTimestamp(build.submittedAt) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Claimed</dt>
+              <dd class="text-slate-300 font-mono text-xs">{{ formatTimestamp(build.claimedAt) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Building started</dt>
+              <dd class="text-slate-300 font-mono text-xs">{{ formatTimestamp(build.buildingStartedAt) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Exporting started</dt>
+              <dd class="text-slate-300 font-mono text-xs">{{ formatTimestamp(build.exportingStartedAt) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Completed</dt>
+              <dd class="text-slate-300 font-mono text-xs">{{ formatTimestamp(build.completedAt) }}</dd>
+            </div>
+            <div class="flex justify-between gap-4">
+              <dt class="text-slate-500">Failed</dt>
+              <dd class="text-slate-300 font-mono text-xs">{{ formatTimestamp(build.failedAt) }}</dd>
+            </div>
+          </dl>
+        </BaseCard>
+
         <!-- Active build progress -->
         <BaseCard v-if="isActive" padding="md" class="space-y-5">
           <!-- Header row -->
@@ -305,6 +352,7 @@ function formatBytes(bytes?: number) {
             </div>
             <div class="flex items-center gap-4 text-xs text-slate-500">
               <span>Elapsed: <span class="text-slate-300 font-mono">{{ elapsedLabel }}</span></span>
+              <span v-if="etaLabel">ETA: <span class="text-slate-300 font-mono">{{ etaLabel }}</span></span>
               <span>{{ progressPercent }}%</span>
             </div>
           </div>

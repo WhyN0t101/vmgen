@@ -77,6 +77,12 @@ public class ProvenanceRecord {
     @OrderBy("executionOrder ASC")
     private List<ProvenanceScript> scripts = new ArrayList<>();
 
+    @OneToMany(mappedBy = "provenanceRecord", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProvenanceParameter> parameters = new ArrayList<>();
+
+    @OneToMany(mappedBy = "provenanceRecord", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProvenanceDependency> dependencies = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         if (finalisedAt == null) {

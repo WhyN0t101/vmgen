@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Static informational page — no data fetching required
+// Static informational page,   no data fetching required
 </script>
 
 <template>
@@ -32,7 +32,7 @@
           <ul class="list-disc list-inside space-y-1 text-slate-400 text-sm">
             <li>The OVA was produced from the registered template and script versions recorded in the provenance manifest.</li>
             <li>Flags were derived using HMAC-SHA256 keyed with a platform secret that never leaves the API server.</li>
-            <li>The build network was isolated — build VMs could not reach the backend API, the database, or other builds.</li>
+            <li>The build network was isolated,   build VMs could not reach the backend API, the database, or other builds.</li>
             <li>The exported OVA SHA-256 hash matches the value in the provenance manifest and the download response header.</li>
           </ul>
         </div>
@@ -41,7 +41,7 @@
           <ul class="list-disc list-inside space-y-1 text-amber-400/80 text-sm">
             <li>Integrity of the VM after it is imported into a third-party hypervisor.</li>
             <li>Availability of external package repositories used during provisioning.</li>
-            <li>Identical low-level artefacts across builds — only functional equivalence (same vulnerability, same exploitation requirements) is guaranteed for identical inputs.</li>
+            <li>Identical low-level artefacts across builds,   only functional equivalence (same vulnerability, same exploitation requirements) is guaranteed for identical inputs.</li>
           </ul>
         </div>
       </section>
@@ -79,10 +79,21 @@
           exploitation activity, or that it has not been modified. Instructors should treat
           telemetry as indicative evidence only, not as proof of exploitation methodology.
         </div>
-        <p class="text-sm text-slate-500">
-          Telemetry collection is disabled by default and requires explicit opt-in at build creation time.
-          Users may delete their uploaded telemetry at any time from the build status page.
-        </p>
+
+        <!-- Telemetry data policy -->
+        <div class="rounded-xl border border-slate-700/50 bg-slate-800/40 px-5 py-4 text-sm text-slate-300 space-y-3">
+          <p class="font-medium">Telemetry data policy</p>
+          <ul class="list-disc list-inside space-y-1 text-slate-400 text-sm">
+            <li><span class="text-slate-300">What is collected:</span> the JSON payload you upload — typically a shell-history excerpt produced by the collector script. No other guest data is captured by the platform.</li>
+            <li><span class="text-slate-300">Who can access it:</span> you (via the build status page) and platform administrators for operational support and abuse investigation. Telemetry is not shared with third parties.</li>
+            <li><span class="text-slate-300">Retention:</span> uploaded telemetry is retained until you delete it or until the platform's automatic 90-day retention policy removes it, whichever comes first.</li>
+            <li><span class="text-slate-300">Opt-in only:</span> telemetry collection is disabled by default and must be explicitly enabled at build creation time. Builds without telemetry enabled cannot upload data.</li>
+          </ul>
+          <p class="text-slate-500 text-xs">
+            You may delete your uploaded telemetry at any time from the build status page.
+            Deletion is immediate and permanent.
+          </p>
+        </div>
       </section>
 
       <!-- Flag submission -->
@@ -104,7 +115,7 @@
           Given identical platform-controlled inputs (template version, script versions, parameters,
           and random seed), the platform produces functionally equivalent VMs that expose identical
           vulnerabilities and require identical exploitation techniques. Flags are explicitly excluded
-          from reproducibility — they incorporate a generation timestamp to ensure uniqueness across
+          from reproducibility,   they incorporate a generation timestamp to ensure uniqueness across
           builds. Bit-for-bit identical OVA files are not guaranteed.
         </p>
         <p class="text-sm text-slate-500">

@@ -23,6 +23,26 @@ public class ProvenanceResponse {
     private Instant buildStartedAt;
     private Instant buildFinishedAt;
     private List<ScriptInfo> scripts;
+    private List<ParameterInfo> parameters;
+    private List<DependencyInfo> dependencies;
+
+    @Data
+    @Builder
+    public static class ParameterInfo {
+        private String name;
+        private String value;
+    }
+
+    @Data
+    @Builder
+    public static class DependencyInfo {
+        private String type;
+        private String name;
+        private String version;
+        private String sourceUrl;
+        private String sha256;
+        private Instant retrievedAt;
+    }
 
     @Data
     @Builder

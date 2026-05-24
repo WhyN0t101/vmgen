@@ -1,8 +1,28 @@
 import logging
+import re
+import shlex
 import time
 import paramiko
 
+from utils.path_safe import validate_guest_path
+
 log = logging.getLogger(__name__)
+
+
+_OWNERSHIP_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+(:[a-zA-Z0-9_.-]+)?$")
+_PERMISSIONS_PATTERN = re.compile(r"^[0-7]{3,4}$")
+
+
+def _validate_guest_ownership(ownership: str) -> str:
+    if not _OWNERSHIP_PATTERN.match(ownership):
+        raise ValueError(f"Invalid ownership '{ownership}'")
+    return ownership
+
+
+def _validate_guest_permissions(mode: str) -> str:
+    if not _PERMISSIONS_PATTERN.match(mode):
+        raise ValueError(f"Invalid permissions '{mode}'")
+    return mode
 
 
 class SSHExecutor:
@@ -94,18 +114,31 @@ class SSHExecutor:
         exit_code = stdout.channel.recv_exit_status()
         return exit_code, stdout.read().decode(), stderr.read().decode()
     
-    def write_remote_file(self, content: str, remote_path: str, mode: str = "644") -> None:
+    def write_remote_file(
+        self,
+        content: str,
+        remote_path: str,
+        mode: str = "644",
+        ownership: str | None = None,
+    ) -> None:
         """Write content to a remote file by piping via stdin — value never appears in the command string."""
-        log.debug(f"Writing {len(content)} bytes to {self.host}:{remote_path}")
-        stdin, stdout, stderr = self._client.exec_command(
-            f"sudo tee {remote_path} > /dev/null && sudo chmod {mode} {remote_path}"
-        )
+        safe_path = validate_guest_path(remote_path, field_name="remote_path")
+        safe_mode = _validate_guest_permissions(mode)
+        log.debug(f"Writing {len(content)} bytes to {self.host}:{safe_path}")
+        command_parts = [
+            f"sudo tee {shlex.quote(safe_path)} > /dev/null",
+            f"sudo chmod {safe_mode} {shlex.quote(safe_path)}",
+        ]
+        if ownership:
+            safe_owner = _validate_guest_ownership(ownership)
+            command_parts.append(f"sudo chown {shlex.quote(safe_owner)} {shlex.quote(safe_path)}")
+        stdin, stdout, stderr = self._client.exec_command(" && ".join(command_parts))
         stdin.write(content.encode())
         stdin.channel.shutdown_write()
         exit_code = stdout.channel.recv_exit_status()
         if exit_code != 0:
             error = stderr.read().decode().strip()
-            raise RuntimeError(f"Failed to write {remote_path}: {error}")
+            raise RuntimeError(f"Failed to write {safe_path}: {error}")
 
     def execute_content(self, script_content: str) -> tuple[int, str, str]:
         """Execute script content by piping it to bash stdin — no local file or SFTP needed."""
