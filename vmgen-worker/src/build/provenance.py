@@ -2,7 +2,8 @@ import hashlib
 from pathlib import Path
 
 
-def compute_sha256(file_path: str, *, allowed_base: str | Path | None = None) -> str:    """SHA-256 of a file, read in chunks to handle large OVAs."""
+def compute_sha256(file_path: str, *, allowed_base: str | Path | None = None) -> str:
+    """SHA-256 of a file, read in chunks to handle large OVAs."""
     path = Path(file_path).expanduser().resolve()
     if allowed_base is not None:
         base = Path(allowed_base).expanduser().resolve()

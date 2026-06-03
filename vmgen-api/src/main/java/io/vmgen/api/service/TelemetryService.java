@@ -118,7 +118,7 @@ public class TelemetryService {
      * 90-day telemetry retention policy disclosed in the Trust Model page.
      */
     @Transactional
-    public int deleteExpiredTelemetry(Duration retentionPeriod) {
+    public void deleteExpiredTelemetry(Duration retentionPeriod) {
         Instant cutoff = Instant.now().minus(retentionPeriod);
         List<TelemetryUpload> expired = telemetryRepository.findActiveUploadedBefore(cutoff);
         Instant now = Instant.now();
@@ -128,7 +128,6 @@ public class TelemetryService {
             log.info("Auto-deleted {} expired telemetry uploads (retention: {} days)",
                     expired.size(), retentionPeriod.toDays());
         }
-        return expired.size();
     }
 
     private TelemetryUploadResponse toResponse(TelemetryUpload upload) {

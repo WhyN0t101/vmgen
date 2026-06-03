@@ -81,18 +81,22 @@ public class FlagService {
 
         // 5. Constant-time comparison: hash submitted value, check against each stored hash
         String submittedHash = hashFlag(request.getFlagValue().trim().toUpperCase());
-        UUID matchedScriptId = null;
+        Flag matchedFlag = null;
         for (Flag flag : flags) {
             if (MessageDigest.isEqual(
                     submittedHash.getBytes(StandardCharsets.UTF_8),
                     flag.getFlagValueHash().getBytes(StandardCharsets.UTF_8))) {
-                matchedScriptId = flag.getScript().getId();
+                matchedFlag = flag;
                 break;
             }
         }
 
-        if (matchedScriptId != null) {
-            auditService.logFlagSubmitted(user, buildId, matchedScriptId, true, ctx);
+        if (matchedFlag != null) {
+            if (matchedFlag.getSolvedAt() == null) {
+                matchedFlag.setSolvedAt(Instant.now());
+                flagRepository.save(matchedFlag);
+            }
+            auditService.logFlagSubmitted(user, buildId, matchedFlag.getScript().getId(), true, ctx);
             log.info("Correct flag submitted for build {} by user {}", buildId, user.getId());
             return new FlagSubmitResponse(true, MAX_ATTEMPTS_PER_BUILD - build.getFailedFlagAttempts());
         }

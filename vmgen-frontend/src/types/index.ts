@@ -347,6 +347,7 @@ export interface BuildScript {
   scriptId: string
   scriptName: string
   executionOrder: number
+  flagSolvedAt?: string | null
 }
 
 export interface Build {

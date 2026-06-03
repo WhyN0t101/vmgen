@@ -6,6 +6,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import { useCategoryList } from '@/composables/useCategories'
 import { useScriptList, useDeprecateScript } from '@/composables/useScripts'
 import { useConfirm } from '@/composables/useConfirm'
+import { formatTimestamp } from '@/utils/dateFormat'
 
 const router = useRouter()
 
@@ -159,7 +160,7 @@ function difficultyBadgeClass(level: string) {
               </span>
             </div>
             <p class="text-xs text-slate-400">
-              Created {{ new Date(script.createdAt).toLocaleString() }}
+              Created {{ formatTimestamp(script.createdAt) }}
             </p>
           </div>
 

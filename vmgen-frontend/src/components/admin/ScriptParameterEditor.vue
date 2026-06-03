@@ -14,6 +14,7 @@ import { cleanRules, defaultParameterForm } from '@/utils/parameterRules'
 import { useScriptParameters } from '@/composables/useScripts'
 import { useRoute } from 'vue-router'
 import { useConfirm } from '@/composables/useConfirm'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps<{
   script: ScriptDetail
@@ -24,6 +25,7 @@ const scriptId = computed(() => (route.params.id as string) || '')
 
 const { listQuery, createMutation, updateMutation, deleteMutation } = useScriptParameters(scriptId)
 const { confirm } = useConfirm()
+const { show } = useToast()
 
 const editing = ref<ScriptParameter | null>(null)
 const showForm = ref(false)
@@ -83,6 +85,18 @@ function removeChoice(index: number) {
 
 
 async function save() {
+  if (
+    (form.value.parameterType === 'CHOICE' || form.value.valueSource === 'AUTO_CHOICE')
+    && !(form.value.choices?.length)
+  ) {
+    show('Add at least one choice for this parameter.', 'error')
+    return
+  }
+  if (form.value.choices?.some(c => !c.label?.trim() || !c.value?.trim())) {
+    show('Each choice needs both a label and a value.', 'error')
+    return
+  }
+
   if (editing.value) {
     const payload: UpdateScriptParameterRequest = {
       displayName: form.value.displayName,

@@ -224,7 +224,10 @@ public class ScriptService {
         if (capabilities != null) {
             for (String capability : capabilities) {
                 if (capability == null || capability.isBlank()) continue;
-                scriptCapabilityRepository.save(new ScriptCapability(scriptId, capability.trim()));
+                ScriptCapability cap = new ScriptCapability();
+                cap.setScriptId(scriptId);
+                cap.setCapability(capability.trim());
+                scriptCapabilityRepository.save(cap);
             }
         }
     }

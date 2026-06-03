@@ -28,14 +28,17 @@ export function formatTimeAgoVerbose(dateString: string): string {
 }
 
 /**
- * Returns a localized timestamp string, e.g. "May 15, 2025, 02:30 PM".
+ * Returns a localized timestamp string in 24-hour time, e.g. "5/16/2026, 17:28:46".
  */
-export function formatTimestamp(dateString: string): string {
-  return new Date(dateString).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
+export function formatTimestamp(dateString?: string | null): string {
+  if (!dateString) return '—'
+  return new Date(dateString).toLocaleString(undefined, {
     year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
   })
 }

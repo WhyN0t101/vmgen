@@ -17,6 +17,7 @@ import io.vmgen.api.models.provenance.ProvenanceRecord;
 import io.vmgen.api.models.provenance.ProvenanceScript;
 import io.vmgen.api.models.script.Script;
 import io.vmgen.api.models.script.ScriptDependency;
+import io.vmgen.api.models.template.Template;
 import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestScript;
 import io.vmgen.api.models.vm.VmRequestScriptParameter;
@@ -715,7 +716,7 @@ public class WorkerService {
     }
 
     /**
-     * Transitions READY builds whose completedAt is older than the retention period to ARCHIVED.
+     * Transitions READY builds whose completedAt is older than the retention period to ARCHIVE.
      * Clears storage_path and sets storage_deleted_at so the download endpoint returns 410.
      * Physical OVA deletion from Proxmox storage is left to an operator or future cleanup task;
      * this method only marks artefacts as no longer available to users.

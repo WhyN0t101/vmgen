@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBuildStatus } from '@/composables/useBuildStatus'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseProgress from '@/components/ui/BaseProgress.vue'
-import { formatTimeAgoVerbose as formatTimeAgo } from '@/utils/dateFormat'
+import { formatTimeAgoVerbose as formatTimeAgo, formatTimestamp } from '@/utils/dateFormat'
 import { api } from '@/api/endpoints'
 import type { BuildLogEntry } from '@/types'
 
@@ -39,24 +39,56 @@ const { data: build, isLoading } = useBuildStatus(requestId)
 const downloading = ref(false)
 const downloadingProvenance = ref(false)
 
-// Flag submission
-const flagInput = ref('')
-const flagSubmitting = ref(false)
-const flagResult = ref<{ correct: boolean; attemptsRemaining: number } | null>(null)
-const flagError = ref<string | null>(null)
-const flagExhausted = computed(() => flagResult.value !== null && flagResult.value.attemptsRemaining === 0)
+// Flag submission — per-script state, shared attempt counter
+interface ScriptFlagState {
+  input: string
+  submitting: boolean
+  correct: boolean
+  error: string | null
+}
 
-async function submitFlag() {
-  if (!build.value || !flagInput.value.trim()) return
-  flagSubmitting.value = true
-  flagResult.value = null
-  flagError.value = null
+const flagStates = ref<Record<string, ScriptFlagState>>({})
+const attemptsRemaining = ref<number | null>(null)
+
+watch(
+  () => build.value?.scripts,
+  (scripts) => {
+    if (!scripts) return
+    for (const s of scripts) {
+      if (!flagStates.value[s.scriptId]) {
+        flagStates.value[s.scriptId] = { input: '', submitting: false, correct: !!s.flagSolvedAt, error: null }
+      } else if (s.flagSolvedAt && !flagStates.value[s.scriptId].correct) {
+        flagStates.value[s.scriptId].correct = true
+      }
+    }
+  },
+  { immediate: true },
+)
+
+const allFlagsCorrect = computed(() => {
+  const scripts = build.value?.scripts
+  return !!scripts?.length && scripts.every(s => flagStates.value[s.scriptId]?.correct)
+})
+
+const flagExhausted = computed(() => attemptsRemaining.value === 0)
+
+async function submitFlag(scriptId: string) {
+  const state = flagStates.value[scriptId]
+  if (!build.value || !state?.input.trim()) return
+  state.submitting = true
+  state.error = null
   try {
-    flagResult.value = await api.submitFlag(build.value.id, flagInput.value.trim())
+    const result = await api.submitFlag(build.value.id, state.input.trim())
+    attemptsRemaining.value = result.attemptsRemaining
+    if (result.correct) {
+      state.correct = true
+    } else {
+      state.error = `Incorrect. ${result.attemptsRemaining} attempt${result.attemptsRemaining === 1 ? '' : 's'} remaining.`
+    }
   } catch (e: any) {
-    flagError.value = e?.response?.data?.message ?? e?.message ?? 'Submission failed'
+    state.error = e?.response?.data?.message ?? e?.message ?? 'Submission failed'
   } finally {
-    flagSubmitting.value = false
+    state.submitting = false
   }
 }
 
@@ -254,11 +286,6 @@ const etaLabel = computed(() => {
   const rem = s % 60
   return rem > 0 ? `~${m}m ${rem}s` : `~${m}m`
 })
-
-function formatTimestamp(value?: string) {
-  if (!value) return '—'
-  return new Date(value).toLocaleString()
-}
 
 function formatBytes(bytes?: number) {
   if (!bytes) return ''
@@ -475,43 +502,55 @@ function formatBytes(bytes?: number) {
             </div>
           </div>
 
-          <div class="mt-6 pt-6 border-t border-slate-800 space-y-3">
+          <div class="mt-6 pt-6 border-t border-slate-800 space-y-4">
             <p class="text-xs font-mono tracking-widest uppercase text-slate-400">Submit Flag</p>
 
-            <div v-if="flagResult?.correct" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
-              Correct flag — challenge complete.
+            <div v-if="allFlagsCorrect" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
+              {{ build.scripts.length === 1 ? 'Correct flag — challenge complete.' : 'All flags correct — challenge complete.' }}
             </div>
 
-            <template v-else>
-              <div v-if="flagExhausted" class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm text-red-400">
-                No attempts remaining for this build.
+            <div v-if="flagExhausted && !allFlagsCorrect" class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm text-red-400">
+              No attempts remaining for this build.
+            </div>
+
+            <div
+              v-for="s in build.scripts"
+              v-show="!allFlagsCorrect || flagStates[s.scriptId]?.correct"
+              :key="s.scriptId"
+              class="space-y-2"
+            >
+              <p v-if="build.scripts.length > 1" class="text-xs text-slate-500 font-mono">
+                {{ s.scriptName }}
+                <span v-if="flagStates[s.scriptId]?.correct" class="text-emerald-400 ml-1">✓</span>
+              </p>
+
+              <div v-if="flagStates[s.scriptId]?.correct" class="text-sm text-emerald-400">
+                Correct flag accepted.
               </div>
 
-              <template v-else>
+              <template v-else-if="!flagExhausted">
                 <div class="flex gap-2">
                   <input
-                    v-model="flagInput"
+                    v-model="flagStates[s.scriptId].input"
                     type="text"
                     placeholder="FLAG{…}"
                     class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    :disabled="flagSubmitting"
-                    @keyup.enter="submitFlag"
+                    :disabled="flagStates[s.scriptId]?.submitting"
+                    @keyup.enter="submitFlag(s.scriptId)"
                   />
                   <BaseButton
                     variant="primary"
-                    :disabled="!flagInput.trim() || flagSubmitting"
-                    @click="submitFlag"
+                    :disabled="!flagStates[s.scriptId]?.input.trim() || flagStates[s.scriptId]?.submitting"
+                    @click="submitFlag(s.scriptId)"
                   >
-                    {{ flagSubmitting ? 'Checking…' : 'Submit' }}
+                    {{ flagStates[s.scriptId]?.submitting ? 'Checking…' : 'Submit' }}
                   </BaseButton>
                 </div>
-
-                <div v-if="flagResult && !flagResult.correct" class="text-sm text-red-400">
-                  Incorrect. {{ flagResult.attemptsRemaining }} attempt{{ flagResult.attemptsRemaining === 1 ? '' : 's' }} remaining.
+                <div v-if="flagStates[s.scriptId]?.error" class="text-sm text-red-400">
+                  {{ flagStates[s.scriptId].error }}
                 </div>
-                <div v-if="flagError" class="text-sm text-red-400">{{ flagError }}</div>
               </template>
-            </template>
+            </div>
           </div>
         </BaseCard>
 

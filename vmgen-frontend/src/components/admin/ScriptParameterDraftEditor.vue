@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import ParameterFormFields from '@/components/admin/ParameterFormFields.vue'
-import type { CreateScriptParameterRequest } from '@/types'
+import type { CreateScriptParameterRequest, CreateParameterChoice } from '@/types'
 import { useToast } from '@/composables/useToast'
 import { cleanRules, defaultParameterForm } from '@/utils/parameterRules'
 
@@ -51,6 +51,20 @@ function deleteParam(index: number) {
   emit('update:parameters', next)
 }
 
+function addChoice() {
+  if (!form.value.choices) form.value.choices = []
+  const choice: CreateParameterChoice = {
+    value: '',
+    label: '',
+    description: '',
+    displayOrder: form.value.choices.length,
+  }
+  form.value.choices.push(choice)
+}
+
+function removeChoice(index: number) {
+  form.value.choices?.splice(index, 1)
+}
 
 function save() {
   if (!form.value.displayName?.trim() || !form.value.parameterName?.trim()) {
@@ -63,6 +77,17 @@ function save() {
   }
   if (hasNameConflict.value) {
     show('A parameter with this name already exists in this script.', 'error')
+    return
+  }
+  if (
+    (form.value.parameterType === 'CHOICE' || form.value.valueSource === 'AUTO_CHOICE')
+    && !(form.value.choices?.length)
+  ) {
+    show('Add at least one choice for this parameter.', 'error')
+    return
+  }
+  if (form.value.choices?.some(c => !c.label?.trim() || !c.value?.trim())) {
+    show('Each choice needs both a label and a value.', 'error')
     return
   }
 
@@ -146,6 +171,8 @@ function save() {
         :has-name-conflict="hasNameConflict"
         show-random-config
         show-choices
+        @add-choice="addChoice"
+        @remove-choice="removeChoice"
       />
 
       <div class="flex justify-end gap-2">

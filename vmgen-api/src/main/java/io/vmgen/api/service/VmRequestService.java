@@ -12,7 +12,9 @@ import io.vmgen.api.dto.build.ProvenanceResponse;
 import io.vmgen.api.models.build.BuildLog;
 import io.vmgen.api.models.provenance.ProvenanceRecord;
 import io.vmgen.api.models.vm.VmRequestState;
+import io.vmgen.api.models.flag.Flag;
 import io.vmgen.api.repository.BuildLogRepository;
+import io.vmgen.api.repository.flag.FlagRepository;
 import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
 import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.dto.script.ScriptParameterDto;
@@ -75,6 +77,7 @@ public class VmRequestService {
     private final ScriptParameterService scriptParameterService;
     private final ProvenanceRecordRepository provenanceRecordRepository;
     private final BuildLogRepository buildLogRepository;
+    private final FlagRepository flagRepository;
     private final AuditService auditService;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -521,6 +524,11 @@ public class VmRequestService {
     private BuildResponse toResponse(VmRequest r, List<Script> scripts, List<UUID> orderedIds) {
         Map<UUID, Script> byId = scripts.stream().collect(Collectors.toMap(Script::getId, s -> s));
 
+        Map<UUID, Instant> solvedAtByScriptId = flagRepository.findByVmRequest_Id(r.getId())
+                .stream()
+                .filter(f -> f.getSolvedAt() != null)
+                .collect(Collectors.toMap(f -> f.getScript().getId(), Flag::getSolvedAt));
+
         List<BuildScriptDto> scriptDtos = new ArrayList<>();
         for (int i = 0; i < orderedIds.size(); i++) {
             UUID id = orderedIds.get(i);
@@ -529,6 +537,7 @@ public class VmRequestService {
                     .scriptId(id)
                     .scriptName(s != null ? s.getName() : id.toString())
                     .executionOrder(i + 1)
+                    .flagSolvedAt(solvedAtByScriptId.get(id))
                     .build());
         }
 

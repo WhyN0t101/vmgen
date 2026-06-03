@@ -46,6 +46,9 @@ public class Flag {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "solved_at")
+    private Instant solvedAt;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {

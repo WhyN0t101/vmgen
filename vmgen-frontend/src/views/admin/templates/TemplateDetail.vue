@@ -15,6 +15,7 @@ import TemplateScriptCompatibilityEditor from '@/components/admin/TemplateScript
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import { useConfirm } from '@/composables/useConfirm'
+import { formatTimestamp } from '@/utils/dateFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,11 +28,6 @@ const { confirm } = useConfirm()
 
 const { data: compatibleScripts, refetch: refetchCompatible } = useTemplateCompatibleScripts(templateId)
 const { data: allScripts } = useScriptList({ activeOnly: ref(true) })
-
-function formatDate(dateString?: string) {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleString()
-}
 
 const parsedValidationLogs = computed(() => {
   if (!template.value?.validationLogs) return ''
@@ -144,11 +140,11 @@ async function handleDeprecate() {
             </div>
             <div>
               <dt class="text-sm text-slate-400">Created</dt>
-              <dd class="text-slate-100">{{ formatDate(template.createdAt) }}</dd>
+              <dd class="text-slate-100">{{ formatTimestamp(template.createdAt) }}</dd>
             </div>
             <div v-if="template.deprecatedAt">
               <dt class="text-sm text-slate-400">Deprecated</dt>
-              <dd class="text-slate-100">{{ formatDate(template.deprecatedAt) }}</dd>
+              <dd class="text-slate-100">{{ formatTimestamp(template.deprecatedAt) }}</dd>
             </div>
           </dl>
         </BaseCard>
@@ -230,7 +226,7 @@ async function handleDeprecate() {
         <dl class="space-y-3">
           <div>
             <dt class="text-sm text-slate-400">Validated At</dt>
-            <dd class="text-slate-100">{{ formatDate(template.validatedAt) }}</dd>
+            <dd class="text-slate-100">{{ formatTimestamp(template.validatedAt) }}</dd>
           </div>
           <div v-if="template.sha256Hash">
             <dt class="text-sm text-slate-400">SHA256 Hash</dt>

@@ -177,6 +177,18 @@ const requiredParamsFilled = computed(() => {
 
 const parameterErrors = ref(false)
 
+const DIFFICULTY_RANK: Record<string, number> = { easy: 1, medium: 2, hard: 3 }
+
+// Warn when a selected script's registered difficulty level exceeds the chosen build difficulty.
+const difficultyWarnings = computed(() => {
+  const buildRank = DIFFICULTY_RANK[difficulty.value] ?? 0
+  return selectedVulnIds.value
+    .map(id => compatibleScripts.value?.find(s => s.id === id))
+    .filter((s): s is NonNullable<typeof s> => !!s)
+    .filter(s => (DIFFICULTY_RANK[s.difficultyLevel?.toLowerCase() ?? ''] ?? 0) > buildRank)
+    .map(s => s.name)
+})
+
 // Warn when two scripts share the same parameter name and the same user-entered value.
 // Identical values on a shared param name (e.g. PORT) will cause one service to fail at VM boot.
 const paramConflictWarnings = computed(() => {
@@ -208,7 +220,11 @@ const paramConflictWarnings = computed(() => {
 })
 
 const canSubmit = computed(() =>
-  !!selectedTemplateId.value && selectedVulnIds.value.length > 0 && requiredParamsFilled.value && !parameterErrors.value
+  !!selectedTemplateId.value &&
+  selectedVulnIds.value.length > 0 &&
+  requiredParamsFilled.value &&
+  !parameterErrors.value &&
+  difficultyWarnings.value.length === 0
 )
 
 function handleSubmit() {
@@ -275,6 +291,13 @@ function handleSubmit() {
             v-model:has-errors="parameterErrors"
             :scripts="scriptsWithUserInputParams"
           />
+
+          <div v-if="difficultyWarnings.length" class="mt-3 rounded-md border border-red-600/40 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+            <span class="font-semibold">Difficulty mismatch:</span>
+            {{ difficultyWarnings.join(', ') }}
+            {{ difficultyWarnings.length === 1 ? 'requires' : 'require' }} a higher difficulty than selected.
+            Increase the build difficulty or deselect the script{{ difficultyWarnings.length === 1 ? '' : 's' }}.
+          </div>
 
           <div v-if="paramConflictWarnings.length" class="mt-3 space-y-2">
             <div
