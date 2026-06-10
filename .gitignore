@@ -3,3 +3,6 @@
 *.iws
 *.iml
 *.ipr
+
+# Docker secrets — never commit real env files
+docker/.env

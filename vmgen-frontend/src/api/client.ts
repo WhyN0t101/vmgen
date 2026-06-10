@@ -7,7 +7,7 @@ if (!_configuredUrl && import.meta.env.PROD) {
 } else if (!_configuredUrl) {
   console.warn('[vmgen] VITE_API_URL is not set; falling back to http://localhost:8080 (dev only).')
 }
-export const API_BASE: string = _configuredUrl || 'http://localhost:8080'
+export const API_BASE: string = _configuredUrl || (import.meta.env.PROD ? '' : 'http://localhost:8080')
 
 // Global handlers set by App.vue
 let onUnauthorized: ((message: string) => void) | null = null

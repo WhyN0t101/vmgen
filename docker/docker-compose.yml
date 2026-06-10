@@ -1,0 +1,101 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: vmgen-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-vmgen}
+      POSTGRES_USER: ${DB_USER:-vmgen}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - vmgen_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vmgen} -d ${DB_NAME:-vmgen}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vmgen-api:
+    build:
+      context: ../vmgen-api
+      dockerfile: ../docker/Dockerfile.api
+    container_name: vmgen-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-vmgen}
+      DB_USERNAME: ${DB_USER:-vmgen}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      VMGEN_JWT_SECRET: ${VMGEN_JWT_SECRET:?VMGEN_JWT_SECRET is required}
+      VMGEN_CORS_ORIGINS: ${VMGEN_CORS_ORIGINS:-http://localhost}
+      PROXMOX_API_URL: ${PROXMOX_API_URL:?PROXMOX_API_URL is required}
+      PROXMOX_TOKEN_ID: ${PROXMOX_TOKEN_ID:?PROXMOX_TOKEN_ID is required}
+      PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET:?PROXMOX_TOKEN_SECRET is required}
+      PROXMOX_VERIFY_SSL: ${PROXMOX_VERIFY_SSL:-false}
+      PROXMOX_NODE: ${PROXMOX_NODE:-pve}
+      WORKER_API_KEY: ${WORKER_API_KEY:?WORKER_API_KEY is required}
+      PLATFORM_SECRET: ${PLATFORM_SECRET:?PLATFORM_SECRET is required}
+      OVA_STORAGE_DIR: /var/lib/vmgen/exports
+    volumes:
+      - ova_storage:/var/lib/vmgen/exports
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  vmgen-frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: ""
+    container_name: vmgen-frontend
+    restart: unless-stopped
+    depends_on:
+      vmgen-api:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+
+  vmgen-worker:
+    build:
+      context: ../vmgen-worker
+      dockerfile: ../docker/Dockerfile.worker
+    container_name: vmgen-worker
+    restart: unless-stopped
+    depends_on:
+      vmgen-api:
+        condition: service_healthy
+    environment:
+      WORKER_ID: ${WORKER_ID:-worker-01}
+      WORKER_POLL_INTERVAL_SECONDS: ${WORKER_POLL_INTERVAL_SECONDS:-30}
+      WORKER_MAX_CONCURRENT_BUILDS: ${WORKER_MAX_CONCURRENT_BUILDS:-3}
+      BACKEND_URL: http://vmgen-api:8080
+      BACKEND_API_KEY: ${WORKER_API_KEY:?WORKER_API_KEY is required}
+      PLATFORM_SECRET: ${PLATFORM_SECRET:?PLATFORM_SECRET is required}
+      PROXMOX_HOST: ${PROXMOX_HOST:?PROXMOX_HOST is required}
+      PROXMOX_TOKEN_ID: ${PROXMOX_TOKEN_ID:?PROXMOX_TOKEN_ID is required}
+      PROXMOX_TOKEN_SECRET: ${PROXMOX_TOKEN_SECRET:?PROXMOX_TOKEN_SECRET is required}
+      PROXMOX_VERIFY_SSL: ${PROXMOX_VERIFY_SSL:-false}
+      PROXMOX_NODE: ${PROXMOX_NODE:-pve}
+      PROXMOX_ISOLATED_BRIDGE: ${PROXMOX_ISOLATED_BRIDGE:-vmbr1}
+      PROXMOX_SSH_USER: ${PROXMOX_SSH_USER:-vmgen}
+      PROXMOX_SSH_KEY_PATH: /run/secrets/proxmox_key
+      PROXMOX_KNOWN_HOSTS_PATH: /run/secrets/known_hosts
+      EXPORT_PATH: /var/lib/vmgen/exports
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ova_storage:/var/lib/vmgen/exports
+      - ${PROXMOX_SSH_KEY_PATH:?PROXMOX_SSH_KEY_PATH is required}:/run/secrets/proxmox_key:ro
+      - ${PROXMOX_KNOWN_HOSTS_PATH:?PROXMOX_KNOWN_HOSTS_PATH is required}:/run/secrets/known_hosts:ro
+
+volumes:
+  vmgen_pgdata:
+  ova_storage:

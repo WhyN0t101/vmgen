@@ -314,7 +314,7 @@ class BuildPipeline:
         self._proxmox.remove_network(build_vmid, proxmox_node)
 
         # Stage 12: EXPORTING — this stage name triggers the BUILDING→EXPORTING state transition in the backend
-        self._progress(job_id, "EXPORTING", 77)
+        self._progress(job_id, "EXPORTING", 87)
         ova_path = str(resolve_under_base(self._config.export_path, job_id, f"{vm_name}.ova"))
         self._proxmox.export_ova(build_vmid, ova_path, storage=disk_storage)
 
