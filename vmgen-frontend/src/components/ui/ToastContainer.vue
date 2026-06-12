@@ -4,7 +4,7 @@ import { useToast } from '@/composables/useToast'
 
 const { toasts, dismiss } = useToast()
 
-const visibleToasts = computed(() => toasts.value)
+const visibleToasts = computed(() => toasts)
 </script>
 
 <template>

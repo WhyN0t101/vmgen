@@ -55,10 +55,11 @@ watch(
   (scripts) => {
     if (!scripts) return
     for (const s of scripts) {
-      if (!flagStates.value[s.scriptId]) {
+      const state = flagStates.value[s.scriptId]
+      if (!state) {
         flagStates.value[s.scriptId] = { input: '', submitting: false, correct: !!s.flagSolvedAt, error: null }
-      } else if (s.flagSolvedAt && !flagStates.value[s.scriptId].correct) {
-        flagStates.value[s.scriptId].correct = true
+      } else if (s.flagSolvedAt && !state.correct) {
+        state.correct = true
       }
     }
   },
@@ -531,7 +532,7 @@ function formatBytes(bytes?: number) {
               <template v-else-if="!flagExhausted">
                 <div class="flex gap-2">
                   <input
-                    v-model="flagStates[s.scriptId].input"
+                    v-model="flagStates[s.scriptId]!.input"
                     type="text"
                     placeholder="FLAG{…}"
                     class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -547,7 +548,7 @@ function formatBytes(bytes?: number) {
                   </BaseButton>
                 </div>
                 <div v-if="flagStates[s.scriptId]?.error" class="text-sm text-red-400">
-                  {{ flagStates[s.scriptId].error }}
+                  {{ flagStates[s.scriptId]?.error }}
                 </div>
               </template>
             </div>

@@ -176,7 +176,7 @@ function difficultyBadgeClass(level: string) {
               v-if="script.isActive"
               variant="ghost"
               size="sm"
-              :disabled="isDeprecating.value"
+              :disabled="isDeprecating"
               @click="handleDeprecate(script.id)"
             >
               Deprecate

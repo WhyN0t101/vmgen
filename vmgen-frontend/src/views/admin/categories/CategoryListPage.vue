@@ -94,6 +94,7 @@ async function moveCategory(cat: CategoryList, direction: 'up' | 'down') {
   if (targetIndex < 0 || targetIndex >= ordered.length) return
 
   const [moved] = ordered.splice(index, 1)
+  if (!moved) return
   ordered.splice(targetIndex, 0, moved)
 
   // Reassign display_order based on new index to avoid duplicates (0..n-1).

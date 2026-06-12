@@ -200,8 +200,8 @@ const paramConflictWarnings = computed(() => {
       if (isRand) continue
       const value = parameterValues.value[id]?.[param.parameterName]?.trim() ?? ''
       if (!value) continue
-      if (!seen[param.parameterName]) seen[param.parameterName] = []
-      seen[param.parameterName].push({ scriptName: name, value })
+      const bucket = (seen[param.parameterName] ??= [])
+      bucket.push({ scriptName: name, value })
     }
   }
 
