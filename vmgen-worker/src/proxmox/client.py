@@ -220,7 +220,8 @@ class ProxmoxClient:
         )
         return client
 
-    def export_ova(self, vmid: int, dest_path: str, storage: str) -> str:
+    def export_ova(self, vmid: int, dest_path: str, storage: str,
+                   host_dest_path: str | None = None) -> str:
         """
         SSH into the Proxmox host, manually build an OVA:
           1. Parse qm config to find disk volume + hardware specs
@@ -228,10 +229,12 @@ class ProxmoxClient:
           3. Convert disk to stream-optimised VMDK with qemu-img
           4. Generate a OVF 1.0 descriptor
           5. Package OVF + VMDK into a tar OVA
-          6. SFTP the OVA to the worker machine
+          6. Deliver the OVA to the worker (SFTP copy, or write to shared storage)
           7. Clean up temp dir on Proxmox
 
-        dest_path is a LOCAL path on the worker.
+        dest_path is the path the worker reads the OVA from (its EXPORT_PATH view).
+        host_dest_path is the Proxmox-host-side path of that same file on shared
+        storage; required when export_transfer_mode == "shared", ignored otherwise.
         Network must already be removed (stage 11) before calling this.
         """
         import os
@@ -277,15 +280,31 @@ class ProxmoxClient:
             )
             self._ssh_write(client, ovf, ovf_path)
 
-            # Step 6: Package as OVA (tar, OVF first per spec)
-            self._ssh_run(client, f"tar -C {proxmox_tmp} -cf {proxmox_ova} vm.ovf disk.vmdk")
-
-            # Step 7: SFTP to worker
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            log.info(f"Transferring OVA from Proxmox to {dest_path}...")
-            with client.open_sftp() as sftp:
-                sftp.get(proxmox_ova, dest_path)
-            log.info("OVA transfer complete")
+            # Step 6 + 7: Package as OVA, then deliver to the worker.
+            if self._config.export_transfer_mode == "shared":
+                # Tar directly onto storage shared with the worker — no copy and
+                # the OVA exists only once. The worker reads it at dest_path.
+                if not host_dest_path:
+                    raise ValueError(
+                        "export_transfer_mode='shared' requires host_dest_path"
+                    )
+                self._ssh_run(client, f"mkdir -p {os.path.dirname(host_dest_path)}")
+                self._ssh_run(
+                    client,
+                    f"tar -C {proxmox_tmp} -cf {host_dest_path} vm.ovf disk.vmdk",
+                )
+                log.info(
+                    f"OVA written to shared storage at {host_dest_path} "
+                    f"(worker reads it at {dest_path})"
+                )
+            else:
+                self._ssh_run(client, f"tar -C {proxmox_tmp} -cf {proxmox_ova} vm.ovf disk.vmdk")
+                # SFTP to worker
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                log.info(f"Transferring OVA from Proxmox to {dest_path}...")
+                with client.open_sftp() as sftp:
+                    sftp.get(proxmox_ova, dest_path)
+                log.info("OVA transfer complete")
 
         finally:
             try:

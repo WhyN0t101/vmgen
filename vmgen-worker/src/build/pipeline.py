@@ -6,6 +6,7 @@ import shlex
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import paramiko # type: ignore
 from proxmox.client import ProxmoxClient
@@ -316,7 +317,15 @@ class BuildPipeline:
         # Stage 12: EXPORTING — this stage name triggers the BUILDING→EXPORTING state transition in the backend
         self._progress(job_id, "EXPORTING", 87)
         ova_path = str(resolve_under_base(self._config.export_path, job_id, f"{vm_name}.ova"))
-        self._proxmox.export_ova(build_vmid, ova_path, storage=disk_storage)
+        # In shared-storage mode the Proxmox host writes the OVA to the same file
+        # via its own view of the storage. Mirror the (already path-safe) relative
+        # location under the host-side shared dir; no container filesystem access.
+        host_dest_path = None
+        if self._config.proxmox.export_transfer_mode == "shared":
+            rel = Path(ova_path).relative_to(Path(self._config.export_path).expanduser().resolve())
+            host_dest_path = str(Path(self._config.proxmox.shared_export_dir) / rel)
+        self._proxmox.export_ova(build_vmid, ova_path, storage=disk_storage,
+                                 host_dest_path=host_dest_path)
 
         # Stage 13: COMPUTE_HASHES
         # NOTE: ova_path must be accessible from the worker machine (e.g. via NFS mount)

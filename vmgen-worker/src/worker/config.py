@@ -16,6 +16,15 @@ class ProxmoxConfig:
     ssh_user: str
     ssh_key_path: str
     known_hosts_path: str    # path to SSH known_hosts file for Proxmox host verification
+    # OVA export transfer: "sftp" copies the OVA from the Proxmox host to the
+    # worker over SFTP (works when worker and Proxmox are separate machines).
+    # "shared" writes the OVA straight onto storage shared between the Proxmox
+    # host and the worker (e.g. virtiofs/NFS) — no copy, no double storage.
+    # Use "shared" when the worker runs as a VM on the same Proxmox host.
+    export_transfer_mode: str = "sftp"
+    # Host-side path of the shared export storage (shared mode only). The same
+    # storage must be mounted into the worker at EXPORT_PATH.
+    shared_export_dir: str = ""
 
 @dataclass
 class BackendConfig:
@@ -53,6 +62,8 @@ class Config:
             ssh_key_path=os.getenv("PROXMOX_SSH_KEY_PATH", ""),
             known_hosts_path=os.getenv("PROXMOX_KNOWN_HOSTS_PATH",
                                        str(Path.home() / ".ssh" / "known_hosts")),
+            export_transfer_mode=os.getenv("EXPORT_TRANSFER_MODE", "sftp").lower(),
+            shared_export_dir=os.getenv("PROXMOX_SHARED_EXPORT_DIR", ""),
         )
 
         worker = WorkerConfig(
@@ -114,5 +125,16 @@ class Config:
             export = Path(self.export_path).expanduser()
             if not export.is_absolute():
                 errors.append("EXPORT_PATH must be an absolute path")
+
+        # OVA export transfer mode
+        if self.proxmox.export_transfer_mode not in ("sftp", "shared"):
+            errors.append("EXPORT_TRANSFER_MODE must be 'sftp' or 'shared'")
+        elif self.proxmox.export_transfer_mode == "shared":
+            if not self.proxmox.shared_export_dir:
+                errors.append(
+                    "PROXMOX_SHARED_EXPORT_DIR is required when EXPORT_TRANSFER_MODE=shared"
+                )
+            elif not Path(self.proxmox.shared_export_dir).is_absolute():
+                errors.append("PROXMOX_SHARED_EXPORT_DIR must be an absolute path")
 
         return errors

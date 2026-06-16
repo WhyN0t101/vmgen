@@ -40,6 +40,8 @@ services:
       PLATFORM_SECRET: ${PLATFORM_SECRET:?PLATFORM_SECRET is required}
       OVA_STORAGE_DIR: /var/lib/vmgen/exports
     volumes:
+      # In shared mode, bind the SAME shared storage the worker uses here, so the
+      # API can serve OVA downloads written by the worker.
       - ova_storage:/var/lib/vmgen/exports
     expose:
       - "8080"
@@ -90,8 +92,15 @@ services:
       PROXMOX_SSH_KEY_PATH: /run/secrets/proxmox_key
       PROXMOX_KNOWN_HOSTS_PATH: /run/secrets/known_hosts
       EXPORT_PATH: /var/lib/vmgen/exports
+      # OVA delivery: "sftp" (default) copies the OVA over SSH; "shared" writes
+      # it onto storage shared with the Proxmox host (set PROXMOX_SHARED_EXPORT_DIR
+      # and mount that storage at /var/lib/vmgen/exports below).
+      EXPORT_TRANSFER_MODE: ${EXPORT_TRANSFER_MODE:-sftp}
+      PROXMOX_SHARED_EXPORT_DIR: ${PROXMOX_SHARED_EXPORT_DIR:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
+      # In shared mode, bind the shared storage here instead of the named volume,
+      # e.g.  - ${SHARED_EXPORT_MOUNT:-ova_storage}:/var/lib/vmgen/exports
       - ova_storage:/var/lib/vmgen/exports
       - ${PROXMOX_SSH_KEY_PATH:?PROXMOX_SSH_KEY_PATH is required}:/run/secrets/proxmox_key:ro
       - ${PROXMOX_KNOWN_HOSTS_PATH:?PROXMOX_KNOWN_HOSTS_PATH is required}:/run/secrets/known_hosts:ro
