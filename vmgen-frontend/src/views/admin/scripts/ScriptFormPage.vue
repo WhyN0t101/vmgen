@@ -15,7 +15,7 @@ import ScriptCompatibilityEditor from '@/components/admin/ScriptCompatibilityEdi
 import ScriptParameterEditor from '@/components/admin/ScriptParameterEditor.vue'
 import ScriptCompatibilityDraftEditor from '@/components/admin/ScriptCompatibilityDraftEditor.vue'
 import ScriptParameterDraftEditor from '@/components/admin/ScriptParameterDraftEditor.vue'
-import type { CreateScriptRequest, CreateScriptParameterRequest, UpdateScriptRequest, ScriptDetail } from '@/types'
+import type { CreateScriptRequest, CreateScriptParameterRequest, UpdateScriptRequest } from '@/types'
 import { useToast } from '@/composables/useToast'
 
 // Admin page for creating or editing a vulnerability script, including
@@ -168,22 +168,15 @@ async function handleSubmit() {
       return
     }
   } else {
-    let created: ScriptDetail | undefined
     try {
-      created = await createMutation.mutateAsync(form.value as CreateScriptRequest)
+      await createMutation.mutateAsync(form.value as CreateScriptRequest)
     } catch {
       // Error handled by mutation via toast, keep user on form.
       return
     }
-    // After creating a script, go straight to the edit view so
-    // compatibility and parameters can be configured immediately.
-    if (created && created.id) {
-      router.push({ name: 'admin-script-edit', params: { id: created.id } })
-      return
-    }
   }
 
-  router.push({ name: 'admin-scripts' })
+  router.push({ name: 'admin' })
 }
 </script>
 

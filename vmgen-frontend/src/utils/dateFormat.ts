@@ -28,17 +28,14 @@ export function formatTimeAgoVerbose(dateString: string): string {
 }
 
 /**
- * Returns a localized timestamp string in 24-hour time, e.g. "5/16/2026, 17:28:46".
+ * Returns a timestamp string in day/month/year 24-hour time, e.g. "16/05/2026, 17:28:46".
+ * Formatted explicitly (not locale-dependent) so the order is consistent everywhere.
  */
 export function formatTimestamp(dateString?: string | null): string {
   if (!dateString) return '—'
-  return new Date(dateString).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
+  const d = new Date(dateString)
+  if (isNaN(d.getTime())) return '—'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}, `
+    + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
