@@ -49,14 +49,24 @@ class ProxmoxClient:
         except Exception:
             return False
         
-    def clone_vm(self, vmid: int, new_vmid: int, name: str, node: str | None = None):
-        """Full clone (not linked) — independent copy so we can modify without touching template."""
+    def clone_vm(self, vmid: int, new_vmid: int, name: str, node: str | None = None,
+                 storage: str | None = None):
+        """Full clone (not linked) — independent copy so we can modify without touching template.
+
+        storage, when set, places the clone's disks on that storage (e.g. a fast
+        SSD pool) regardless of where the template lives. Empty = Proxmox default
+        (same storage as the template).
+        """
         log.info(f"Cloning VM {vmid} → {new_vmid} (name: {name})...")
-        task = self._node_api(node).qemu(vmid).clone.post(
+        clone_args = dict(
             newid=new_vmid,
             name=name,
             full=1,     # full=1 means full clone, full=0 would be linked (shares disk)
         )
+        if storage:
+            clone_args["storage"] = storage
+            log.info(f"Clone target storage: {storage}")
+        task = self._node_api(node).qemu(vmid).clone.post(**clone_args)
         self._wait_for_task(task, node, timeout=600)  # cloning a full disk takes time
         log.info(f"VM {new_vmid} cloned successfully")
 

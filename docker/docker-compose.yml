@@ -88,6 +88,9 @@ services:
       PROXMOX_VERIFY_SSL: ${PROXMOX_VERIFY_SSL:-false}
       PROXMOX_NODE: ${PROXMOX_NODE:-pve}
       PROXMOX_ISOLATED_BRIDGE: ${PROXMOX_ISOLATED_BRIDGE:-vmbr1}
+      # Target storage for build VM clones (e.g. local-lvm for SSD). Empty =
+      # clone onto the template's own storage.
+      PROXMOX_BUILD_STORAGE: ${PROXMOX_BUILD_STORAGE:-}
       PROXMOX_SSH_USER: ${PROXMOX_SSH_USER:-vmgen}
       PROXMOX_SSH_KEY_PATH: /run/secrets/proxmox_key
       PROXMOX_KNOWN_HOSTS_PATH: /run/secrets/known_hosts

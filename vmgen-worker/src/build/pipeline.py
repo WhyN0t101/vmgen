@@ -93,7 +93,8 @@ class BuildPipeline:
         self._build_vmid = build_vmid
         self._build_node = proxmox_node
         vm_name = f"vmgen-build-{job_id[:8]}"
-        self._proxmox.clone_vm(template_vmid, build_vmid, vm_name, proxmox_node)
+        self._proxmox.clone_vm(template_vmid, build_vmid, vm_name, proxmox_node,
+                               storage=self._config.proxmox.build_storage or None)
         self._log(job_id, "INFO", f"Cloned template {template_vmid} → build VM {build_vmid} ({vm_name})", "CLONE_TEMPLATE")
 
         # Stage 3: CONFIGURE_NETWORK

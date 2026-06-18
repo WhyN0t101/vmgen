@@ -16,6 +16,10 @@ class ProxmoxConfig:
     ssh_user: str
     ssh_key_path: str
     known_hosts_path: str    # path to SSH known_hosts file for Proxmox host verification
+    # Target storage for build VM clones. Empty = clone onto the template's own
+    # storage (Proxmox default). Set to e.g. "local-lvm" to run builds on fast
+    # storage regardless of where the templates live.
+    build_storage: str = ""
     # OVA export transfer: "sftp" copies the OVA from the Proxmox host to the
     # worker over SFTP (works when worker and Proxmox are separate machines).
     # "shared" writes the OVA straight onto storage shared between the Proxmox
@@ -64,6 +68,7 @@ class Config:
                                        str(Path.home() / ".ssh" / "known_hosts")),
             export_transfer_mode=os.getenv("EXPORT_TRANSFER_MODE", "sftp").lower(),
             shared_export_dir=os.getenv("PROXMOX_SHARED_EXPORT_DIR", ""),
+            build_storage=os.getenv("PROXMOX_BUILD_STORAGE", ""),
         )
 
         worker = WorkerConfig(
