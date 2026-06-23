@@ -8,8 +8,13 @@ services:
       POSTGRES_DB: ${DB_NAME:-vmgen}
       POSTGRES_USER: ${DB_USER:-vmgen}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # Optional restricted runtime user. Only created (on first init) when
+      # DB_API_PASSWORD is set; otherwise the API uses the owner role as before.
+      DB_API_USERNAME: ${DB_API_USERNAME:-vmgen_api}
+      DB_API_PASSWORD: ${DB_API_PASSWORD:-}
     volumes:
       - vmgen_pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-vmgen} -d ${DB_NAME:-vmgen}"]
       interval: 10s
@@ -27,8 +32,12 @@ services:
         condition: service_healthy
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-vmgen}
+      # Owner role — used by Flyway for migrations (DDL).
       DB_USERNAME: ${DB_USER:-vmgen}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # Runtime role — restricted DML-only user if DB_API_* set, else the owner.
+      DB_API_USERNAME: ${DB_API_USERNAME:-${DB_USER:-vmgen}}
+      DB_API_PASSWORD: ${DB_API_PASSWORD:-${DB_PASSWORD}}
       VMGEN_JWT_SECRET: ${VMGEN_JWT_SECRET:?VMGEN_JWT_SECRET is required}
       VMGEN_CORS_ORIGINS: ${VMGEN_CORS_ORIGINS:-http://localhost}
       PROXMOX_API_URL: ${PROXMOX_API_URL:?PROXMOX_API_URL is required}

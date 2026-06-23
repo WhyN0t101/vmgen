@@ -672,10 +672,10 @@ public class WorkerService {
     }
 
     /**
-     * Derives the raw flag string: "FLAG{<26-char-base32>}".
+     * Derives the raw flag string: "FLAG{<28-char-base32>}".
      * HMAC-SHA256(key=platformSecret, msg=seedHex||requestId||scriptId||timestamp)
-     *   -> first 17 bytes, zero last 6 bits of byte[16] (& 0xC0)
-     *   -> Base32 (no padding) -> "FLAG{<26 chars>}"
+     *   -> first 17 bytes, zero last 6 bits of byte[16] (& 0xC0) -> 130 bits entropy
+     *   -> Base32 (no padding) -> "FLAG{<28 chars>}" (17 bytes -> 28 base32 chars; always ends "AA")
      */
     private String deriveRawFlag(String seedHex, String requestId, String scriptId, String timestamp) {
         try {

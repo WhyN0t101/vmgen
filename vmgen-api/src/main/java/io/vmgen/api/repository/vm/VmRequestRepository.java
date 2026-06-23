@@ -2,7 +2,9 @@ package io.vmgen.api.repository.vm;
 
 import io.vmgen.api.models.vm.VmRequest;
 import io.vmgen.api.models.vm.VmRequestState;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -95,6 +97,17 @@ public interface VmRequestRepository extends JpaRepository<VmRequest, UUID> {
      */
     @Query("SELECT vr FROM VmRequest vr LEFT JOIN FETCH vr.user LEFT JOIN FETCH vr.template WHERE vr.id = :id")
     Optional<VmRequest> findByIdWithUserAndTemplate(@Param("id") UUID id);
+
+    /**
+     * Load a build holding a row-level write lock (SELECT ... FOR UPDATE).
+     * Used by flag submission so concurrent attempts on the same build serialise,
+     * giving consistent read-modify-write semantics on the per-build attempt counter
+     * (a second submission blocks until the first commits, so neither can slip past
+     * the per-build attempt gate).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT vr FROM VmRequest vr WHERE vr.id = :id")
+    Optional<VmRequest> findByIdForUpdate(@Param("id") UUID id);
 
     /**
      * Increment the failed flag attempt counter for a single build.

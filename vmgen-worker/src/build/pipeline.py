@@ -155,6 +155,14 @@ class BuildPipeline:
             )
         log.info(f"[{job_id}] Verified guest user '{ssh_user}' exists")
 
+        # Wait for cloud-init / first-boot apt activity to settle before running
+        # scripts. On fresh cloud images, cloud-init and the apt-daily /
+        # unattended-upgrades timers hold the apt lock right after boot — without
+        # this, the first script that calls apt fails with a lock error. Bounded
+        # so a stuck cloud-init can't hang the build indefinitely.
+        log.info(f"[{job_id}] Waiting for cloud-init to finish before running scripts")
+        ssh.execute("sudo timeout 300 cloud-init status --wait 2>/dev/null || true")
+
         # Stages 6-9 run over SSH — try/finally guarantees disconnect
         try:
             # Stage 6: EXECUTE_SCRIPTS

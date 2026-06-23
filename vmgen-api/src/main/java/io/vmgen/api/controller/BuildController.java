@@ -24,7 +24,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -89,60 +88,19 @@ public class BuildController {
         long fileLength = info.sizeBytes();
         String checksum = info.sha256() != null ? info.sha256() : "";
 
-        if (rangeHeader == null) {
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .contentLength(fileLength)
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            ContentDisposition.attachment().filename(filename).build().toString())
-                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                    .header("X-Checksum-SHA256", checksum)
-                    .body(file);
-        }
-
-        List<HttpRange> ranges;
-        try {
-            ranges = HttpRange.parseRanges(rangeHeader);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-                    .header(HttpHeaders.CONTENT_RANGE, "bytes */" + fileLength)
-                    .build();
-        }
-
-        // Multi-range not supported — fall back to full file
-        if (ranges.size() != 1) {
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .contentLength(fileLength)
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            ContentDisposition.attachment().filename(filename).build().toString())
-                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                    .header("X-Checksum-SHA256", checksum)
-                    .body(file);
-        }
-
-        HttpRange range = ranges.getFirst();
-        long start = range.getRangeStart(fileLength);
-        long end   = range.getRangeEnd(fileLength);
-
-        if (start > end || start >= fileLength) {
-            return ResponseEntity.status(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-                    .header(HttpHeaders.CONTENT_RANGE, "bytes */" + fileLength)
-                    .build();
-        }
-
-        long contentLength = end - start + 1;
-        ResourceRegion region = new ResourceRegion(file, start, contentLength);
-
-        return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+        // Serve the file as a Resource. Spring's ResourceHttpMessageConverter
+        // handles HTTP Range requests for a Resource body itself; Spring 7 removed
+        // the standalone ResourceRegionHttpMessageConverter, so hand-building a
+        // ResourceRegion here has no converter and 500s. Advertise Accept-Ranges so
+        // clients may still request ranges; the converter honours them.
+        return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .contentLength(contentLength)
-                .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileLength)
+                .contentLength(fileLength)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.attachment().filename(filename).build().toString())
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .header("X-Checksum-SHA256", checksum)
-                .body(region);
+                .body(file);
     }
 
     @GetMapping("/{id}/provenance")

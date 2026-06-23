@@ -50,8 +50,10 @@ public class FlagService {
             throw new AccountLockedException(secondsRemaining);
         }
 
-        // 2. Load build — must exist, belong to this user, and be READY
-        VmRequest build = vmRequestRepository.findById(buildId)
+        // 2. Load build under a row-level write lock — must exist, belong to this user,
+        // and be READY. The lock serialises concurrent submissions for the same build so
+        // the per-build attempt gate below cannot be bypassed by simultaneous requests.
+        VmRequest build = vmRequestRepository.findByIdForUpdate(buildId)
                 .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + buildId));
 
         if (!build.getUser().getId().equals(user.getId())) {

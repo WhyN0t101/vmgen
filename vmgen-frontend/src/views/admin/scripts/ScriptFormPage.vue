@@ -50,7 +50,28 @@ const isSubmitting = computed(
   () => createMutation.isPending.value || updateMutation.isPending.value,
 )
 
-type ScriptFormState = CreateScriptRequest & { id?: string }
+type ScriptFormState = CreateScriptRequest & {
+  id?: string
+  requiredOsFamilies: string[]
+  requiredCapabilities: string[]
+}
+
+// Must match the template-side options so script requirements line up with the
+// tags set on templates (validated at build submission).
+const OS_FAMILY_OPTIONS = ['ubuntu', 'debian', 'kali-linux', 'fedora', 'centos', 'windows']
+const CAPABILITY_OPTIONS = ['ssh', 'web_server', 'database', 'docker', 'systemd']
+const customCapability = ref('')
+
+function toggleInArray(arr: string[], value: string) {
+  const i = arr.indexOf(value)
+  if (i > -1) arr.splice(i, 1)
+  else arr.push(value)
+}
+function addCustomCapability() {
+  const v = customCapability.value.trim()
+  if (v && !form.value.requiredCapabilities.includes(v)) form.value.requiredCapabilities.push(v)
+  customCapability.value = ''
+}
 
 const form = ref<ScriptFormState>({
   identifier: '',
@@ -63,6 +84,8 @@ const form = ref<ScriptFormState>({
   flagLocation: '',
   flagOwnership: '',
   flagPermissions: '0644',
+  requiredOsFamilies: [],
+  requiredCapabilities: [],
   minRamMb: null,
   minDiskGb: null,
   conflictsWithScriptIds: [],
@@ -85,6 +108,8 @@ watch(existingScript, (s) => {
     flagLocation: s.flagLocation,
     flagOwnership: s.flagOwnership,
     flagPermissions: s.flagPermissions || '0644',
+    requiredOsFamilies: s.requiredOsFamilies ?? [],
+    requiredCapabilities: s.requiredCapabilities ?? [],
     minRamMb: s.minRamMb ?? null,
     minDiskGb: s.minDiskGb ?? null,
   }
@@ -158,6 +183,8 @@ async function handleSubmit() {
       flagLocation: form.value.flagLocation,
       flagOwnership: form.value.flagOwnership,
       flagPermissions: form.value.flagPermissions,
+      requiredOsFamilies: form.value.requiredOsFamilies,
+      requiredCapabilities: form.value.requiredCapabilities,
       minRamMb: form.value.minRamMb,
       minDiskGb: form.value.minDiskGb,
     }
@@ -339,6 +366,76 @@ async function handleSubmit() {
             </div>
           </div>
 
+        </section>
+
+        <!-- Compatibility constraints -->
+        <section class="space-y-4 border-b border-slate-800 pb-6">
+          <h2 class="text-lg font-semibold text-slate-100">Compatibility constraints</h2>
+          <p class="text-xs text-slate-500">
+            Restrict which templates this script can run on. At build submission the
+            platform rejects the build if the chosen template's OS family or capability
+            tags don't satisfy these. Leave both empty to allow any template.
+          </p>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-300">Required OS families</label>
+            <div class="flex flex-wrap gap-2">
+              <label
+                v-for="os in OS_FAMILY_OPTIONS"
+                :key="os"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-700 bg-slate-900 cursor-pointer text-sm text-slate-200 hover:bg-slate-800"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.requiredOsFamilies.includes(os)"
+                  @change="toggleInArray(form.requiredOsFamilies, os)"
+                />
+                {{ os }}
+              </label>
+            </div>
+            <p class="mt-1 text-[11px] text-slate-500">Empty = runs on any OS family.</p>
+          </div>
+
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-300">Required capabilities</label>
+            <div class="flex flex-wrap gap-2">
+              <label
+                v-for="cap in CAPABILITY_OPTIONS"
+                :key="cap"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-700 bg-slate-900 cursor-pointer text-sm text-slate-200 hover:bg-slate-800"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.requiredCapabilities.includes(cap)"
+                  @change="toggleInArray(form.requiredCapabilities, cap)"
+                />
+                {{ cap }}
+              </label>
+            </div>
+            <div class="flex gap-2 mt-2">
+              <input
+                v-model="customCapability"
+                type="text"
+                placeholder="Custom capability…"
+                class="flex-1 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                @keyup.enter.prevent="addCustomCapability"
+              />
+              <BaseButton type="button" variant="secondary" @click="addCustomCapability">Add</BaseButton>
+            </div>
+            <div v-if="form.requiredCapabilities.length > 0" class="flex flex-wrap gap-2 mt-2">
+              <span
+                v-for="cap in form.requiredCapabilities"
+                :key="cap"
+                class="inline-flex items-center gap-1 px-3 py-1 bg-primary-500/20 text-primary-400 rounded-md text-sm"
+              >
+                {{ cap }}
+                <button type="button" class="hover:text-primary-300" @click="toggleInArray(form.requiredCapabilities, cap)">✕</button>
+              </span>
+            </div>
+            <p class="mt-1 text-[11px] text-slate-500">
+              Empty = no special capability required. Each must match a tag set on the template.
+            </p>
+          </div>
         </section>
 
         <!-- Script content -->
