@@ -37,6 +37,8 @@ const requestId = computed(() => route.params.requestId as string)
 const { data: build, isLoading } = useBuildStatus(requestId)
 
 const downloading = ref(false)
+const downloadProgress = ref(0)
+const downloadError = ref<string | null>(null)
 const downloadingProvenance = ref(false)
 
 // Flag submission — per-script state, shared attempt counter
@@ -178,9 +180,15 @@ async function submitTelemetry() {
 async function downloadOva() {
   if (!build.value) return
   downloading.value = true
+  downloadProgress.value = 0
+  downloadError.value = null
   try {
     const filename = build.value.ovaFilename ?? `vm-${build.value.id}.ova`
-    await api.downloadBuild(build.value.id, filename, build.value.ovaSha256)
+    await api.downloadBuild(build.value.id, filename, build.value.ovaSha256, (received, total) => {
+      downloadProgress.value = total > 0 ? Math.round((received / total) * 100) : 0
+    })
+  } catch (e: any) {
+    downloadError.value = e?.response?.data?.message ?? e?.message ?? 'Download failed'
   } finally {
     downloading.value = false
   }
@@ -442,8 +450,9 @@ function formatBytes(bytes?: number) {
                 SHA256: {{ build.ovaSha256 }}
               </p>
               <BaseButton class="w-full mt-2" :disabled="downloading" @click="downloadOva">
-                {{ downloading ? 'Downloading…' : 'Download OVA' }}
+                {{ downloading ? `Downloading… ${downloadProgress}%` : 'Download OVA' }}
               </BaseButton>
+              <p v-if="downloadError" class="text-xs text-red-400 mt-2">{{ downloadError }}</p>
             </div>
 
             <div class="rounded-lg border border-slate-700/50 bg-slate-800/30 px-4 py-3 text-xs text-slate-400 space-y-1">

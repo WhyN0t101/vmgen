@@ -61,70 +61,87 @@ export const api = {
     return apiRequest<PagedResponse<Build>>(`/api/builds?page=${page}&size=${size}`)
   },
 
-  downloadBuild: async (id: string, filename: string, expectedSha256?: string): Promise<void> => {
+  /**
+   * Downloads a build's OVA via a single authenticated request, streaming the
+   * response body into one pre-sized buffer. The JWT is attached as a header
+   * (the token lives in memory only, so a plain anchor link cannot carry it).
+   * The downloaded bytes are verified against the build's recorded SHA-256
+   * before being handed to the browser, so a corrupted transfer never reaches
+   * the user. `onProgress` reports received/total bytes for a progress UI.
+   */
+  downloadBuild: async (
+    id: string,
+    filename: string,
+    expectedSha256?: string,
+    onProgress?: (received: number, total: number) => void,
+  ): Promise<void> => {
     const authStore = useAuthStore()
     const authHeaders: Record<string, string> = {}
     if (authStore.token) authHeaders.Authorization = `Bearer ${authStore.token}`
 
-    const CHUNK_SIZE = 4 * 1024 * 1024
-
-    async function sha256Hex(blob: Blob): Promise<string> {
-      const buffer = await blob.arrayBuffer()
-      const hash = await crypto.subtle.digest('SHA-256', buffer)
-      return Array.from(new Uint8Array(hash))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('')
+    const resp = await fetch(`${API_BASE}/api/builds/${id}/download`, { headers: authHeaders })
+    if (!resp.ok || !resp.body) {
+      throw new Error(`Download failed: ${resp.status} ${resp.statusText}`)
     }
 
-    const probe = await fetch(`${API_BASE}/api/builds/${id}/download`, {
-      headers: { ...authHeaders, Range: 'bytes=0-0' },
-    })
+    const expectedHash = (expectedSha256 ?? resp.headers.get('X-Checksum-SHA256') ?? '').toLowerCase()
+    const total = Number.parseInt(resp.headers.get('Content-Length') ?? '0', 10)
 
-    if (!probe.ok && probe.status !== 206) {
-      throw new Error(`Download failed: ${probe.statusText}`)
-    }
+    // Stream the body. When the length is known we write directly into a single
+    // contiguous buffer; this avoids holding both a per-chunk array AND a second
+    // copy of the whole file, which is what exhausted browser memory on
+    // multi-GB OVAs under the old ranged approach.
+    const reader = resp.body.getReader()
+    let received = 0
+    let bytes: Uint8Array<ArrayBuffer>
 
-    const checksumHeader = probe.headers.get('X-Checksum-SHA256')
-    const expectedHash = (expectedSha256 ?? checksumHeader ?? '').toLowerCase()
-    const contentRange = probe.headers.get('Content-Range')
-    const totalSize = contentRange ? Number.parseInt(contentRange.split('/')[1] ?? '0', 10) : 0
-
-    let blob: Blob
-
-    if (totalSize > CHUNK_SIZE) {
-      const parts: BlobPart[] = []
-      let offset = 0
-      while (offset < totalSize) {
-        const end = Math.min(offset + CHUNK_SIZE - 1, totalSize - 1)
-        const chunkResp = await fetch(`${API_BASE}/api/builds/${id}/download`, {
-          headers: { ...authHeaders, Range: `bytes=${offset}-${end}` },
-        })
-        if (!chunkResp.ok && chunkResp.status !== 206) {
-          throw new Error(`Download failed at byte ${offset}: ${chunkResp.statusText}`)
-        }
-        parts.push(await chunkResp.arrayBuffer())
-        offset = end + 1
+    if (total > 0) {
+      bytes = new Uint8Array(total)
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        bytes.set(value, received)
+        received += value.length
+        onProgress?.(received, total)
       }
-      blob = new Blob(parts)
     } else {
-      const fullResp = await fetch(`${API_BASE}/api/builds/${id}/download`, { headers: authHeaders })
-      if (!fullResp.ok) throw new Error(`Download failed: ${fullResp.statusText}`)
-      blob = await fullResp.blob()
+      // Unknown length: accumulate then concatenate once.
+      const chunks: Uint8Array[] = []
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+        received += value.length
+        onProgress?.(received, received)
+      }
+      bytes = new Uint8Array(received)
+      let pos = 0
+      for (const c of chunks) {
+        bytes.set(c, pos)
+        pos += c.length
+      }
     }
 
     if (expectedHash) {
-      const actual = (await sha256Hex(blob)).toLowerCase()
+      // Hash the buffer in place — no second large allocation.
+      const digest = await crypto.subtle.digest('SHA-256', bytes)
+      const actual = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
       if (actual !== expectedHash) {
-        throw new Error('Download checksum verification failed')
+        throw new Error('Checksum verification failed — the downloaded file is corrupted and was not saved.')
       }
     }
 
-    const url = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(new Blob([bytes]))
     const a = document.createElement('a')
     a.href = url
     a.download = filename
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
+    // Revoke after a delay so the browser has started writing the file.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
   },
 
   getProvenance: async (id: string): Promise<ProvenanceResponse> => {
