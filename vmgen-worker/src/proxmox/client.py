@@ -2,6 +2,7 @@ from proxmoxer import ProxmoxAPI # type: ignore
 from proxmox.ovf import generate_ovf
 import hashlib
 import paramiko # type: ignore
+import threading
 import time
 import logging
 
@@ -20,6 +21,10 @@ class ProxmoxClient:
             backend='https',
         )
         self._node = config.node
+        # Serialises VMID allocation + clone across concurrent build threads.
+        # cluster/nextid only *reports* the lowest free id, it does not reserve
+        # it, so two builds racing here would otherwise clone into the same VMID.
+        self._clone_lock = threading.Lock()
 
     def _node_api(self, node: str | None = None) -> object:
         """Shortcut so we don't repeat proxmox.nodes(node) everywhere."""
@@ -70,6 +75,35 @@ class ProxmoxClient:
         self._wait_for_task(task, node, timeout=600)  # cloning a full disk takes time
         log.info(f"VM {new_vmid} cloned successfully")
 
+    def clone_next_free(self, template_vmid: int, name: str, node: str | None = None,
+                        storage: str | None = None, attempts: int = 5) -> int:
+        """Allocate a free VMID and clone into it atomically across threads.
+
+        cluster/nextid does not reserve the id it returns, so concurrent builds
+        could otherwise pick the same one. We hold _clone_lock across nextid +
+        clone so the id is claimed before the next thread allocates, and retry
+        if a clone still collides (defence in depth). Returns the new VMID.
+        """
+        for attempt in range(1, attempts + 1):
+            with self._clone_lock:
+                new_vmid = int(self._px.cluster.nextid.get())
+                try:
+                    self.clone_vm(template_vmid, new_vmid, name, node, storage)
+                    return new_vmid
+                except Exception as e:
+                    if "already exists" in str(e).lower() and attempt < attempts:
+                        log.warning(f"VMID {new_vmid} was taken in a race; retrying ({attempt}/{attempts})")
+                        continue
+                    # Terminal failure — best-effort remove any partial clone so
+                    # we don't leak an orphaned VMID the pipeline never tracked.
+                    try:
+                        if self.vm_exists(new_vmid, node):
+                            self.delete_vm(new_vmid, node)
+                    except Exception as cleanup_err:
+                        log.warning(f"Could not clean up partial clone {new_vmid}: {cleanup_err}")
+                    raise
+        raise RuntimeError(f"Could not allocate a free VMID after {attempts} attempts")
+
     def configure_resources(self, vmid: int, ram_mb: int | None, disk_gb: int | None, node: str | None = None):
         """Adjust RAM and/or disk on a cloned VM before it starts. Both params are optional."""
         if ram_mb:
@@ -97,11 +131,26 @@ class ProxmoxClient:
             else:
                 log.warning(f"VM {vmid}: no resizable disk found — disk resize skipped")
 
+    @staticmethod
+    def _mac_for_vmid(vmid: int) -> str:
+        """Deterministic, unique, locally-administered MAC derived from the VMID.
+
+        Setting net0 without a macaddr let Proxmox hand concurrent clones the
+        same MAC, so pfSense leased them the same IP and their SSH sessions
+        collided. Encoding the (unique) VMID into the MAC guarantees each
+        concurrent build VM gets a distinct MAC -> distinct DHCP lease. The
+        0x02 first octet marks it locally-administered/unicast.
+        """
+        return "02:00:00:{:02x}:{:02x}:{:02x}".format(
+            (vmid >> 16) & 0xFF, (vmid >> 8) & 0xFF, vmid & 0xFF
+        )
+
     def configure_network(self, vmid: int, node: str | None = None):
-        """Attach VM to the isolated build bridge (from config)."""
-        log.info(f"Attaching VM {vmid} to isolated bridge {self._config.isolated_bridge}")
+        """Attach VM to the isolated build bridge with a unique per-VMID MAC."""
+        mac = self._mac_for_vmid(vmid)
+        log.info(f"Attaching VM {vmid} to isolated bridge {self._config.isolated_bridge} (MAC {mac})")
         self._node_api(node).qemu(vmid).config.put(
-            net0=f"virtio,bridge={self._config.isolated_bridge}"
+            net0=f"virtio={mac},bridge={self._config.isolated_bridge}"
         )
     def verify_network_isolation(self, bridge: str) -> bool:
         """

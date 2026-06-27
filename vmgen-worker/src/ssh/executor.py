@@ -81,6 +81,13 @@ class SSHExecutor:
             pkey=self.pkey,
             sock=sock,
         )
+        # Keep the session alive through idle gaps (e.g. cloud-init wait) and
+        # long-running scripts so a stateful firewall (pfSense) or the guest
+        # does not silently drop the connection between channels — otherwise the
+        # next exec_command fails with "SSH session not active".
+        transport = self._client.get_transport()
+        if transport is not None:
+            transport.set_keepalive(30)
 
     def disconnect(self):
         if self._client:

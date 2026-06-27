@@ -122,7 +122,7 @@ export const api = {
       }
     }
 
-    if (expectedHash) {
+    if (expectedHash && crypto?.subtle) {
       // Hash the buffer in place — no second large allocation.
       const digest = await crypto.subtle.digest('SHA-256', bytes)
       const actual = Array.from(new Uint8Array(digest))
@@ -131,6 +131,15 @@ export const api = {
       if (actual !== expectedHash) {
         throw new Error('Checksum verification failed — the downloaded file is corrupted and was not saved.')
       }
+    } else if (expectedHash) {
+      // Web Crypto (crypto.subtle) is only available in secure contexts
+      // (HTTPS or localhost). Over plain HTTP we cannot verify in-browser, so
+      // the file is still saved and the user can verify it manually against the
+      // SHA-256 shown on the build page (e.g. Get-FileHash / sha256sum).
+      console.warn(
+        'Skipping in-browser checksum verification: crypto.subtle is unavailable ' +
+          '(page served over an insecure context). Verify the OVA against the displayed SHA-256 manually.',
+      )
     }
 
     const url = URL.createObjectURL(new Blob([bytes]))

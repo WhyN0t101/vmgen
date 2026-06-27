@@ -50,8 +50,9 @@ services:
       OVA_STORAGE_DIR: /var/lib/vmgen/exports
     volumes:
       # In shared mode, bind the SAME shared storage the worker uses here, so the
-      # API can serve OVA downloads written by the worker.
-      - ova_storage:/var/lib/vmgen/exports
+      # API can serve OVA downloads written by the worker. Set SHARED_EXPORT_MOUNT
+      # to the VM-side path of the shared dir; defaults to the named volume.
+      - ${SHARED_EXPORT_MOUNT:-ova_storage}:/var/lib/vmgen/exports
     expose:
       - "8080"
     healthcheck:
@@ -111,9 +112,9 @@ services:
       PROXMOX_SHARED_EXPORT_DIR: ${PROXMOX_SHARED_EXPORT_DIR:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      # In shared mode, bind the shared storage here instead of the named volume,
-      # e.g.  - ${SHARED_EXPORT_MOUNT:-ova_storage}:/var/lib/vmgen/exports
-      - ova_storage:/var/lib/vmgen/exports
+      # In shared mode, set SHARED_EXPORT_MOUNT to the VM-side path of the shared
+      # dir (e.g. /srv/vmgen-exports); defaults to the named volume in sftp mode.
+      - ${SHARED_EXPORT_MOUNT:-ova_storage}:/var/lib/vmgen/exports
       - ${PROXMOX_SSH_KEY_PATH:?PROXMOX_SSH_KEY_PATH is required}:/run/secrets/proxmox_key:ro
       - ${PROXMOX_KNOWN_HOSTS_PATH:?PROXMOX_KNOWN_HOSTS_PATH is required}:/run/secrets/known_hosts:ro
 

@@ -174,7 +174,8 @@ public class TemplateService {
 
     /**
      * Persists the capability tags associated with a template.
-     * No-ops if the capability list is null or empty.
+     * Trims each tag and skips null/blank entries; no-ops if nothing remains.
+     * Duplicates are dropped so the (template_id, capability) primary key never collides.
      */
     private void saveCapabilities(Template template, List<String> capabilities) {
         if (capabilities == null || capabilities.isEmpty()) {
@@ -182,8 +183,15 @@ public class TemplateService {
         }
 
         List<TemplateCapability> caps = capabilities.stream()
+                .filter(cap -> cap != null && !cap.isBlank())
+                .map(String::trim)
+                .distinct()
                 .map(cap -> new TemplateCapability(template.getId(), cap, template))
                 .toList();
+
+        if (caps.isEmpty()) {
+            return;
+        }
 
         capabilityRepository.saveAll(caps);
     }
