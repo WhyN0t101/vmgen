@@ -508,13 +508,19 @@ public class TemplateService {
      * Used for list endpoints where full detail is not required.
      */
     private TemplateListResponse toListResponse(Template template) {
+        List<String> capabilities = capabilityRepository.findAllByTemplateId(template.getId()).stream()
+                .map(TemplateCapability::getCapability)
+                .toList();
+
         return TemplateListResponse.builder()
                 .id(template.getId())
                 .identifier(template.getIdentifier())
                 .version(template.getVersion())
                 .osFamily(template.getOsFamily())
+                .architecture(template.getArchitecture())
                 .description(template.getDescription())
                 .status(template.getStatus())
+                .capabilities(capabilities)
                 .createdAt(template.getCreatedAt())
                 .build();
     }

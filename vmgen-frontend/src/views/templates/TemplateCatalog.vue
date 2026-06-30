@@ -97,11 +97,29 @@ function formatIdentifier(id: string): string {
                   {{ template.version }}
                 </span>
               </div>
-              <p class="text-xs text-slate-500 mb-2 capitalize">{{ template.osFamily }}</p>
+              <p class="text-xs text-slate-500 mb-2">
+                <span class="capitalize">{{ template.osFamily }}</span>
+                <span class="text-slate-600"> · {{ template.architecture }}</span>
+              </p>
               <p v-if="template.description" class="text-xs text-slate-400 leading-relaxed line-clamp-2">
                 {{ template.description }}
               </p>
               <p v-else class="text-xs text-slate-600 italic">No description provided.</p>
+              <div v-if="template.capabilities?.length" class="flex flex-wrap gap-1 mt-2">
+                <span
+                  v-for="cap in template.capabilities.slice(0, 3)"
+                  :key="cap"
+                  class="text-[10px] font-mono text-sky-300/80 bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 rounded"
+                >
+                  {{ cap }}
+                </span>
+                <span
+                  v-if="template.capabilities.length > 3"
+                  class="text-[10px] font-mono text-slate-500 px-1 py-0.5"
+                >
+                  +{{ template.capabilities.length - 3 }}
+                </span>
+              </div>
             </div>
           </div>
         </BaseCard>

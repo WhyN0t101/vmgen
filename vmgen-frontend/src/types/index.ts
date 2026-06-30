@@ -47,8 +47,10 @@ export interface TemplateListResponse {
   identifier: string
   version: string
   osFamily: OsFamily
+  architecture: Architecture
   description?: string
   status: TemplateStatus
+  capabilities: string[]
   createdAt: string
 }
 

@@ -142,7 +142,15 @@ export const api = {
       )
     }
 
-    const url = URL.createObjectURL(new Blob([bytes]))
+    // The Blob constructor rejects any single ArrayBufferView larger than 2 GB,
+    // so split the buffer into sub-2-GB views (zero-copy subarrays) and let the
+    // Blob assemble them — the resulting Blob itself may exceed 2 GB.
+    const MAX_VIEW = 1 << 30 // 1 GiB per view, comfortably under the 2 GB limit
+    const parts: Uint8Array<ArrayBuffer>[] = []
+    for (let off = 0; off < bytes.length; off += MAX_VIEW) {
+      parts.push(bytes.subarray(off, Math.min(off + MAX_VIEW, bytes.length)) as Uint8Array<ArrayBuffer>)
+    }
+    const url = URL.createObjectURL(new Blob(parts))
     const a = document.createElement('a')
     a.href = url
     a.download = filename

@@ -36,15 +36,6 @@ const filteredScripts = computed(() => {
   )
 })
 
-// Conflict map: scriptId → list of conflicting script IDs
-const conflictMap = computed<Record<string, string[]>>(() => {
-  const map: Record<string, string[]> = {}
-  for (const s of (allScripts.value ?? [])) {
-    if (s.conflictsWithIds?.length) map[s.id] = s.conflictsWithIds
-  }
-  return map
-})
-
 // Requires map: scriptId → list of required script IDs
 const requiresMap = computed<Record<string, string[]>>(() => {
   const map: Record<string, string[]> = {}
@@ -61,16 +52,6 @@ const nameById = computed<Record<string, string>>(() => {
   return map
 })
 
-// Returns why a script is disabled (conflicts with a selected one), or null if ok
-function conflictReasonFor(id: string): string | null {
-  for (const selectedId of selectedCompatibleScriptIds.value) {
-    if ((conflictMap.value[selectedId] ?? []).includes(id)) {
-      return `Conflicts with "${nameById.value[selectedId] ?? selectedId}"`
-    }
-  }
-  return null
-}
-
 // Returns the IDs that caused this script to be auto-selected as a dependency
 function requiredByLabels(id: string): string[] {
   const labels: string[] = []
@@ -83,7 +64,6 @@ function requiredByLabels(id: string): string[] {
 }
 
 function toggleScript(id: string) {
-  if (conflictReasonFor(id)) return
   if (selectedCompatibleScriptIds.value.has(id)) {
     selectedCompatibleScriptIds.value.delete(id)
   } else {
@@ -653,22 +633,16 @@ async function handleSubmit() {
           <label
             v-for="s in filteredScripts"
             :key="s.id"
-            :class="[
-              'flex items-start gap-3 px-3 py-2 rounded-lg transition-colors',
-              conflictReasonFor(s.id)
-                ? 'opacity-40 cursor-not-allowed'
-                : 'cursor-pointer hover:bg-slate-800/60',
-            ]"
+            class="flex items-start gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer hover:bg-slate-800/60"
           >
             <input
               type="checkbox"
               :checked="selectedCompatibleScriptIds.has(s.id)"
-              :disabled="!!conflictReasonFor(s.id)"
               @change="toggleScript(s.id)"
               class="mt-0.5 shrink-0"
             />
             <div class="min-w-0">
-              <p :class="['text-sm', conflictReasonFor(s.id) ? 'text-slate-400' : 'text-slate-100']">
+              <p class="text-sm text-slate-100">
                 {{ s.name }}
               </p>
               <p class="text-[11px] font-mono text-slate-500">
@@ -676,10 +650,7 @@ async function handleSubmit() {
                 <span v-if="s.categoryName" class="ml-2 text-slate-400">· {{ s.categoryName }}</span>
                 <span class="ml-2 text-slate-500">· {{ s.difficultyLevel }}</span>
               </p>
-              <p v-if="conflictReasonFor(s.id)" class="text-[11px] text-red-400 mt-0.5">
-                 {{ conflictReasonFor(s.id) }}
-              </p>
-              <p v-else-if="requiredByLabels(s.id).length > 0" class="text-[11px] text-amber-400 mt-0.5">
+              <p v-if="requiredByLabels(s.id).length > 0" class="text-[11px] text-amber-400 mt-0.5">
                 ↳ Auto-selected: required by "{{ requiredByLabels(s.id).join('", "') }}"
               </p>
               <p v-else-if="(requiresMap[s.id] ?? []).length > 0" class="text-[11px] text-sky-400 mt-0.5">
