@@ -14,7 +14,7 @@ const selectedVulnIds = ref<string[]>([])
 const difficulty = ref<'easy' | 'medium' | 'hard'>('medium')
 const telemetryEnabled = ref(false)
 
-// size: 100 loads the full catalog without pagination — the template selector
+// size: 100 loads the full catalog without pagination - the template selector
 // needs all available options visible at once.
 const { data: templates, isLoading: templatesLoading } = useActiveTemplates({ size: 100 })
 const { data: compatibleScripts, isLoading: scriptsLoading } = usePublicCompatibleScripts(selectedTemplateId)
@@ -308,7 +308,7 @@ function handleSubmit() {
               <span class="font-semibold">Parameter conflict:</span>
               <span class="font-mono ml-1">{{ w.paramName }}</span> is set to
               <span class="font-mono">{{ w.value }}</span> in multiple scripts
-              ({{ w.scripts.join(', ') }}) — this will cause one service to fail at boot.
+              ({{ w.scripts.join(', ') }}) - this will cause one service to fail at boot.
               Use different values or enable randomisation.
             </div>
           </div>

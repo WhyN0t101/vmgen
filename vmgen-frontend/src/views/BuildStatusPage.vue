@@ -478,7 +478,7 @@ function formatBytes(bytes?: number) {
 
             <div v-else-if="telemetrySubmitted" class="space-y-3">
               <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
-                Telemetry submitted — your instructor can now review your session.
+                Telemetry submitted - your instructor can now review your session.
               </div>
               <div v-if="telemetryDeleteError" class="text-xs text-red-400">{{ telemetryDeleteError }}</div>
               <BaseButton variant="secondary" class="w-full" :disabled="telemetryDeleting" @click="deleteTelemetry">
@@ -516,7 +516,7 @@ function formatBytes(bytes?: number) {
             <p class="text-xs font-mono tracking-widest uppercase text-slate-400">Submit Flag</p>
 
             <div v-if="allFlagsCorrect" class="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-300">
-              {{ build.scripts.length === 1 ? 'Correct flag — challenge complete.' : 'All flags correct — challenge complete.' }}
+              {{ build.scripts.length === 1 ? 'Correct flag - challenge complete.' : 'All flags correct - challenge complete.' }}
             </div>
 
             <div v-if="flagExhausted && !allFlagsCorrect" class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm text-red-400">

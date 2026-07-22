@@ -247,7 +247,7 @@ const privilegedPortWarning = computed(() => {
         </div>
       </div>
       <p v-if="privilegedPortWarning" class="text-[11px] text-amber-400">
-        ⚠ Min is below 1024. If this parameter is a port, services binding below 1024 require root — set min ≥ 1024 unless this is intentional.
+         Min is below 1024. If this parameter is a port, services binding below 1024 require root - set min ≥ 1024 unless this is intentional.
       </p>
       <!-- String/other: length + charset -->
       <div v-else class="grid gap-4 md:grid-cols-2">

@@ -84,7 +84,7 @@
         <div class="rounded-xl border border-slate-700/50 bg-slate-800/40 px-5 py-4 text-sm text-slate-300 space-y-3">
           <p class="font-medium">Telemetry data policy</p>
           <ul class="list-disc list-inside space-y-1 text-slate-400 text-sm">
-            <li><span class="text-slate-300">What is collected:</span> the JSON payload you upload — typically a shell-history excerpt produced by the collector script. No other guest data is captured by the platform.</li>
+            <li><span class="text-slate-300">What is collected:</span> the JSON payload you upload - typically a shell-history excerpt produced by the collector script. No other guest data is captured by the platform.</li>
             <li><span class="text-slate-300">Who can access it:</span> you (via the build status page) and platform administrators for operational support and abuse investigation. Telemetry is not shared with third parties.</li>
             <li><span class="text-slate-300">Retention:</span> uploaded telemetry is retained until you delete it or until the platform's automatic 90-day retention policy removes it, whichever comes first.</li>
             <li><span class="text-slate-300">Opt-in only:</span> telemetry collection is disabled by default and must be explicitly enabled at build creation time. Builds without telemetry enabled cannot upload data.</li>

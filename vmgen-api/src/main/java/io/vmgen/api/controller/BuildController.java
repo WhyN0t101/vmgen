@@ -1,6 +1,6 @@
 package io.vmgen.api.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import io.vmgen.api.dto.build.BuildDownloadInfo;
 import io.vmgen.api.dto.build.BuildLogDto;
 import io.vmgen.api.dto.build.BuildResponse;

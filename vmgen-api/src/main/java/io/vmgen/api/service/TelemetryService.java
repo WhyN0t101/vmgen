@@ -1,9 +1,8 @@
 package io.vmgen.api.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vmgen.api.dto.audit.AuditContext;
 import io.vmgen.api.dto.telemetry.TelemetryUploadResponse;
+import tools.jackson.databind.JsonNode;
 import io.vmgen.api.exceptions.ForbiddenException;
 import io.vmgen.api.exceptions.ResourceNotFoundException;
 import io.vmgen.api.exceptions.ValidationException;
@@ -37,7 +36,6 @@ public class TelemetryService {
     private final VmRequestRepository vmRequestRepository;
     private final TelemetryRepository telemetryRepository;
     private final AuditService auditService;
-    private final ObjectMapper objectMapper;
 
     @Transactional
     public TelemetryUploadResponse uploadTelemetry(UUID buildId, JsonNode body, User user) {
@@ -142,15 +140,7 @@ public class TelemetryService {
     }
 
     private byte[] serialize(JsonNode body) {
-        try {
-            return objectMapper.writeValueAsBytes(body);
-        } catch (Exception e) {
-        throw new ValidationException(
-                "Validation failed",
-                List.of("Failed to serialize telemetry JSON"));
-
-    }
-
+        return body.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     private String computeSha256(byte[] data) {
