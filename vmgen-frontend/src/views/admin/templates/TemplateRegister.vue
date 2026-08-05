@@ -424,9 +424,10 @@ async function handleSubmit() {
         <div class="mb-4 rounded-lg border border-slate-700 bg-slate-900/40 p-4">
           <p class="text-sm text-slate-200 font-semibold mb-1">What is validation?</p>
           <p class="text-xs text-slate-400">
-            After registration, VMGen will boot this template in isolation, attempt SSH using the
-            configuration below, and run basic checks. Templates must pass validation before users
-            can request VMs from them.
+            After registration, VMGen confirms this template's VM ID exists and is reachable on
+            Proxmox. Templates must pass this check before users can request VMs from them.
+            Isolated-boot and SSH checks are not yet performed automatically — verify SSH access
+            manually before publishing.
           </p>
         </div>
 
