@@ -106,6 +106,17 @@ const telemetryDeleting = ref(false)
 const telemetryDeleted = ref(false)
 const telemetryDeleteError = ref<string | null>(null)
 
+// Server is the source of truth for whether telemetry is currently uploaded —
+// local flags alone would reset to their initial values on every remount.
+watch(
+  () => build.value?.telemetryUploadedAt,
+  (uploadedAt) => {
+    telemetrySubmitted.value = !!uploadedAt
+    if (uploadedAt) telemetryDeleted.value = false
+  },
+  { immediate: true },
+)
+
 async function deleteTelemetry() {
   if (!build.value) return
   telemetryDeleting.value = true

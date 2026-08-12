@@ -360,6 +360,7 @@ export interface Build {
   scripts: BuildScript[]
   difficulty?: string
   telemetryEnabled: boolean
+  telemetryUploadedAt?: string | null
   currentWorkerStage?: string
   submittedAt: string
   claimedAt?: string

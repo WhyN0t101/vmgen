@@ -23,6 +23,9 @@ public class BuildResponse {
     private String difficulty;
     private boolean telemetryEnabled;
 
+    /** Set when a non-deleted telemetry upload exists for this build; null otherwise. */
+    private Instant telemetryUploadedAt;
+
     /** Current worker stage description (null when queued or complete). */
     private String currentWorkerStage;
 

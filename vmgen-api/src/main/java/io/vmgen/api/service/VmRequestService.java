@@ -13,9 +13,11 @@ import io.vmgen.api.models.build.BuildLog;
 import io.vmgen.api.models.provenance.ProvenanceRecord;
 import io.vmgen.api.models.vm.VmRequestState;
 import io.vmgen.api.models.flag.Flag;
+import io.vmgen.api.models.telemetry.TelemetryUpload;
 import io.vmgen.api.repository.BuildLogRepository;
 import io.vmgen.api.repository.flag.FlagRepository;
 import io.vmgen.api.repository.provenance.ProvenanceRecordRepository;
+import io.vmgen.api.repository.telemetry.TelemetryRepository;
 import io.vmgen.api.dto.common.PagedResponse;
 import io.vmgen.api.dto.script.ScriptParameterDto;
 import io.vmgen.api.dto.script.ScriptSelectionResult;
@@ -78,6 +80,7 @@ public class VmRequestService {
     private final ProvenanceRecordRepository provenanceRecordRepository;
     private final BuildLogRepository buildLogRepository;
     private final FlagRepository flagRepository;
+    private final TelemetryRepository telemetryRepository;
     private final AuditService auditService;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -544,6 +547,13 @@ public class VmRequestService {
         Template t = r.getTemplate();
         String templateName = t != null ? t.getIdentifier() + " " + t.getVersion() : "";
 
+        boolean telemetryEnabled = Boolean.TRUE.equals(r.getTelemetryEnabled());
+        Instant telemetryUploadedAt = telemetryEnabled
+                ? telemetryRepository.findByVmRequest_IdAndDeletedAtIsNull(r.getId())
+                        .map(TelemetryUpload::getUploadedAt)
+                        .orElse(null)
+                : null;
+
         return BuildResponse.builder()
                 .id(r.getId())
                 .state(r.getState().name().toLowerCase())
@@ -551,7 +561,8 @@ public class VmRequestService {
                 .templateName(templateName)
                 .scripts(scriptDtos)
                 .difficulty(r.getDifficultyOverride())
-                .telemetryEnabled(Boolean.TRUE.equals(r.getTelemetryEnabled()))
+                .telemetryEnabled(telemetryEnabled)
+                .telemetryUploadedAt(telemetryUploadedAt)
                 .currentWorkerStage(r.getCurrentWorkerStage())
                 .submittedAt(r.getSubmittedAt())
                 .claimedAt(r.getClaimedAt())
