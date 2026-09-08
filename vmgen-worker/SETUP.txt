@@ -51,7 +51,9 @@ VMGen Worker - Setup Instructions
    - Fill in your credentials:
      * DATABASE_PASSWORD
      * PROXMOX_HOST, PROXMOX_TOKEN_ID, PROXMOX_TOKEN_SECRET
-     * PROXMOX_ISOLATED_BRIDGE (default: vmbr1)
+     * PROXMOX_ISOLATED_BRIDGE (code default: vmbr1 -- must actually point at a bridge/subnet
+       genuinely separate from the management/platform network, e.g. vmbr2; same-subnet hosts
+       bypass any firewall between them, so this can't just be left at the default)
      * PROXMOX_SSH_KEY_PATH (e.g. C:\Users\whoami\.ssh\vmgen_worker)
      * PROXMOX_SSH_USER (default: root)
      * BACKEND_API_KEY

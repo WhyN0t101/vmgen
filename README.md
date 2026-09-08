@@ -6,9 +6,10 @@ A platform for deterministic generation of vulnerable virtual machines for cyber
 
 | Path | Role |
 |------|------|
-| `vmgen-api/` | Spring Boot backend, Flyway migrations, `docker-compose.yml` (Postgres + pgAdmin) |
+| `vmgen-api/` | Spring Boot backend and Flyway migrations |
 | `vmgen-frontend/` | Vue 3 + Vite SPA |
 | `vmgen-worker/` | Python build worker (Proxmox + pipeline); see `vmgen-worker/SETUP.txt` |
+| `docker/` | Full Docker Compose deployment (PostgreSQL, API, frontend, and worker) |
 
 ## Project concept
 
@@ -44,7 +45,7 @@ VMGen enables educators and security researchers to:
 ### Backend (`vmgen-api`)
 
 - **Framework**: Spring Boot 4.0 (Java 21)
-- **Security**: Spring Security 6 with JWT authentication (HS256; session tokens tracked server-side)
+- **Security**: Spring Security 7 with JWT authentication (HS256; session tokens tracked server-side)
 - **Database**: PostgreSQL 16 (via Docker for local dev)
 - **ORM**: JPA/Hibernate
 - **Migrations**: Flyway (`src/main/resources/db/migration`; consolidated baseline `V1__initial_schema.sql`, with older increments archived under `db/migration_legacy/`)
@@ -54,7 +55,7 @@ VMGen enables educators and security researchers to:
 
 ### Worker (`vmgen-worker`)
 
-- **Language**: Python 3.11+
+- **Language**: Python 3.14+
 - **Proxmox integration**: `proxmoxer` (API) + `paramiko` (SSH)
 - **Build pipeline**: Multi-stage pipeline — clone, provision, scripts, flags, OVA export, provenance
 - **Flag derivation**: Requests raw flags from backend API (`POST /api/worker/jobs/{id}/derive-flags`); platform secret never leaves the backend
@@ -64,17 +65,16 @@ VMGen enables educators and security researchers to:
 ### Database
 
 - **PostgreSQL 16** in Docker (local dev)
-- **pgAdmin** optional UI on port 5050 (same Compose file as Postgres)
 
 ## Prerequisites
 
 - **Java 21 JDK** (not JRE)
-- **Node.js 18+** and npm
+- **Node.js 20.19+ or 22.12+** and npm
 - **Docker** and Docker Compose
 - **Maven** (or use included `mvnw` / `mvnw.cmd` in `vmgen-api`)
 - **IDE** (IntelliJ IDEA, VS Code, or Cursor recommended)
 
-For running builds end-to-end you also need **Python 3.11+**, **Proxmox VE**, and worker-specific setup (`vmgen-worker/SETUP.txt`).
+For running builds end-to-end you also need **Python 3.14+**, **Proxmox VE**, and worker-specific setup (`vmgen-worker/SETUP.txt`).
 
 ## Quick start
 
@@ -126,42 +126,21 @@ VMGEN_CORS_ORIGINS=http://localhost:5173
 SWAGGER_ENABLED=false
 ```
 
-### 1. Start the database
+### 1. Start PostgreSQL for local development
 
-Run Compose **from** `vmgen-api` (the directory that contains `docker-compose.yml`):
+The API expects PostgreSQL on `localhost:5432` by default. Start a local PostgreSQL 16 instance with the following development values, or override them through the environment variables shown above:
 
-```bash
-cd vmgen-api
-docker compose up -d
-```
-
-(On older Docker installs you may need `docker-compose` with a hyphen.)
-
-- **PostgreSQL**: `localhost:5432`
 - **Database**: `vmgen`
 - **Username / password**: `vmgen` / `vmgen`
 
-Postgres only (skip pgAdmin):
+The Compose deployment under `docker/` is intended to run the containerised platform as a stack; its PostgreSQL port is not published to the host. To run the complete stack instead of the local-development flow, copy `docker/.env.example` to `docker/.env`, replace every required `CHANGE_ME` value, and run:
 
 ```bash
-docker compose up -d postgres
+cd docker
+docker compose up -d --build
 ```
 
-#### pgAdmin (optional UI)
-
-Compose also runs pgAdmin at **http://localhost:5050**
-
-- **pgAdmin login**: `admin@example.com` / `admin`
-
-**First-time server registration** (add the Postgres server once per fresh pgAdmin volume):
-
-1. **Object → Register → Server**.
-2. **General**: display name (e.g. `VMGen Postgres`).
-3. **Connection**:
-   - **Host**: `postgres` if pgAdmin runs **in this Compose stack**. If you use **desktop** pgAdmin on the host, use `localhost` or `127.0.0.1`.
-   - **Port**: `5432`
-   - **Maintenance database**: `postgres`
-   - **Username** / **Password**: `vmgen` / `vmgen`
+(On older Docker installs you may need `docker-compose` with a hyphen.)
 
 **Connection URL** (IDEs, `psql`, scripts):
 
@@ -170,12 +149,10 @@ Compose also runs pgAdmin at **http://localhost:5050**
 **Reset database** (destructive — drops Compose volumes):
 
 ```bash
-cd vmgen-api
+cd docker
 docker compose down -v
-docker compose up -d
+docker compose up -d --build
 ```
-
-**Optional — pre-register a server in Docker pgAdmin** via `PGADMIN_SERVER_JSON` on the `pgadmin` service. See the [pgAdmin container deployment docs](https://www.pgadmin.org/docs/pgadmin4/latest/container_deployment.html#mapped-files-and-directories). Do not commit production secrets.
 
 ### 2. Start the backend
 
@@ -257,7 +234,7 @@ From the host, using the Compose Postgres container:
 docker exec -it vmgen-postgres psql -U vmgen -d vmgen -c "UPDATE users SET role = 'ADMIN' WHERE email = 'your-email@example.com';"
 ```
 
-Or run the same statement in pgAdmin’s query tool.
+Or run the same statement through your preferred PostgreSQL client.
 
 ## License
 

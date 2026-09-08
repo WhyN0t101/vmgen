@@ -14,6 +14,14 @@ def generate_ovf(vm_name: str, cpu_count: int, memory_mb: int,
 
     Declares a lsilogic SCSI controller (InstanceID 4) that the disk item references
     as its parent — required for VMware/VirtualBox to enumerate and boot the disk.
+
+    OperatingSystemSection (ovf:id="94", CIM code for "Linux 2.6.x (64-bit)") is required
+    for VirtualBox specifically: without it, VirtualBox imports the VM as guest type
+    "Other/Unknown" and applies generic hardware defaults (notably IO-APIC left disabled),
+    which hangs a multi-vCPU Linux guest before it reaches GRUB -- a black screen with a
+    blinking cursor and no boot output at all. VMware Workstation boots fine either way;
+    this section costs nothing there. Confirmed by reproducing the hang, then confirming
+    a manual guest-type correction in an already-imported VM's settings fixed it.
     """
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <Envelope xmlns="http://schemas.dmtf.org/ovf/envelope/1"
@@ -37,6 +45,10 @@ def generate_ovf(vm_name: str, cpu_count: int, memory_mb: int,
   </DiskSection>
   <VirtualSystem ovf:id="{vm_name}">
     <Info>VMGen generated vulnerable VM</Info>
+    <OperatingSystemSection ovf:id="94">
+      <Info>Guest Operating System</Info>
+      <Description>Ubuntu Linux (64-bit)</Description>
+    </OperatingSystemSection>
     <VirtualHardwareSection>
       <Info>Virtual hardware requirements</Info>
       <System>

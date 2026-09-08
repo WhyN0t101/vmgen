@@ -11,7 +11,9 @@ worker:
 proxmox:
   node: "pve"
   storage: "local-lvm"
-  build_network: "vmbr1"
+  # Must be genuinely separate from the management/platform network's bridge/subnet --
+  # same-subnet hosts bypass any firewall between them via direct ARP/switching.
+  build_network: "vmbr2"
 
 timeouts:
   ssh_wait_seconds: 300          # 5 minutes to wait for SSH
