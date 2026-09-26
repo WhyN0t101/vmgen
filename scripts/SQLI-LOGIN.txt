@@ -1,0 +1,260 @@
+#!/bin/bash
+# =============================================================================
+#
+# SQL Injection - Vulnerable Login Portal
+# Target: Ubuntu 22.04 / 24.04 (clean cloud-init template)
+# Chain: Discover login form -> SQLi bypass or UNION extraction -> flag
+# =============================================================================
+
+set -e
+
+PORT="{{PORT}}"
+DIFFICULTY="{{DIFFICULTY}}"   # easy | hard
+APP_TITLE="{{APP_TITLE}}"
+APP_DIR="/opt/sqli-app"
+DB_PATH="${APP_DIR}/db.sqlite3"
+APP_USER="www-sqli"
+
+# =============================================================================
+# STEP 1 - Install dependencies
+# =============================================================================
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get -o DPkg::Lock::Timeout=300 update
+sudo NEEDRESTART_MODE=a DEBIAN_FRONTEND=noninteractive \
+    apt-get -o DPkg::Lock::Timeout=300 install -y python3 python3-flask
+
+# =============================================================================
+# STEP 2 - Create app user and directory
+# =============================================================================
+id "$APP_USER" &>/dev/null || sudo useradd -r -s /sbin/nologin "$APP_USER"
+sudo mkdir -p "$APP_DIR"
+
+# =============================================================================
+# STEP 3 - Create the vulnerable Flask application
+# App reads DIFFICULTY, VULN_FIELD, APP_TITLE from environment variables
+# set by the systemd service - no bash expansion needed inside the heredoc.
+# =============================================================================
+sudo tee "${APP_DIR}/app.py" > /dev/null << 'PYEOF'
+from flask import Flask, request, render_template_string, session, redirect
+import sqlite3
+import os
+
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
+DB_PATH    = os.path.join(os.path.dirname(__file__), 'db.sqlite3')
+FLAG_PATH  = os.path.join(os.path.dirname(__file__), 'flag.txt')
+DIFFICULTY = os.environ.get('DIFFICULTY', 'easy')   # easy | hard
+APP_TITLE  = os.environ.get('APP_TITLE',  'CorpNet Portal')
+
+def load_flag_into_db():
+    if not os.path.exists(FLAG_PATH):
+        return
+    with open(FLAG_PATH) as f:
+        flag = f.read().strip()
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE secrets SET secret = ? WHERE owner = 'admin'", (flag,))
+    conn.commit()
+    conn.close()
+
+@app.before_request
+def _reload_flag():
+    # The worker writes the flag file during the PLACE_FLAGS stage, which runs
+    # AFTER this app was started in EXECUTE_SCRIPTS. Loading the flag only at
+    # import time would therefore always miss it (the dashboard/UNION extraction
+    # would return the 'flag_not_placed_yet' placeholder). Reloading per request
+    # ensures the real flag is loaded into the secrets table once it is placed.
+    load_flag_into_db()
+
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html>
+<head><title>{{ app_title }}</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee;
+         display: flex; justify-content: center; align-items: center;
+         height: 100vh; margin: 0; }
+  .card { background: #16213e; padding: 2rem; border-radius: 8px; width: 340px; }
+  h2 { text-align: center; color: #e94560; margin-bottom: 1.5rem; }
+  input { width: 100%; padding: 8px; margin: 6px 0; box-sizing: border-box;
+          background: #0f3460; border: none; color: #eee; border-radius: 4px; }
+  button { width: 100%; padding: 10px; background: #e94560; border: none;
+           color: white; border-radius: 4px; cursor: pointer; font-size: 1rem;
+           margin-top: 8px; }
+  .error { color: #e94560; text-align: center; margin-top: 10px; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>{{ app_title }}</h2>
+  <form method="POST">
+    <input type="text" name="username" placeholder="Username" autocomplete="off" />
+    <input type="password" name="password" placeholder="Password" />
+    <button type="submit">Login</button>
+  </form>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+</div>
+</body>
+</html>
+"""
+
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html>
+<head><title>{{ app_title }} - Dashboard</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; padding: 2rem; }
+  h2 { color: #e94560; }
+  .info { background: #16213e; padding: 1rem; border-radius: 6px; margin: 0.5rem 0; }
+  .secret { background: #0f3460; padding: 1rem; border-radius: 4px;
+            margin-top: 1rem; word-break: break-all; font-family: monospace; }
+  a { color: #e94560; }
+</style>
+</head>
+<body>
+  <h2>Welcome, {{ username }}</h2>
+  <div class="info">Role: {{ role }}</div>
+  {% if secret %}
+  <p>Your secret:</p>
+  <div class="secret">{{ secret }}</div>
+  {% endif %}
+  <br><a href="/logout">Logout</a>
+</body>
+</html>
+"""
+
+@app.route('/', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            # VULNERABLE: password field concatenated directly into the query
+            query = f"SELECT id, username, role FROM users WHERE username = ? AND password = '{password}'"
+            c.execute(query, (username,))
+            row = c.fetchone()
+            if row:
+                session['user_id'] = row[0]
+                session['username'] = row[1]
+                session['role'] = row[2]
+                return redirect('/dashboard')
+            else:
+                error = 'Invalid credentials'
+        except Exception as e:
+            error = f'DB error: {e}' if DIFFICULTY == 'easy' else 'Invalid credentials'
+        finally:
+            conn.close()
+    return render_template_string(LOGIN_HTML, error=error, app_title=APP_TITLE)
+
+@app.route('/dashboard')
+def dashboard():
+    if 'username' not in session:
+        return redirect('/')
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT secret FROM secrets WHERE owner = ?", (session['username'],))
+    row = c.fetchone()
+    secret = row[0] if row else None
+    conn.close()
+    return render_template_string(DASHBOARD_HTML,
+        username=session['username'],
+        role=session['role'],
+        secret=secret,
+        app_title=APP_TITLE)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+PYEOF
+
+# =============================================================================
+# STEP 4 - Initialise the database
+# =============================================================================
+sudo python3 - << PYEOF
+import sqlite3
+conn = sqlite3.connect("${DB_PATH}")
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS users (
+    id       INTEGER PRIMARY KEY,
+    username TEXT NOT NULL,
+    password TEXT NOT NULL,
+    role     TEXT NOT NULL
+)''')
+c.execute('''CREATE TABLE IF NOT EXISTS secrets (
+    id     INTEGER PRIMARY KEY,
+    owner  TEXT NOT NULL,
+    secret TEXT NOT NULL
+)''')
+c.execute("DELETE FROM users")
+c.execute("DELETE FROM secrets")
+c.execute("INSERT INTO users VALUES (1, 'admin', 'adm1n_p@ssw0rd_2024!', 'admin')")
+c.execute("INSERT INTO users VALUES (2, 'alice', 'alice123', 'user')")
+c.execute("INSERT INTO users VALUES (3, 'bob',   'ilovecats', 'user')")
+c.execute("INSERT INTO secrets VALUES (1, 'admin', 'flag_not_placed_yet')")
+c.execute("INSERT INTO secrets VALUES (2, 'alice', 'My cat is named Whiskers')")
+c.execute("INSERT INTO secrets VALUES (3, 'bob',   'I prefer dogs actually')")
+conn.commit()
+conn.close()
+print("[+] Database initialised.")
+PYEOF
+
+# =============================================================================
+# STEP 5 - Fix permissions
+# =============================================================================
+sudo chown -R "${APP_USER}:${APP_USER}" "$APP_DIR"
+sudo chmod 750 "$APP_DIR"
+sudo chmod 640 "${DB_PATH}"
+
+# =============================================================================
+# STEP 6 - Create systemd service
+# =============================================================================
+if [ ! -f /etc/systemd/system/sqli-app.service ]; then
+    sudo tee /etc/systemd/system/sqli-app.service > /dev/null << EOF
+[Unit]
+Description=SQLi Vulnerable Web App
+After=network.target
+
+[Service]
+Type=simple
+User=${APP_USER}
+WorkingDirectory=${APP_DIR}
+Environment=PORT=${PORT}
+Environment=DIFFICULTY=${DIFFICULTY}
+Environment=APP_TITLE=${APP_TITLE}
+ExecStart=/usr/bin/python3 ${APP_DIR}/app.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable sqli-app
+fi
+
+if ! sudo systemctl is-active --quiet sqli-app; then
+    sudo systemctl start sqli-app
+fi
+
+# =============================================================================
+# STEP 7 - Verify
+# =============================================================================
+sleep 2
+
+if ! sudo systemctl is-active --quiet sqli-app; then
+    echo "[-] ERROR: sqli-app is not running."
+    sudo journalctl -u sqli-app --no-pager | tail -20
+    exit 1
+fi
+
+if ss -tlnp | grep -q ":${PORT} "; then
+    echo "[+] SQLi app running on port ${PORT} (difficulty=${DIFFICULTY})."
+else
+    echo "[-] WARNING: Port ${PORT} not listening."
+fi

