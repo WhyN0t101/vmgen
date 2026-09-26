@@ -469,7 +469,7 @@ public class VmRequestService {
      * (built before this feature was introduced).
      */
     @Transactional(readOnly = true)
-    public AdminBuildCredentialsResponse getAdminBuildCredentials(UUID requestId) {
+    public AdminBuildCredentialsResponse getAdminBuildCredentials(UUID requestId, User admin, AuditContext ctx) {
         VmRequest request = vmRequestRepository.findById(requestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Build not found: " + requestId));
         ProvenanceRecord provenance = provenanceRecordRepository.findByVmRequest_Id(requestId)
@@ -477,6 +477,7 @@ public class VmRequestService {
         if (provenance.getVmLoginPassword() == null) {
             throw new ResourceNotFoundException("VM login credentials not available for this build");
         }
+        auditService.logBuildCredentialsAccessed(admin, requestId, ctx);
         return AdminBuildCredentialsResponse.builder()
                 .buildId(requestId)
                 .sshUsername(request.getTemplate().getExpectedSshUser())

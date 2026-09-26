@@ -54,6 +54,9 @@ public class AuditService {
 
     // Telemetry events
     private static final String ACTION_TELEMETRY_DELETED = "telemetry_deleted";
+    // Admin access to sensitive build data
+    private static final String ACTION_BUILD_CREDENTIALS_ACCESSED = "build_credentials_accessed";
+    private static final String ACTION_TELEMETRY_ACCESSED = "telemetry_accessed";
 
     // Script admin events
     private static final String ACTION_SCRIPT_CREATED = "script_created";
@@ -221,6 +224,20 @@ public class AuditService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logTelemetryDeleted(User user, UUID buildId, AuditContext ctx) {
         write(user, ACTION_TELEMETRY_DELETED, "build", buildId, ctx,
+                Map.of("buildId", buildId.toString()));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logTelemetryAccessed(User admin, UUID buildId, AuditContext ctx) {
+        write(admin, ACTION_TELEMETRY_ACCESSED, "build", buildId, ctx,
+                Map.of("buildId", buildId.toString()));
+    }
+
+    //  Admin access to sensitive build data
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logBuildCredentialsAccessed(User admin, UUID buildId, AuditContext ctx) {
+        write(admin, ACTION_BUILD_CREDENTIALS_ACCESSED, "build", buildId, ctx,
                 Map.of("buildId", buildId.toString()));
     }
 

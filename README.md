@@ -90,7 +90,7 @@ The API loads an optional **properties-style** `.env` file from the **working di
 # JWT signing (minimum ~32 characters; use a strong random value in production)
 VMGEN_JWT_SECRET=<min-32-char-random-string>
 
-# Flag derivation (must match workers’ PLATFORM_SECRET)
+# Flag derivation secret (backend only — workers never receive it; they call /derive-flags)
 PLATFORM_SECRET=<256-bit-hex-or-long-random-secret>
 
 # Worker authentication — same value as the worker’s BACKEND_API_KEY
@@ -198,7 +198,7 @@ The SPA calls the API on `localhost:8080`; ensure `VMGEN_CORS_ORIGINS` includes 
 
 ### 4. (Optional) Start the worker
 
-Only needed for **real Proxmox builds** (not for browsing the UI or API-only testing). Copy `vmgen-worker/.env.example` → `.env`, set `BACKEND_API_KEY` to the same value as **`WORKER_API_KEY`** on the API, align `PLATFORM_SECRET`, then follow **`vmgen-worker/SETUP.txt`** (SSH key to Proxmox, `EXPORT_PATH`, etc.).
+Only needed for **real Proxmox builds** (not for browsing the UI or API-only testing). Copy `vmgen-worker/.env.example` → `.env`, set `BACKEND_API_KEY` to the same value as **`WORKER_API_KEY`** on the API (workers do not need `PLATFORM_SECRET`), then follow **`vmgen-worker/SETUP.txt`** (SSH key to Proxmox, `EXPORT_PATH`, etc.).
 
 ```bash
 cd vmgen-worker

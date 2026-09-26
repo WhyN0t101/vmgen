@@ -104,9 +104,10 @@ public class TelemetryService {
     }
 
     @Transactional(readOnly = true)
-    public TelemetryUploadResponse getAdminTelemetry(UUID buildId) {
+    public TelemetryUploadResponse getAdminTelemetry(UUID buildId, User admin, AuditContext ctx) {
         TelemetryUpload upload = telemetryRepository.findByVmRequest_IdAndDeletedAtIsNull(buildId)
                 .orElseThrow(() -> new ResourceNotFoundException("No telemetry found for build: " + buildId));
+        auditService.logTelemetryAccessed(admin, buildId, ctx);
         return toResponse(upload);
     }
 
