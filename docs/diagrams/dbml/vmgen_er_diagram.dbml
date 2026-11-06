@@ -1,0 +1,155 @@
+// VMGen Core Data Model — ER Diagram (Architecture Chapter)
+// Full schema: vmgen_schema.dbml
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table users {
+  id uuid [primary key]
+  username varchar(255) [unique, not null]
+  email varchar(255) [unique, not null]
+  role varchar(50) [not null, default: 'USER']
+  locked_until timestamp [note: 'Set when flag-based lockout is triggered']
+  created_at timestamp [not null]
+}
+
+Table vulnerability_categories {
+  id uuid [primary key]
+  identifier varchar(100) [unique, not null]
+  name varchar(255) [not null]
+  description text
+  is_active boolean [not null, default: true]
+  created_by uuid [not null]
+  created_at timestamp [not null]
+}
+
+Table templates {
+  id uuid [primary key]
+  identifier varchar(255) [not null]
+  version varchar(50) [not null]
+  os_family varchar(100) [not null]
+  os_version varchar(100) [not null]
+  architecture varchar(50) [not null]
+  status varchar(50) [not null, note: 'DRAFT | VALIDATING | ACTIVE | FAILED | DEPRECATED']
+  sha256_hash varchar(64)
+  ssh_auth_method varchar(20) [not null, note: 'cloudinit | password_reset | static_key']
+  created_by uuid [not null]
+  created_at timestamp [not null]
+
+  indexes {
+    (identifier, version) [unique]
+  }
+}
+
+Table scripts {
+  id uuid [primary key]
+  identifier varchar(255) [not null]
+  version varchar(50) [not null]
+  name varchar(255) [not null]
+  category_id uuid
+  difficulty_level varchar(50) [not null]
+  sha256_hash varchar(64) [not null]
+  flag_location text [not null]
+  is_active boolean [not null, default: true]
+  created_by uuid [not null]
+  created_at timestamp [not null]
+
+  indexes {
+    (identifier, version) [unique]
+  }
+}
+
+Table vm_requests {
+  id uuid [primary key]
+  user_id uuid [not null]
+  template_id uuid [not null]
+  build_seed varchar(64) [not null]
+  difficulty_override varchar(50)
+  telemetry_enabled boolean [not null, default: false]
+  state varchar(50) [not null, note: 'QUEUED | BUILDING | EXPORTING | READY | FAILED | ARCHIVED']
+  failed_flag_attempts integer [not null, default: 0, note: 'Per-build failed flag counter. Exhausted at 5; account locks after 3 exhausted builds.']
+  ova_sha256 varchar(64)
+  ova_size_bytes bigint
+  submitted_at timestamp [not null]
+  completed_at timestamp
+  failed_at timestamp
+  claimed_by_worker_id varchar(255)
+}
+
+Table vm_request_scripts {
+  vm_request_id uuid [not null]
+  script_id uuid [not null]
+  execution_order integer [not null]
+  auto_added boolean [not null, default: false]
+
+  indexes {
+    (vm_request_id, script_id) [pk]
+  }
+}
+
+Table provenance_records {
+  id uuid [primary key]
+  vm_request_id uuid [unique, not null]
+  template_identifier varchar(255) [not null]
+  template_version varchar(50) [not null]
+  template_sha256 varchar(64) [not null]
+  build_seed varchar(64) [not null]
+  flag_derivation_timestamp timestamp [not null]
+  ova_sha256 varchar(64) [not null]
+  telemetry_enabled boolean [not null]
+  finalised_at timestamp [not null, note: 'Immutable once written']
+}
+
+Table flags {
+  id uuid [primary key]
+  vm_request_id uuid [not null]
+  script_id uuid [not null]
+  flag_value_hash varchar(64) [not null]
+  flag_derivation_timestamp timestamp [not null]
+  created_at timestamp [not null]
+
+  indexes {
+    (vm_request_id, script_id) [unique]
+  }
+}
+
+Table submission_attempts {
+  id bigserial [primary key]
+  flag_id uuid [not null]
+  user_id uuid [not null]
+  submitted_value_hash varchar(64) [not null]
+  is_correct boolean [not null]
+  submitted_at timestamp [not null]
+}
+
+Table build_logs {
+  id bigserial [primary key]
+  vm_request_id uuid [not null]
+  log_level varchar(20) [not null]
+  stage varchar(100)
+  message text [not null]
+  logged_at timestamp [not null]
+}
+
+// =========================
+// Relationships
+// =========================
+
+Ref: vulnerability_categories.created_by > users.id
+Ref: templates.created_by > users.id
+Ref: scripts.created_by > users.id
+Ref: scripts.category_id > vulnerability_categories.id
+
+Ref: vm_requests.user_id > users.id
+Ref: vm_requests.template_id > templates.id
+
+Ref: vm_request_scripts.vm_request_id > vm_requests.id [delete: cascade]
+Ref: vm_request_scripts.script_id > scripts.id
+
+Ref: provenance_records.vm_request_id - vm_requests.id
+
+Ref: flags.vm_request_id > vm_requests.id [delete: cascade]
+Ref: flags.script_id > scripts.id
+
+Ref: submission_attempts.flag_id > flags.id [delete: cascade]
+Ref: submission_attempts.user_id > users.id
+
+Ref: build_logs.vm_request_id > vm_requests.id [delete: cascade]

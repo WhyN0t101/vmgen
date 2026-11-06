@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 850" width="1200" height="850">
+  <defs>
+    <!-- Arrow markers -->
+    <marker id="arrowBlack" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333333" />
+    </marker>
+    <marker id="arrowGrey" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#666666" />
+    </marker>
+    <marker id="arrowOrange" markerWidth="12" markerHeight="12" refX="10" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L10,3 z" fill="#CC6600" />
+    </marker>
+
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="850" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="600" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" text-anchor="middle" fill="#333333">
+    Single-Host Reference Architecture
+  </text>
+
+  <!-- ========== TRUST BOUNDARY (Trusted Computing Base) ========== -->
+  <rect x="220" y="80" width="760" height="590" rx="8" ry="8" fill="#f8f8f8" stroke="#666666" stroke-width="3" stroke-dasharray="10,5" opacity="0.5"/>
+  <text x="600" y="105" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#555555">
+    Trusted Computing Base (Platform Authority)
+  </text>
+
+  <!-- ========== WAN ========== -->
+  <ellipse cx="100" cy="200" rx="60" ry="35" fill="none" stroke="#333333" stroke-width="2"/>
+  <text x="100" y="205" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">
+    WAN
+  </text>
+
+  <!-- ========== pfSense (Network Boundary) ========== -->
+  <rect x="240" y="150" width="170" height="135" rx="5" ry="5" fill="#e8e8e8" stroke="#333333" stroke-width="2" filter="url(#shadow)"/>
+  <text x="325" y="168" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#333333">
+    pfSense
+  </text>
+  <text x="325" y="184" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">
+    LAN 192.168.1.254
+  </text>
+  <text x="325" y="197" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#666666">
+    BUILD 192.168.2.254
+  </text>
+
+  <!-- Interface annotations -->
+  <text x="325" y="213" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#555555">
+    • WAN (Internet)
+  </text>
+  <text x="325" y="226" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#555555">
+    • LAN (Management, 192.168.1.0/24)
+  </text>
+  <text x="325" y="239" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#555555">
+    • BUILD (Isolated, 192.168.2.0/24)
+  </text>
+  <text x="325" y="262" font-family="Arial, sans-serif" font-size="8" font-style="italic" text-anchor="middle" fill="#888888">
+    BUILD: separate bridge/subnet, blocks egress,
+  </text>
+    <text x="325" y="273" font-family="Arial, sans-serif" font-size="8" font-style="italic" text-anchor="middle" fill="#888888">
+    permits Worker SSH ingress only
+  </text>
+
+  <!-- Connection: WAN to pfSense -->
+  <path d="M 160 194 L 240 194"
+        fill="none"
+        stroke="#333333"
+        stroke-width="1.5"
+        marker-end="url(#arrowBlack)"/>
+
+  <text x="190" y="175" font-family="Arial, sans-serif" font-size="9" font-style="italic" text-anchor="middle" fill="#333333">
+    Internet
+  </text>
+
+  <!-- ========== LAN Network Container ========== -->
+  <rect x="430" y="130" width="270" height="520" rx="8" ry="8" fill="#fafafa" stroke="#999999" stroke-width="2" filter="url(#shadow)"/>
+  <text x="565" y="158" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#555555">
+    LAN Network (192.168.1.0/24)
+  </text>
+
+  <!-- Connection: pfSense to LAN (Management Network) -->
+  <line x1="410" y1="190" x2="430" y2="190" stroke="#666666" stroke-width="2" marker-end="url(#arrowGrey)"/>
+  <text x="420" y="180" font-family="Arial, sans-serif" font-size="9" font-style="italic" text-anchor="middle" fill="#666666">
+    LAN
+  </text>
+
+  <!-- Connection: pfSense to BUILD Network (Isolated) -->
+  <path d="M 410 220 Q 550 220 720 220" fill="none" stroke="#CC6600" stroke-width="2" marker-end="url(#arrowOrange)"/>
+  <text x="550" y="238" font-family="Arial, sans-serif" font-size="9" font-style="italic" text-anchor="middle" fill="#CC6600">
+    BUILD (isolated)
+  </text>
+
+
+  <!-- ========== Platform VM (Trusted Components) ========== -->
+  <rect x="460" y="180" width="220" height="220" rx="6" ry="6" fill="#d8d8d8" stroke="#555555" stroke-width="2" filter="url(#shadow)"/>
+  <text x="570" y="202" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#333333">
+    Platform VM
+  </text>
+  <text x="570" y="218" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">
+    192.168.1.10
+  </text>
+
+  <!-- Platform VM Data Flow Annotations (compact note) -->
+  <rect x="448" y="408" width="200" height="50" rx="3" ry="3" fill="#f0f0f0" stroke="#999999" stroke-width="1" opacity="0.9"/>
+  <text x="458" y="422" font-family="Arial, sans-serif" font-size="8" text-anchor="start" fill="#555555">
+    <tspan font-style="italic" font-weight="bold">Internal flows:</tspan>
+  </text>
+  <text x="458" y="433" font-family="Arial, sans-serif" font-size="8" text-anchor="start" fill="#555555">
+    Frontend→Backend→Worker
+  </text>
+  <text x="458" y="444" font-family="Arial, sans-serif" font-size="8" text-anchor="start" fill="#555555">
+    Database: queries, provenance, read-only scripts
+  </text>
+  <text x="458" y="455" font-family="Arial, sans-serif" font-size="8" text-anchor="start" fill="#555555">
+    Worker: async job queue, API to storage
+  </text>
+
+  <!-- Frontend Container -->
+  <rect x="475" y="240" width="90" height="70" rx="4" ry="4" fill="#a8a8a8" stroke="#555555" stroke-width="1.5"/>
+  <text x="520" y="280" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#ffffff">
+    Frontend
+  </text>
+
+  <!-- Backend Container -->
+  <rect x="580" y="240" width="90" height="70" rx="4" ry="4" fill="#a8a8a8" stroke="#555555" stroke-width="1.5"/>
+  <text x="625" y="280" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#ffffff">
+    Backend
+  </text>
+
+  <!-- Database Container -->
+  <rect x="475" y="325" width="90" height="70" rx="4" ry="4" fill="#a8a8a8" stroke="#555555" stroke-width="1.5"/>
+  <text x="520" y="365" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#ffffff">
+    Database
+  </text>
+
+  <!-- Worker Container -->
+  <rect x="580" y="325" width="90" height="70" rx="4" ry="4" fill="#a8a8a8" stroke="#555555" stroke-width="1.5"/>
+  <text x="625" y="365" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="#ffffff">
+    Worker
+  </text>
+
+  <!-- ========== Isolated Build Network Zone ========== -->
+  <rect x="720" y="180" width="220" height="260" rx="6" ry="6" fill="#fff3e6" stroke="#CC6600" stroke-width="2" stroke-dasharray="5,3" filter="url(#shadow)"/>
+  <text x="830" y="202" font-family="Arial, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" fill="#CC6600">
+    Isolated Build Zone
+  </text>
+  <text x="830" y="215" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#CC6600">
+    BUILD Network (192.168.2.0/24)
+  </text>
+
+  <!-- Generated VM 1 (Ephemeral) -->
+  <rect x="735" y="225" width="90" height="60" rx="4" ry="4" fill="#ffffff" stroke="#CC6600" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="780" y="250" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#CC6600">
+    Gen VM 1
+  </text>
+  <text x="780" y="267" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">
+    .10
+  </text>
+  <text x="780" y="280" font-family="Arial, sans-serif" font-size="8" font-style="italic" text-anchor="middle" fill="#999999">
+    Ephemeral
+  </text>
+
+  <!-- Generated VM 2 (Ephemeral) -->
+  <rect x="835" y="225" width="90" height="60" rx="4" ry="4" fill="#ffffff" stroke="#CC6600" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="880" y="250" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#CC6600">
+    Gen VM 2
+  </text>
+  <text x="880" y="267" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">
+    .11
+  </text>
+  <text x="880" y="280" font-family="Arial, sans-serif" font-size="8" font-style="italic" text-anchor="middle" fill="#999999">
+    Ephemeral
+  </text>
+
+  <!-- Generated VM 3 (Ephemeral) -->
+  <rect x="735" y="305" width="90" height="60" rx="4" ry="4" fill="#ffffff" stroke="#CC6600" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="780" y="330" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#CC6600">
+    Gen VM 3
+  </text>
+  <text x="780" y="347" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#666666">
+    .12
+  </text>
+  <text x="780" y="360" font-family="Arial, sans-serif" font-size="8" font-style="italic" text-anchor="middle" fill="#999999">
+    Ephemeral
+  </text>
+
+  <!-- More VMs indicator -->
+  <text x="880" y="338" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#cccccc">
+    . . .
+  </text>
+  <text x="880" y="358" font-family="Arial, sans-serif" font-size="9" font-style="italic" text-anchor="middle" fill="#999999">
+    DHCP: .10-.250
+  </text>
+
+  <!-- Network isolation annotation (prominent) -->
+  <text x="830" y="390" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#CC6600">
+    Firewall enforced
+  </text>
+  <text x="830" y="407" font-family="Arial, sans-serif" font-size="9" font-style="italic" text-anchor="middle" fill="#CC6600">
+    No LAN access
+  </text>
+  <text x="830" y="421" font-family="Arial, sans-serif" font-size="9" font-style="italic" text-anchor="middle" fill="#CC6600">
+    Worker SSH only
+  </text>
+
+  <!-- ========== DATA FLOWS ========== -->
+
+  <!-- Flow 1: User Request (WAN → pfSense WAN) -->
+  <path d="M 155 212 L 240 212"
+        fill="none"
+        stroke="#333333"
+        stroke-width="1.5"
+        marker-end="url(#arrowBlack)"/>
+
+  <text x="160" y="232" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#333333">
+    User Requests
+  </text>
+
+  <!-- Flow: pfSense LAN → Frontend (specific component targeting) -->
+  <path d="M 410 190 Q 430 240 475 260" fill="none" stroke="#333333" stroke-width="1.5" marker-end="url(#arrowBlack)"/>
+
+  <!-- Flow 2: API Calls (Frontend → Backend) -->
+  <path d="M 565 255 L 580 255" fill="none" stroke="#666666" stroke-width="1.5" marker-end="url(#arrowGrey)"/>
+
+  <!-- Flow 3: Job Queue (Backend → Worker) -->
+  <path d="M 635 310 L 635 325" fill="none" stroke="#666666" stroke-width="1.5" marker-end="url(#arrowGrey)"/>
+  <path d="M 615 325 L 615 310" fill="none" stroke="#666666" stroke-width="1.5" marker-end="url(#arrowGrey)"/>
+
+  <!-- Worker → Database (Read-only) -->
+  <!--<path d="M 580 360 L 565 360" fill="none" stroke="#666666" stroke-width="1.5" marker-end="url(#arrowGrey)"/> -->
+
+  <!-- Flow: Backend → Database (Provenance) -->
+<path d="M 580 308
+         L 565 329"
+      fill="none"
+      stroke="#666666"
+      stroke-width="1.5"
+      marker-end="url(#arrowGrey)"/>
+
+
+  <!-- Flow 4: SSH - CRITICAL CONNECTION (Worker → Gen VMs) -->
+  <line x1="670" y1="355" x2="735" y2="280" stroke="#CC6600" stroke-width="3" marker-end="url(#arrowOrange)"/>
+  <text x="685" y="345" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#CC6600">
+    SSH
+  </text>
+  <text x="685" y="355" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#CC6600">
+    Vulnerability
+  </text>
+  <text x="685" y="365" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#CC6600">
+    injection
+  </text>
+
+  <!-- ========== PROXMOX STORAGE (Infrastructure Level) ========== -->
+  <rect x="240" y="530" width="160" height="70" rx="4" ry="4" fill="#cccccc" stroke="#666666" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="320" y="555" font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#333333">
+    Proxmox Storage
+  </text>
+  <text x="320" y="573" font-family="Arial, sans-serif" font-size="9" text-anchor="middle" fill="#555555">
+    Templates + OVA
+  </text>
+  <text x="320" y="590" font-family="Arial, sans-serif" font-size="8" font-style="italic" text-anchor="middle" fill="#888888">
+  (Proxmox host, LAN 192.168.1.2)
+   </text>
+
+  <!-- Storage API access from Worker (bidirectional for clone/export) -->
+<path d="M 660 395
+         L 660 470
+         Q 660 620 400 565"
+      fill="none"
+      stroke="#666666"
+      stroke-width="1.5"
+      stroke-dasharray="4,3"
+      marker-end="url(#arrowGrey)"/>
+
+  <text x="670" y="472" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666666">
+    Proxmox API + SSH
+  </text>
+  <text x="670" y="484" font-family="Arial, sans-serif" font-size="9" font-style="italic" fill="#666666">
+    (lifecycle, OVA export)
+  </text>
+  <text x="670" y="495" font-family="Arial, sans-serif" font-size="8" font-style="italic" fill="#666666">
+  direct on LAN (192.168.1.2)
+</text>
+
+  <!-- ========== TRUST BOUNDARY LABELS ========== -->
+  <text x="600" y="690" font-family="Arial, sans-serif" font-size="11" font-weight="bold" text-anchor="middle" fill="#555555">
+    Platform guarantees apply within this boundary
+  </text>
+
+  <!-- Outside trust boundary annotation -->
+  <text x="600" y="710" font-family="Arial, sans-serif" font-size="10" font-style="italic" text-anchor="middle" fill="#999999">
+    Post-export: VMs execute on user infrastructure (untrusted, no platform control)
+  </text>
+
+  <!-- ========== LEGEND ========== -->
+  <text x="50" y="720" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#555555">
+    Legend:
+  </text>
+
+  <line x1="50" y1="735" x2="90" y2="735" stroke="#CC6600" stroke-width="3" marker-end="url(#arrowOrange)"/>
+  <text x="95" y="739" font-family="Arial, sans-serif" font-size="10" fill="#333333">
+    Trust boundary crossing
+  </text>
+
+  <line x1="50" y1="755" x2="90" y2="755" stroke="#666666" stroke-width="1.5" marker-end="url(#arrowGrey)"/>
+  <text x="95" y="759" font-family="Arial, sans-serif" font-size="10" fill="#333333">
+    Data flow
+  </text>
+
+  <line x1="50" y1="775" x2="90" y2="775" stroke="#666666" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowGrey)"/>
+  <text x="95" y="779" font-family="Arial, sans-serif" font-size="10" fill="#333333">
+    Infrastructure API
+  </text>
+
+  <rect x="50" y="789" width="30" height="18" rx="2" ry="2" fill="none" stroke="#CC6600" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="85" y="801" font-family="Arial, sans-serif" font-size="10" fill="#333333">
+    Ephemeral component
+  </text>
+
+</svg>

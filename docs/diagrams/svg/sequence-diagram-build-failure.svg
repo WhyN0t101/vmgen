@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" width="1200" height="1600">
+  <!-- Title -->
+  <text x="600" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#333">
+    Build Failure Scenario - Timeout Detection &amp; State Transition
+  </text>
+
+  <!-- Define styles -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333" />
+    </marker>
+    <marker id="arrowhead-return" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#666" />
+    </marker>
+    <marker id="arrowhead-error" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#CC0000" />
+    </marker>
+  </defs>
+
+  <!-- Actors/Components -->
+  <!-- User -->
+  <rect x="50" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="100" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">User</text>
+  <line x1="100" y1="100" x2="100" y2="1550" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Frontend -->
+  <rect x="200" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="250" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Web Frontend</text>
+  <line x1="250" y1="100" x2="250" y2="1550" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Backend API -->
+  <rect x="375" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="425" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Backend API</text>
+  <line x1="425" y1="100" x2="425" y2="1550" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Database -->
+  <rect x="550" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="600" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Database</text>
+  <line x1="600" y1="100" x2="600" y2="1550" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Automation Worker -->
+  <rect x="725" y="60" width="120" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="785" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Automation Worker</text>
+  <line x1="785" y1="100" x2="785" y2="1550" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Hypervisor -->
+  <rect x="900" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="950" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Hypervisor</text>
+  <line x1="950" y1="100" x2="950" y2="1550" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Storage -->
+  <rect x="1050" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="1100" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Storage</text>
+  <line x1="1100" y1="100" x2="1100" y2="1550" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Sequence Flow -->
+  <g font-family="Arial, sans-serif" font-size="12">
+
+    <!-- Initial successful steps (abbreviated) -->
+    <rect x="35" y="130" width="830" height="60" fill="#E8F8F5" stroke="#16A085" stroke-width="1" rx="3"/>
+    <text x="450" y="150" font-size="11" font-weight="bold" text-anchor="middle" fill="#117864">Steps 1-11: Normal flow up to Worker claiming job and starting build</text>
+    <text x="450" y="167" font-size="10" text-anchor="middle">Worker polls, Backend dequeues job (Queued → Building),</text>
+    <text x="450" y="182" font-size="10" text-anchor="middle">Worker creates VM and starts script execution</text>
+
+    <!-- Step 12: Worker sends initial progress -->
+    <line x1="785" y1="220" x2="425" y2="220" stroke="#FF6600" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="560" y="215" font-size="11" fill="#FF6600">12. PATCH /api/worker/jobs/{id}/progress</text>
+    <text x="560" y="230" font-size="11" fill="#FF6600">(stage="EXECUTE_SCRIPTS", percent=33)</text>
+
+    <line x1="425" y1="250" x2="600" y2="250" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="475" y="245" font-size="11" fill="#333">13. UPDATE last_update_time</text>
+
+    <line x1="600" y1="270" x2="425" y2="270" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <line x1="425" y1="290" x2="785" y2="290" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="580" y="305" font-size="11" fill="#666">14. ACK</text>
+
+    <!-- CRASH HAPPENS -->
+    <rect x="710" y="330" width="150" height="80" fill="#FFCCCC" stroke="#CC0000" stroke-width="3" rx="5"/>
+    <text x="785" y="355" font-size="14" font-weight="bold" text-anchor="middle" fill="#CC0000">WORKER CRASH</text>
+    <text x="785" y="375" font-size="11" text-anchor="middle" fill="#990000">Process terminates,</text>
+    <text x="785" y="390" font-size="11" text-anchor="middle" fill="#990000">VM hangs, or</text>
+    <text x="785" y="405" font-size="11" text-anchor="middle" fill="#990000">network failure</text>
+
+    <!-- X mark on worker lifeline -->
+    <line x1="775" y1="420" x2="795" y2="440" stroke="#CC0000" stroke-width="4"/>
+    <line x1="795" y1="420" x2="775" y2="440" stroke="#CC0000" stroke-width="4"/>
+
+    <!-- Worker lifeline becomes dashed/grayed out -->
+    <line x1="785" y1="440" x2="785" y2="1550" stroke="#CCC" stroke-width="2" stroke-dasharray="10,5"/>
+
+    <!-- Note: What handles crashes -->
+    <rect x="720" y="460" width="300" height="95" fill="#FFFACD" stroke="#DAA520" stroke-width="2" rx="3"/>
+    <text x="870" y="480" font-size="11" font-weight="bold" text-anchor="middle">What handles crashes:</text>
+    <text x="870" y="497" font-size="10" text-anchor="middle">Worker does NOT explicitly deregister</text>
+    <text x="870" y="512" font-size="10" text-anchor="middle">Backend uses PASSIVE DETECTION via</text>
+    <text x="870" y="527" font-size="10" text-anchor="middle">absence of heartbeat/progress updates</text>
+    <text x="870" y="542" font-size="10" text-anchor="middle">Timeout = configurable (default 10 min)</text>
+
+    <!-- Time passes -->
+    <rect x="35" y="580" width="690" height="50" fill="#F4F6F7" stroke="#85929E" stroke-width="1" rx="3"/>
+    <text x="380" y="600" font-size="12" font-weight="bold" text-anchor="middle" fill="#566573">⏰ TIME ELAPSES: Configurable timeout passes with no heartbeat</text>
+    <text x="380" y="617" font-size="10" text-anchor="middle" fill="#566573">(workerLastHeartbeatAt + timeout_seconds &lt; current_time)</text>
+
+    <!-- Step 15: Backend timeout monitor detects silence -->
+    <rect x="375" y="650" width="100" height="70" fill="#D4E6F1" stroke="#2874A6" stroke-width="2" rx="3"/>
+    <text x="425" y="670" font-size="10" font-weight="bold" text-anchor="middle">15. Timeout Monitor</text>
+    <text x="425" y="685" font-size="10" text-anchor="middle">Detects silence</text>
+    <text x="425" y="700" font-size="10" text-anchor="middle">(background job)</text>
+    <text x="425" y="715" font-size="10" text-anchor="middle">Initiates failure</text>
+
+    <!-- Step 16: Backend queries database for stale jobs -->
+    <line x1="425" y1="740" x2="600" y2="740" stroke="#CC0000" stroke-width="2" marker-end="url(#arrowhead-error)"/>
+    <text x="470" y="735" font-size="11" fill="#CC0000">16. SELECT jobs WHERE</text>
+    <text x="470" y="750" font-size="11" fill="#CC0000">state IN ('Building','Exporting')</text>
+    <text x="470" y="765" font-size="11" fill="#CC0000">AND last_update &lt; NOW() - 10min</text>
+
+    <!-- Step 17: Database returns stale jobs -->
+    <line x1="600" y1="785" x2="425" y2="785" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="480" y="800" font-size="11" fill="#666">17. Return stale job(s)</text>
+
+    <!-- Step 18: Backend transitions to Failed -->
+    <line x1="425" y1="830" x2="600" y2="830" stroke="#CC0000" stroke-width="2" marker-end="url(#arrowhead-error)"/>
+    <text x="470" y="825" font-size="11" fill="#CC0000">18. UPDATE VmRequest</text>
+    <text x="470" y="840" font-size="11" fill="#CC0000">SET state = 'Failed'</text>
+    <text x="470" y="855" font-size="11" fill="#CC0000">error = 'Worker timeout'</text>
+
+    <!-- Step 19: Database confirms -->
+    <line x1="600" y1="875" x2="425" y2="875" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="480" y="890" font-size="11" fill="#666">19. Confirm state change</text>
+
+    <!-- Note: State transition -->
+    <rect x="35" y="915" width="690" height="45" fill="#FFE5E5" stroke="#E74C3C" stroke-width="2" rx="3"/>
+    <text x="380" y="935" font-size="11" font-weight="bold" text-anchor="middle" fill="#C0392B">State Transition: Building → Failed</text>
+    <text x="380" y="952" font-size="10" text-anchor="middle">Backend is sole authority for state transitions (except Worker-initiated Building/Exporting)</text>
+
+    <!-- Step 20: Frontend polls for status -->
+    <line x1="250" y1="985" x2="425" y2="985" stroke="#9932CC" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="310" y="980" font-size="11" fill="#9932CC">20. GET /api/builds/{id}</text>
+
+    <!-- Step 21: Backend queries database -->
+    <line x1="425" y1="1015" x2="600" y2="1015" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="475" y="1010" font-size="11" fill="#333">21. SELECT VmRequest</text>
+
+    <!-- Step 22: Database returns Failed state -->
+    <line x1="600" y1="1045" x2="425" y2="1045" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="480" y="1040" font-size="11" fill="#666">22. state='Failed',</text>
+    <text x="480" y="1055" font-size="11" fill="#666">error='Worker timeout'</text>
+
+    <!-- Step 23: Backend returns to Frontend -->
+    <line x1="425" y1="1080" x2="250" y2="1080" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="310" y="1075" font-size="11" fill="#666">23. Return Failed status</text>
+
+    <!-- Step 24: Frontend displays to User -->
+    <line x1="250" y1="1110" x2="100" y2="1110" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="145" y="1105" font-size="11" fill="#666">24. Display error</text>
+
+    <!-- Note: How status updates reach frontend -->
+    <rect x="35" y="1140" width="280" height="85" fill="#E8F8F5" stroke="#16A085" stroke-width="2" rx="3"/>
+    <text x="175" y="1160" font-size="11" font-weight="bold" text-anchor="middle" fill="#117864">How status updates reach frontend:</text>
+    <text x="175" y="1177" font-size="10" text-anchor="middle">1. Frontend polls Backend REST API</text>
+    <text x="175" y="1192" font-size="10" text-anchor="middle">2. Backend queries Database</text>
+    <text x="175" y="1207" font-size="10" text-anchor="middle">3. Database is single source of truth</text>
+    <text x="175" y="1222" font-size="10" text-anchor="middle">4. No WebSockets/SSE - polling only</text>
+
+    <!-- SCENARIO 2: Race condition - Worker comes back late -->
+    <rect x="35" y="1260" width="1130" height="50" fill="#FEF5E7" stroke="#F39C12" stroke-width="2" rx="3"/>
+    <text x="600" y="1280" font-size="13" font-weight="bold" text-anchor="middle" fill="#D68910">RACE CONDITION SCENARIO: Worker Recovers After Timeout</text>
+    <text x="600" y="1297" font-size="11" text-anchor="middle" fill="#9C640C">Worker was slow (not crashed) and completes build after Backend marked it Failed</text>
+
+    <!-- Step 25: Worker (zombie) tries to complete -->
+    <line x1="785" y1="1335" x2="425" y2="1335" stroke="#FF6600" stroke-width="2" marker-end="url(#arrowhead)" stroke-dasharray="5,5"/>
+    <text x="560" y="1330" font-size="11" fill="#FF6600">25. POST /api/jobs/{id}/complete</text>
+    <text x="560" y="1345" font-size="11" fill="#FF6600">(attempts late completion)</text>
+
+    <!-- Step 26: Backend validates state -->
+    <rect x="375" y="1360" width="100" height="65" fill="#D4E6F1" stroke="#2874A6" stroke-width="2" rx="3"/>
+    <text x="425" y="1380" font-size="10" font-weight="bold" text-anchor="middle">26. Validate State</text>
+    <text x="425" y="1395" font-size="10" text-anchor="middle">state = 'Failed'</text>
+    <text x="425" y="1410" font-size="10" text-anchor="middle">NOT in (Building,</text>
+    <text x="425" y="1420" font-size="9" text-anchor="middle">Exporting)</text>
+
+    <!-- Step 27: Backend rejects -->
+    <line x1="425" y1="1445" x2="785" y2="1445" stroke="#CC0000" stroke-width="2" marker-end="url(#arrowhead-error)"/>
+    <text x="560" y="1440" font-size="11" fill="#CC0000">27. REJECT: 409 Conflict</text>
+    <text x="560" y="1455" font-size="11" fill="#CC0000">"State does not permit completion"</text>
+
+    <!-- Step 28: Worker cleans up automatically on 409 rejection -->
+    <rect x="720" y="1475" width="430" height="60" fill="#FFE5E5" stroke="#CC0000" stroke-width="1" rx="3"/>
+    <text x="935" y="1495" font-size="11" font-weight="bold" text-anchor="middle" fill="#CC0000">28. Worker auto-cleans up on 409 rejection</text>
+    <text x="935" y="1512" font-size="10" text-anchor="middle">Deletes the build VM; removes the OVA from the export path (NFR7).</text>
+    <text x="935" y="1527" font-size="10" text-anchor="middle">Only an interrupted SFTP transfer leaves a partial file for the cron sweep.</text>
+
+    <!-- Final note -->
+    <rect x="720" y="1548" width="430" height="50" fill="#E8DAEF" stroke="#8E44AD" stroke-width="2" rx="3"/>
+    <text x="935" y="1568" font-size="11" font-weight="bold" text-anchor="middle" fill="#6C3483">Backend enforces state validation for idempotency</text>
+    <text x="935" y="1585" font-size="10" text-anchor="middle">409 prevents double-registration; artefact cleanup is automatic</text>
+
+  </g>
+
+</svg>

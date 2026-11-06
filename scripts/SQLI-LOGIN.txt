@@ -19,7 +19,13 @@ APP_USER="www-sqli"
 # STEP 1 - Install dependencies
 # =============================================================================
 export DEBIAN_FRONTEND=noninteractive
-sudo apt-get -o DPkg::Lock::Timeout=300 update
+# "apt-get update" takes the lists lock, which DPkg::Lock::Timeout does not
+# cover, so retry while first-boot apt-daily/unattended-upgrades hold it.
+for attempt in $(seq 1 30); do
+    sudo apt-get -o DPkg::Lock::Timeout=300 update && break
+    [ "$attempt" -eq 30 ] && exit 1
+    sleep 10
+done
 sudo NEEDRESTART_MODE=a DEBIAN_FRONTEND=noninteractive \
     apt-get -o DPkg::Lock::Timeout=300 install -y python3 python3-flask
 

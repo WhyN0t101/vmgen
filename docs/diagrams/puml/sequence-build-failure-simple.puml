@@ -1,0 +1,67 @@
+@startuml Build Failure Scenarios (Simplified)
+
+title Build Failure — Timeout Detection & Race Condition
+
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam sequenceParticipantBorderThickness 1.5
+skinparam sequenceParticipantBackgroundColor #E8F4F8
+skinparam noteBorderColor #DAA520
+skinparam noteBackgroundColor #FFFACD
+skinparam sequenceGroupBorderThickness 1
+skinparam sequenceLifeLineBorderColor #999999
+skinparam sequenceMessageAlign left
+
+actor       "User"               as U
+participant "Web Frontend"       as FE
+participant "Backend API"        as BE
+participant "Automation Worker"  as W
+participant "Proxmox Hypervisor" as PX
+
+== Normal Start (abbreviated) ==
+
+W -> BE : progress (stage=EXECUTE_SCRIPTS)
+BE --> W : ACK
+
+== Worker Failure ==
+
+note over W #FFCCCC
+  WORKER CRASH
+  Process dies, VM hangs, or
+  network partitions. No deregistration.
+end note
+
+...
+
+== Timeout Detection ==
+
+note over BE
+  Backend periodically checks for stale jobs
+  (no progress within timeout window).
+end note
+
+BE -> BE : Mark job FAILED
+
+== Frontend Discovers Failure ==
+
+FE -> BE : GET /api/builds/{id}
+BE --> FE : state=FAILED
+FE --> U  : Display failure reason
+
+== Race Condition: Late Completion ==
+
+note over W #FEF5E7
+  Worker was slow, not crashed —
+  finishes after backend already failed the job.
+end note
+
+W -[#FF6600]-> BE : POST …/complete (late attempt)
+BE -> BE : State already FAILED — cannot transition to READY
+BE -[#CC0000]-> W : 409 Conflict
+
+note over W #FFE5E5
+  Worker cleans up build VM and export
+  artefacts on rejection.
+end note
+
+@enduml

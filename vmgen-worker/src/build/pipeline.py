@@ -341,6 +341,7 @@ class BuildPipeline:
         # Stage 13: COMPUTE_HASHES
         # NOTE: ova_path must be accessible from the worker machine (e.g. via NFS mount)
         self._progress(job_id, "COMPUTE_HASHES", 91)
+        self._wait_for_file(job_id, ova_path)
         ova_checksum = compute_sha256(ova_path, allowed_base=self._config.export_path)
         ova_size = os.path.getsize(ova_path)
         self._log(job_id, "INFO",
@@ -415,6 +416,25 @@ class BuildPipeline:
     def _log(self, job_id: str, level: str, message: str, stage: str | None = None):
         """Fire-and-forget build log — never raises, never blocks the build."""
         self._backend.append_log(job_id, level, message, stage)
+
+    def _wait_for_file(self, job_id: str, path: str, timeout: int = 90, interval: int = 2) -> None:
+        """Wait until a file written by the Proxmox host becomes visible to the worker.
+
+        With shared-storage export the host creates the OVA and its directory over NFS;
+        the worker's NFS client can keep serving a cached "not found" for the new
+        directory for 30-60 s, so reading the path immediately after the export can fail
+        even though the file is complete on the host."""
+        deadline = time.monotonic() + timeout
+        waited = False
+        while not os.path.exists(path):
+            if time.monotonic() >= deadline:
+                raise FileNotFoundError(f"OVA not visible at {path} after {timeout}s")
+            if not waited:
+                self._log(job_id, "WARN",
+                          "OVA not yet visible on shared storage, waiting for the NFS view to refresh",
+                          "COMPUTE_HASHES")
+                waited = True
+            time.sleep(interval)
 
     def _cleanup_vm(self):
         if self._build_vmid is not None:

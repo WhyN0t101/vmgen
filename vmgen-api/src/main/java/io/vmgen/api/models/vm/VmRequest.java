@@ -93,7 +93,7 @@ public class VmRequest {
     @Column(name = "storage_deleted_at")
     private Instant storageDeletedAt;
 
-    // Flag attempt tracking (per CLAUDE.md: 5 per build; 3 exhausted builds → 1-hr lockout)
+    // Flag attempt tracking (5 per build; 3 exhausted builds → 1-hr lockout)
     @Column(name = "failed_flag_attempts", nullable = false)
     private int failedFlagAttempts = 0;
 

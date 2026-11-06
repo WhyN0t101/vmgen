@@ -20,7 +20,7 @@ VMGen Worker - Setup Instructions
    ssh-keyscan -H <PROXMOX_HOST_IP> >> ~/.ssh/known_hosts
 
    Example for this lab:
-   ssh-keyscan -H 172.22.21.95 >> ~/.ssh/known_hosts
+   ssh-keyscan -H 192.168.1.2 >> ~/.ssh/known_hosts
 
    This appends the Proxmox host's public key to your local known_hosts file.
    The worker reads this file at startup (PROXMOX_KNOWN_HOSTS_PATH in .env).

@@ -1,0 +1,58 @@
+@startuml Normal Build Flow (Simplified)
+
+title Normal Build Flow
+
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam sequenceParticipantBorderThickness 1.5
+skinparam sequenceParticipantBackgroundColor #E8F4F8
+skinparam sequenceGroupBorderThickness 1
+skinparam sequenceLifeLineBorderColor #999999
+skinparam sequenceMessageAlign left
+
+actor       "User"               as U
+participant "Web Frontend"       as FE
+participant "Backend API"        as BE
+participant "Automation Worker"  as W
+participant "Proxmox Hypervisor" as PX
+
+== Submission ==
+
+U  -> FE : Configure scenario
+FE -> BE : POST /api/builds
+BE --> FE : requestId (state=QUEUED)
+
+== Claiming ==
+
+W  -> BE : Poll: claim job
+BE --> W  : Build spec (state=BUILDING)
+
+== Provisioning & Script Execution ==
+
+W  -> PX : Clone template, start VM, wait for SSH
+W  -> PX : Execute vulnerability scripts (SSH)
+W  -> BE : Derive flags
+BE --> W  : Raw flags
+W  -> PX : Place flags, sanitise, shut down VM
+
+== Export ==
+
+W  -> BE : progress (state=EXPORTING)
+W  -> PX : Export OVA (SSH), transfer to worker
+W  -> W  : Compute OVA checksum
+
+== Completion ==
+
+W  -> BE : Complete (OVA path, checksum, provenance, flag hashes)
+BE -> BE : Verify flag hashes
+BE --> W  : state=READY
+
+== Status Polling ==
+
+loop while build active
+  FE -> BE : GET /api/builds/{id}
+  BE --> FE : current state
+end
+FE --> U : READY — download + flag submission
+
+@enduml

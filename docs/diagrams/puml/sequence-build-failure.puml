@@ -1,0 +1,93 @@
+@startuml Build Failure Scenarios
+
+title Build Failure — Timeout Detection & Race Condition Handling
+
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam sequenceParticipantBorderThickness 1.5
+skinparam sequenceParticipantBackgroundColor #E8F4F8
+skinparam noteBorderColor #DAA520
+skinparam noteBackgroundColor #FFFACD
+skinparam sequenceGroupBorderThickness 1
+skinparam sequenceLifeLineBorderColor #999999
+skinparam sequenceMessageAlign left
+
+actor       "User"               as U
+participant "Web Frontend"       as FE
+participant "Backend API"        as BE
+participant "Automation Worker"  as W
+participant "Proxmox Hypervisor" as PX
+
+== Normal Start (Abbreviated) ==
+
+note over U, PX
+  Normal flow: worker claims job, VM provisioned, scripts executing.
+end note
+
+W -> BE : PATCH …/progress (stage=EXECUTE_SCRIPTS, percent=33)
+BE --> W : 200 ACK
+
+== Worker Failure ==
+
+note over W #FFCCCC
+  WORKER CRASH
+  Process terminates, VM hangs,
+  or network partition occurs.
+  Worker does NOT deregister.
+end note
+
+...
+
+== Timeout Detection ==
+
+note over BE
+  ScheduledTasksService fires every 60s.
+  markStaleJobsAsFailed checks lastProgressAt
+  (no-progress silence), NOT the heartbeat:
+  10 min in BUILDING, 35 min in EXPORTING.
+  The /ping liveness call updates only
+  workerLastHeartbeatAt, so a hung script still
+  ages out lastProgressAt and fails.
+  Hard cap: markLongRunningJobsAsFailed at
+  3-hour wall-clock, regardless of progress.
+end note
+
+BE -> BE : markStaleJobsAsFailed()\nstate: BUILDING → FAILED
+
+== Frontend Discovers Failure ==
+
+FE -> BE : GET /api/builds/{id}
+BE --> FE : {state=FAILED, failureReason}
+FE --> U  : Display failure reason
+
+== Race Condition: Slow Worker Completes After Timeout ==
+
+note over W #FEF5E7
+  Worker was slow, not crashed.
+  Build finished after backend already
+  marked the job FAILED.
+end note
+
+W -[#FF6600]-> BE : POST …/complete\n(late attempt)
+
+BE -> BE : canTransitionTo(FAILED → READY)?\nResult: FALSE
+
+BE -[#CC0000]-> W : 409 Conflict
+
+note over W #FFE5E5
+  Worker catches 409 after 3 retry attempts.
+  The exception propagates to run()'s handler:
+  _cleanup_vm() deletes the Proxmox build VM and
+  _cleanup_export_artifacts() removes the OVA from
+  the worker export path (NFR7). fail_job() is then
+  called. (Only an SFTP transfer interrupted mid-copy
+  leaves an orphaned partial OVA for the cron sweep.)
+end note
+
+note over BE #E8DAEF
+  State machine prevents double-registration.
+  A FAILED job cannot transition to READY
+  regardless of what the worker sends.
+end note
+
+@enduml

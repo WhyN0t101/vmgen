@@ -12,7 +12,7 @@ const AUTH_CHANNEL = 'vmgen_auth'
 export const useAuthStore = defineStore('auth', () => {
   // JWT is kept in memory only — never written to localStorage or sessionStorage.
   // Page refresh requires re-authentication. This prevents XSS scripts from
-  // extracting long-lived tokens and satisfies AGENT_GUIDELINES Rule 12.
+  // extracting long-lived tokens.
   const user = ref<User | null>(null)
   const token = ref<string | null>(null)
   const role = ref<'user' | 'admin' | null>(null)

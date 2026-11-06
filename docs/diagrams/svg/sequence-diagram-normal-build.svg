@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1400" width="1200" height="1400">
+  <!-- Title -->
+  <text x="600" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#333">
+    Normal Build Flow - Component Coordination Protocol
+  </text>
+
+  <!-- Define styles -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333" />
+    </marker>
+    <marker id="arrowhead-return" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#666" />
+    </marker>
+  </defs>
+
+  <!-- Actors/Components -->
+  <!-- User -->
+  <rect x="50" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="100" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">User</text>
+  <line x1="100" y1="100" x2="100" y2="1350" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Frontend -->
+  <rect x="200" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="250" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Web Frontend</text>
+  <line x1="250" y1="100" x2="250" y2="1350" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Backend API -->
+  <rect x="375" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="425" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Backend API</text>
+  <line x1="425" y1="100" x2="425" y2="1350" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Database -->
+  <rect x="550" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="600" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Database</text>
+  <line x1="600" y1="100" x2="600" y2="1350" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Automation Worker -->
+  <rect x="725" y="60" width="120" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="785" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Automation Worker</text>
+  <line x1="785" y1="100" x2="785" y2="1350" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Hypervisor -->
+  <rect x="900" y="60" width="100" height="40" fill="#E8F4F8" stroke="#333" stroke-width="2" rx="5"/>
+  <text x="950" y="85" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Hypervisor</text>
+  <line x1="950" y1="100" x2="950" y2="1350" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Worker FS actor removed — OVA is written to worker local disk as part of the SFTP transfer, not a separate component -->
+
+  <!-- Sequence Flow -->
+  <g font-family="Arial, sans-serif" font-size="12">
+
+    <!-- Step 1: User submits VM request -->
+    <line x1="100" y1="130" x2="250" y2="130" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="175" y="125" font-size="11" fill="#333">1. Submit VM request</text>
+
+    <!-- Step 2: Frontend to Backend -->
+    <line x1="250" y1="160" x2="425" y2="160" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="310" y="155" font-size="11" fill="#333">2. POST /api/builds</text>
+
+    <!-- Step 3: Backend validates and creates VmRequest -->
+    <line x1="425" y1="190" x2="600" y2="190" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="475" y="185" font-size="11" fill="#333">3. INSERT VmRequest</text>
+    <text x="475" y="200" font-size="11" fill="#333">(state=Queued)</text>
+
+    <!-- Step 4: Database confirms -->
+    <line x1="600" y1="220" x2="425" y2="220" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="485" y="235" font-size="11" fill="#666">4. Confirm</text>
+
+    <!-- Step 5: Backend returns request ID -->
+    <line x1="425" y1="260" x2="250" y2="260" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="310" y="255" font-size="11" fill="#666">5. Return request_id</text>
+
+    <!-- Step 6: Frontend returns to user -->
+    <line x1="250" y1="290" x2="100" y2="290" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="145" y="285" font-size="11" fill="#666">6. Redirect to status page</text>
+
+    <!-- Note box -->
+    <rect x="720" y="120" width="240" height="70" fill="#FFFACD" stroke="#DAA520" stroke-width="1" rx="3"/>
+    <text x="840" y="140" font-size="11" font-weight="bold" text-anchor="middle">Who initiates transitions:</text>
+    <text x="840" y="157" font-size="10" text-anchor="middle">Backend creates Queued state</text>
+    <text x="840" y="172" font-size="10" text-anchor="middle">Worker initiates Building/Exporting</text>
+    <text x="840" y="187" font-size="10" text-anchor="middle">Backend transitions to Ready</text>
+
+    <!-- Step 7: Worker polls for jobs -->
+    <line x1="785" y1="330" x2="425" y2="330" stroke="#0066CC" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="570" y="325" font-size="11" fill="#0066CC">7. Poll: POST /api/worker/jobs/claim</text>
+
+    <!-- Step 8: Backend queries database -->
+    <line x1="425" y1="360" x2="600" y2="360" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="470" y="355" font-size="11" fill="#333">8. SELECT &amp; UPDATE</text>
+    <text x="470" y="370" font-size="11" fill="#333">(atomic dequeue)</text>
+    <text x="470" y="385" font-size="11" fill="#333">state: Queued → Building</text>
+
+    <!-- Step 9: Database returns job details -->
+    <line x1="600" y1="405" x2="425" y2="405" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="480" y="420" font-size="11" fill="#666">9. Job details</text>
+
+    <!-- Step 10: Backend returns job to Worker -->
+    <line x1="425" y1="445" x2="785" y2="445" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="570" y="440" font-size="11" fill="#666">10. Job assignment</text>
+
+    <!-- Step 11: Worker creates VM -->
+    <line x1="785" y1="480" x2="950" y2="480" stroke="#006400" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="830" y="475" font-size="11" fill="#006400">11. Create VM instance</text>
+
+    <!-- Step 12: Hypervisor creates VM -->
+    <rect x="950" y="500" width="100" height="30" fill="#E8DAEF" stroke="#8E44AD" stroke-width="2" rx="3"/>
+    <text x="1000" y="520" font-size="10" text-anchor="middle">VM Creation</text>
+
+    <!-- Step 13: Worker executes scripts via SSH -->
+    <rect x="785" y="550" width="120" height="30" fill="#D5F4E6" stroke="#27AE60" stroke-width="2" rx="3"/>
+    <text x="845" y="570" font-size="10" text-anchor="middle">Execute scripts (SSH)</text>
+
+    <!-- Step 14: Worker sends progress update -->
+    <line x1="785" y1="600" x2="425" y2="600" stroke="#FF6600" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="560" y="595" font-size="11" fill="#FF6600">14. POST /api/jobs/{id}/progress</text>
+    <text x="560" y="610" font-size="11" fill="#FF6600">(stage, percentage, logs)</text>
+
+    <!-- Step 15: Backend updates database -->
+    <line x1="425" y1="630" x2="600" y2="630" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="475" y="625" font-size="11" fill="#333">15. UPDATE VmRequest</text>
+    <text x="475" y="640" font-size="11" fill="#333">(progress, last_update_time)</text>
+
+    <!-- Step 16: Ack -->
+    <line x1="600" y1="660" x2="425" y2="660" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <line x1="425" y1="680" x2="785" y2="680" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="580" y="675" font-size="11" fill="#666">16. ACK</text>
+
+    <!-- Note: Progress updates must be < 10 min apart -->
+    <rect x="720" y="710" width="260" height="55" fill="#FFE5E5" stroke="#CC0000" stroke-width="1" rx="3"/>
+    <text x="850" y="730" font-size="11" font-weight="bold" text-anchor="middle" fill="#CC0000">CRITICAL: Heartbeat timeout (configurable, default 10 min)</text>
+    <text x="850" y="747" font-size="10" text-anchor="middle">Worker sends heartbeat every 60s; backend runs</text>
+    <text x="850" y="762" font-size="10" text-anchor="middle">markStaleJobsAsFailed if heartbeat gap exceeded</text>
+
+    <!-- Step 17: Worker sends EXPORTING progress update — backend detects stage name and transitions state -->
+    <line x1="785" y1="790" x2="425" y2="790" stroke="#FF6600" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="560" y="785" font-size="11" fill="#FF6600">17. PATCH /api/worker/jobs/{id}/progress</text>
+    <text x="560" y="800" font-size="11" fill="#FF6600">(stage=EXPORTING, percent=77)</text>
+
+    <line x1="425" y1="820" x2="600" y2="820" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="475" y="815" font-size="11" fill="#333">18. UPDATE state: BUILDING→EXPORTING</text>
+    <line x1="600" y1="840" x2="425" y2="840" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <line x1="425" y1="860" x2="785" y2="860" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+
+    <!-- Step 19: Worker builds OVA on Proxmox via SSH (qemu-img + tar) -->
+    <line x1="785" y1="895" x2="950" y2="895" stroke="#006400" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="830" y="890" font-size="11" fill="#006400">19. SSH: qemu-img convert + tar OVA</text>
+
+    <!-- Step 20: Worker SFTP transfers OVA from Proxmox to worker local path -->
+    <line x1="950" y1="925" x2="785" y2="925" stroke="#006400" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="830" y="920" font-size="11" fill="#006400">20. SFTP: OVA → worker export path</text>
+
+    <!-- SFTP completes — OVA now on worker local disk, no separate actor needed -->
+
+    <!-- Step 22: Worker registers completion -->
+    <line x1="785" y1="1005" x2="425" y2="1005" stroke="#006400" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="560" y="1000" font-size="11" fill="#006400">22. POST /api/worker/jobs/{id}/complete</text>
+    <text x="560" y="1015" font-size="11" fill="#006400">(OVA path, SHA-256, provenance, flag hashes)</text>
+
+    <!-- Step 23: Backend validates state -->
+    <rect x="425" y="1015" width="100" height="50" fill="#D4E6F1" stroke="#2874A6" stroke-width="2" rx="3"/>
+    <text x="475" y="1035" font-size="10" text-anchor="middle">23. Validate state</text>
+    <text x="475" y="1050" font-size="10" text-anchor="middle">permits completion</text>
+
+    <!-- Step 24: Backend updates to Ready -->
+    <line x1="425" y1="1085" x2="600" y2="1085" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <text x="475" y="1080" font-size="11" fill="#333">24. UPDATE state=Ready</text>
+    <text x="475" y="1095" font-size="11" fill="#333">INSERT ProvenanceRecord</text>
+
+    <line x1="600" y1="1115" x2="425" y2="1115" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <line x1="425" y1="1135" x2="785" y2="1135" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="580" y="1130" font-size="11" fill="#666">25. Success</text>
+
+    <!-- Polling loop for frontend -->
+    <rect x="35" y="1170" width="280" height="70" fill="#FFF9E6" stroke="#F39C12" stroke-width="2" rx="3"/>
+    <text x="175" y="1190" font-size="11" font-weight="bold" text-anchor="middle" fill="#D68910">Status Updates to Frontend:</text>
+    <text x="175" y="1207" font-size="10" text-anchor="middle">Frontend polls: GET /api/builds/{id}</text>
+    <text x="175" y="1222" font-size="10" text-anchor="middle">Backend queries Database for current state</text>
+    <text x="175" y="1237" font-size="10" text-anchor="middle">User sees: Queued → Building → Exporting → Ready</text>
+
+    <!-- Step 26-27: Frontend polls -->
+    <line x1="250" y1="1270" x2="425" y2="1270" stroke="#9932CC" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+    <text x="310" y="1265" font-size="11" fill="#9932CC">26. GET /api/builds/{id} (periodic)</text>
+
+    <line x1="425" y1="1295" x2="600" y2="1295" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="475" y="1290" font-size="11" fill="#333">27. Query state</text>
+
+    <line x1="600" y1="1315" x2="425" y2="1315" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <line x1="425" y1="1330" x2="250" y2="1330" stroke="#666" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrowhead-return)"/>
+    <text x="485" y="1325" font-size="11" fill="#666">28. Return current state</text>
+
+  </g>
+
+</svg>

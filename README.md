@@ -2,6 +2,8 @@
 
 A platform for deterministic generation of vulnerable virtual machines for cybersecurity education and training. Build vulnerable training environments with full provenance tracking and isolated execution.
 
+> **Warning:** the vulnerability scripts in `scripts/` are intentionally vulnerable. Use them only in isolated lab environments, never on production or internet-facing systems.
+
 ## Repository layout
 
 | Path | Role |
@@ -10,6 +12,7 @@ A platform for deterministic generation of vulnerable virtual machines for cyber
 | `vmgen-frontend/` | Vue 3 + Vite SPA |
 | `vmgen-worker/` | Python build worker (Proxmox + pipeline); see `vmgen-worker/SETUP.txt` |
 | `docker/` | Full Docker Compose deployment (PostgreSQL, API, frontend, and worker) |
+| `docs/` | Architecture, operations notes, diagrams and the interactive architecture explorer — see [docs/README.md](docs/README.md) |
 
 ## Project concept
 

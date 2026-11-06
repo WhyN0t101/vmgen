@@ -1,0 +1,88 @@
+@startuml Normal Build Flow
+
+title Normal Build Flow
+
+skinparam sequenceArrowThickness 1.5
+skinparam roundcorner 5
+skinparam sequenceParticipantBorderThickness 1.5
+skinparam sequenceParticipantBackgroundColor #E8F4F8
+skinparam noteBorderColor #DAA520
+skinparam noteBackgroundColor #FFFACD
+skinparam sequenceGroupBorderThickness 1
+skinparam sequenceLifeLineBorderColor #999999
+skinparam sequenceMessageAlign left
+
+actor       "User"               as U
+participant "Web Frontend"       as FE
+participant "Backend API"        as BE
+participant "Automation Worker"  as W
+participant "Proxmox Hypervisor" as PX
+
+== Build Submission ==
+
+U  -> FE : Configure scenario\n(template, scripts, parameters)
+FE -> BE : POST /api/builds
+BE --> FE : 201 Created {requestId, state=QUEUED}
+FE --> U  : Redirect to build status page
+
+== Job Claiming ==
+
+W  -> BE : POST /api/worker/jobs/claim
+note right : HTTP 204 = queue empty;\nworker sleeps then retries.
+BE --> W  : 200 OK — full build spec\n(scripts + resolved parameters,\nbuildSeed, sshAuthMethod)
+
+== VM Provisioning (Stages 2–5) ==
+
+W  -> PX : Clone template VM (full copy)
+W  -> BE : PATCH …/progress (stage=CONFIGURE_NETWORK)
+W  -> PX : Attach isolated bridge\nInject ephemeral cloud-init SSH key
+W  -> PX : Start VM
+W  -> PX : Poll guest agent for IP (up to 120s)\nAwait SSH daemon (up to 300s)\nvia Proxmox jump host
+
+== Script Execution & Flag Placement (Stages 6–11) ==
+
+loop Each script (pre-resolved execution order)
+  W  -> PX : SSH: prepend param exports\n+ pipe script to bash -s
+  W  -> BE : PATCH …/progress (stage=EXECUTE_SCRIPTS i/n)
+end
+
+W  -> BE : POST …/derive-flags {timestamp}
+BE --> W  : {rawFlags per script, vmLoginPassword}
+
+W  -> PX : SSH: write each flag to declared path\nverify by read-back
+
+W  -> PX : SSH: sanitise VM\n(remove keys, host certs, logs,\nreset credentials, portable netplan)
+W  -> PX : ACPI shutdown\nRemove network interfaces
+
+== OVA Export (Stages 12–13) ==
+
+W  -> BE : PATCH …/progress (stage=EXPORTING)
+note right : Backend detects "EXPORTING" stage\nand transitions state BUILDING→EXPORTING.
+
+W  -> PX : SSH: manual export (qm exportovf removed in PVE 9.x)\nsudo pvesm path → sudo qemu-img convert --salvage -O vmdk\n+ generate OVF 1.0 descriptor → tar to vm.ova
+PX --> W  : SFTP: vm.ova → worker export path\n(or direct write when co-located on shared storage)
+W  -> W  : Compute SHA-256 of OVA
+
+== Completion (Stages 14–16) ==
+
+W  -> W  : Assemble provenance manifest\n(template hash, script hashes,\nexecution records, flag timestamp)
+
+W  -> BE : POST …/complete\n{ovaPath, ovaChecksum, provenance,\nflagHashes — SHA-256 only, never raw}
+note right : Retries up to 3× (5s back-off).
+
+BE -> BE : Re-derive expected flag hashes\nConstant-time comparison
+BE --> W  : 200 OK — state transitions to READY
+
+W  -> PX : Delete build VM (cleanup)
+
+== Frontend Status Polling ==
+
+loop Every 2s while QUEUED / BUILDING / EXPORTING
+  FE -> BE : GET /api/builds/{id}
+  BE --> FE : {state, currentWorkerStage, progressPercent}
+  FE --> U  : Update progress bar
+end
+
+FE --> U : state=READY\nShow OVA download + flag submission
+
+@enduml

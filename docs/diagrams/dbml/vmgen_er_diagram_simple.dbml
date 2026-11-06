@@ -1,0 +1,71 @@
+// VMGen Core Data Model — ER Diagram (Simplified: structure only, no descriptive attributes)
+// Full annotated version: vmgen_er_diagram.dbml
+
+Table users {
+  id uuid [primary key]
+}
+
+Table vulnerability_categories {
+  id uuid [primary key]
+}
+
+Table templates {
+  id uuid [primary key]
+}
+
+Table scripts {
+  id uuid [primary key]
+  category_id uuid
+}
+
+Table vm_requests {
+  id uuid [primary key]
+  user_id uuid
+  template_id uuid
+}
+
+Table vm_request_scripts {
+  vm_request_id uuid
+  script_id uuid
+
+  indexes {
+    (vm_request_id, script_id) [pk]
+  }
+}
+
+Table provenance_records {
+  id uuid [primary key]
+  vm_request_id uuid [unique]
+}
+
+Table flags {
+  id uuid [primary key]
+  vm_request_id uuid
+  script_id uuid
+}
+
+Table submission_attempts {
+  id bigserial [primary key]
+  flag_id uuid
+  user_id uuid
+}
+
+// =========================
+// Relationships
+// =========================
+
+Ref: scripts.category_id > vulnerability_categories.id
+
+Ref: vm_requests.user_id > users.id
+Ref: vm_requests.template_id > templates.id
+
+Ref: vm_request_scripts.vm_request_id > vm_requests.id [delete: cascade]
+Ref: vm_request_scripts.script_id > scripts.id
+
+Ref: provenance_records.vm_request_id - vm_requests.id
+
+Ref: flags.vm_request_id > vm_requests.id [delete: cascade]
+Ref: flags.script_id > scripts.id
+
+Ref: submission_attempts.flag_id > flags.id [delete: cascade]
+Ref: submission_attempts.user_id > users.id
